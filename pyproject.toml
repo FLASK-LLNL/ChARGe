@@ -1,0 +1,16 @@
+[project]
+name = "charge"
+version = "0.1.0"
+description = "ChARGe: Chemistry-tool for Automated Reasoning and Generation"
+authors = []
+license = {file = "LICENSE"}
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "mcp>=1.9.0",
+    "jsonschema>=4.17.3",]
+
+ollama = ["ollama>=0.5.0"]
+gemini = ["google-genai >=1.19.0"]
+
+all = ["charge[ollama,gemini]"]
