@@ -15,13 +15,13 @@ import argparse
 import httpx
 
 parser = argparse.ArgumentParser(description="Molecule Generation")
-backends = ["openai", "gemini", "ollama", "livchat"]
+backends = ["openai", "gemini", "ollama", "livai", "livchat"]
 parser.add_argument(
     "--backend",
     type=str,
     default="openai",
     choices=backends,
-    help="Backend to use: openai or gemini",
+    help="Backend to use: openai, gemini, livai, livchat",
 )
 
 args = parser.parse_args()
@@ -39,7 +39,7 @@ async def main():
         "family": ModelFamily.UNKNOWN,
         "structured_output": True,
     }
-    if backend == "openai" or backend == "gemini" or backend == "livchat":
+    if backend == "openai" or backend == "gemini" or backend == "livai" or backend == "livchat":
         from autogen_ext.models.openai import OpenAIChatCompletionClient
 
         kwargs = {}
@@ -48,8 +48,10 @@ async def main():
             model = "gpt-4"
             kwargs["parallel_tool_calls"] = False
             kwargs["reasoning_effort"] = "high"
-        elif backend == "livchat":
+        elif backend == "livai" or backend == "livchat":
             API_KEY = os.getenv("OPENAI_API_KEY")
+            BASE_URL = os.getenv("LIVAI_BASE_URL")
+            assert BASE_URL is not None, "LivAI Base URL must be set in environment variable"
             model = "gpt-4.1"
             kwargs["base_url"] = "https://livai-api.llnl.gov/v1"
             kwargs["http_client"] = httpx.AsyncClient(verify=False)
