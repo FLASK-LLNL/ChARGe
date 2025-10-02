@@ -9,11 +9,31 @@ from charge._to_mcp import experiment_to_mcp
 
 
 class Client:
-    def __init__(self, experiment_type: Type[Experiment], path: str = "."):
+    def __init__(
+        self, experiment_type: Experiment, path: str = ".", max_retries: int = 3
+    ):
         self.experiment_type = experiment_type
         self.path = path
+        self.max_retries = max_retries
+        self._setup()
+
+    def _setup(self):
+        class_info = inspect_class(self.experiment_type)
+
+        methods = inspect.getmembers(self.experiment_type, predicate=inspect.isfunction)
+
+        verifier_methods = []
+        for name, method in methods:
+            if is_verifier(method):
+                verifier_methods.append(method)
+        if len(verifier_methods) < 1:
+            raise ValueError(
+                f"Experiment class {self.experiment_type.__name__} must have at least one verifier method."
+            )
+        self.verifier_methods = verifier_methods
 
     def setup_mcp_servers(self):
+
         class_info = inspect_class(self.experiment_type)
 
         methods = inspect.getmembers(self.experiment_type, predicate=inspect.isfunction)
