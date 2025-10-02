@@ -42,9 +42,14 @@ class AutoGenClient(Client):
             model_client (Optional[ChatCompletionClient], optional): Pre-initialized model client. If provided, `backend`, `model`, and `api_key` are ignored. Defaults to None.
             api_key (Optional[str], optional): API key for the model. Defaults to None.
             model_info (Optional[dict], optional): Additional model info. Defaults to None.
-            model_kwargs (Optional[dict], optional): Additional keyword arguments for the model client. Defaults to None.
-            server_path (Optional[str], optional): Path to an existing MCP server script. If provided, this server will be used instead of generating new ones. Defaults to None.
-            server_url (Optional[str], optional): URL of an existing MCP server. If provided, this server will be used instead of generating new ones. Defaults to None.
+            model_kwargs (Optional[dict], optional): Additional keyword arguments for the model client.
+                                                     Defaults to None.
+            server_path (Optional[str], optional): Path to an existing MCP server script. If provided, this
+                                                   server will be used instead of generating
+                                                   new ones. Defaults to None.
+            server_url (Optional[str], optional): URL of an existing MCP server over the SSE transport.
+                                                  If provided, this server will be used instead of generating
+                                                  new ones. Defaults to None.
             server_kwargs (Optional[dict], optional): Additional keyword arguments for the server client. Defaults to None.
             max_tool_calls (int, optional): Maximum number of tool calls per task. Defaults to 15.
         Raises:

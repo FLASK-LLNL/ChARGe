@@ -18,9 +18,9 @@ class Client:
         self._setup()
 
     def _setup(self):
-        class_info = inspect_class(self.experiment_type)
-
-        methods = inspect.getmembers(self.experiment_type, predicate=inspect.isfunction)
+        cls_info = inspect_class(self.experiment_type)
+        methods = inspect.getmembers(self.experiment_type, predicate=inspect.ismethod)
+        name = cls_info["name"]
 
         verifier_methods = []
         for name, method in methods:
@@ -28,15 +28,16 @@ class Client:
                 verifier_methods.append(method)
         if len(verifier_methods) < 1:
             raise ValueError(
-                f"Experiment class {self.experiment_type.__name__} must have at least one verifier method."
+                f"Experiment class {name} must have at least one verifier method."
             )
         self.verifier_methods = verifier_methods
 
     def setup_mcp_servers(self):
 
         class_info = inspect_class(self.experiment_type)
+        name = class_info["name"]
 
-        methods = inspect.getmembers(self.experiment_type, predicate=inspect.isfunction)
+        methods = inspect.getmembers(self.experiment_type, predicate=inspect.ismethod)
 
         verifier_methods = []
         hypothesis_methods = []
@@ -47,19 +48,16 @@ class Client:
                 hypothesis_methods.append(method)
         if len(verifier_methods) < 1:
             raise ValueError(
-                f"Experiment class {self.experiment_type.__name__} must have at least one verifier method."
+                f"Experiment class {name} must have at least one verifier method."
             )
         if len(hypothesis_methods) > 1:
-            filename = os.path.join(
-                self.path, f"{self.experiment_type.__name__}_hypotheses.py"
-            )
+            filename = os.path.join(self.path, f"{name}_hypotheses.py")
             with open(filename, "w") as f:
                 f.write(experiment_to_mcp(class_info, hypothesis_methods))
             self.hypothesis_server_path = filename
 
-        verifier_filename = os.path.join(
-            self.path, f"{self.experiment_type.__name__}_verifiers.py"
-        )
+        # Not used but generated for future
+        verifier_filename = os.path.join(self.path, f"{name}_verifiers.py")
         with open(verifier_filename, "w") as f:
             f.write(experiment_to_mcp(class_info, verifier_methods))
         self.verifier_server_path = verifier_filename
