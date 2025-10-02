@@ -1,6 +1,18 @@
 # ChARGe
 **Ch**emical tool **A**ugmented **R**easoning models for **Ge**nerating molecules and reactions
 
+## Installation
+
+To install the package, clone the repository and run:
+```bash
+pip install -e .
+```
+
+Or install directly from GitHub:
+```bash
+pip install git+https://github.com/FLASK-LLNL/ChARGe.git
+```
+
 
 ## Running an Experiment
 
@@ -8,11 +20,6 @@
 
 import argparse
 from charge.clients import GeminiClient
-
-myexperiment = LeadMoleculeOptimization(
-   system_prompt=args.system_prompt,
-   hypothesis_prompt=args.user_prompt
-)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -25,9 +32,8 @@ if __name__ == "__main__":
         hypothesis_prompt=args.user_prompt
     )
 
-    runner = GeminiClient()
-    runner.setup_mcp_servers(myexperiment)
-    results = runner.run(myexperiment)
+    runner = GeminiClient(experiment_type=myexperiment)
+    results = runner.run()
     print(results)
 
     while True:
@@ -37,7 +43,7 @@ if __name__ == "__main__":
 
 ```
 
-## Defining a Custom Experiment
+## Defining an Experiment
 
 ```python
 from charge.experiments import Experiment

@@ -25,7 +25,7 @@ For example, to use `autogen` with `ollama` backend and `gpt-oss:latest` model, 
 
 ```bash
 python main.py --client autogen --backend ollama --model gpt-oss:latest --server-path reaction_server.py --user-prompt "Generate a new reaction SMARTS and reactants for the target molecule: CC(=O)OC1=CC=CC=C1C(=O)O" 
-```
+``` 
 
 
 ## Notes
