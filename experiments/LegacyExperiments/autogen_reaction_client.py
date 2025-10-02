@@ -30,8 +30,7 @@ if not backend:
     raise ValueError(f"Backend must be one of {backends}")
 
 
-async def main() -> None:
-
+async def main():
     if backend == "openai" or backend == "gemini":
         from autogen_ext.models.openai import OpenAIChatCompletionClient
 
@@ -57,33 +56,37 @@ async def main() -> None:
             },
         )
 
-    mol_server = StdioServerParams(command="python3", args=["mol_server.py"], env=None)
+    reaction_server = StdioServerParams(
+        command="python3", args=["reaction_server.py"], env=None
+    )
 
     system_prompt = (
-        "You are a helpful SMILES generator "
-        + "that can generate new molecules in a SMILES format and optimize"
-        + " for density and synthetic accessibility."
+        "You are an expert retrosynthesis and chemical reaction generator "
+        + "that can propose new reactions by generating Reaction SMARTS"
+        + "and SMILES molecules. Make sure the SMILES strings are valid first."
+        + "If stuck, try different reaction SMARTS or reactants."
+        + " Generate a reaction SMARTS and reactants for the given molecule."
+        + " For each reaction SMARTS verify it."
+        + " If the reaction SMARTS is valid, check if the reactants are valid SMILES."
+        + " If they are valid, check if the reaction can be performed"
+        + " Use the diagnoise tools to fix any issues that arise."
+        + " and return the reaction SMARTS, reactants, and products."
+        + " Prefer reactions that are more likely to be performed in a lab "
+        + " setting. \n\n"
     )
     print("System prompt:", system_prompt)
 
     print("Prompt: \n")
-    chat_prompt = (
-        "Generate a new SMILES string"
-        + " for molecules similar to CC(=O)O[C@H](C)CCN. For each molecules you suggest "
-        + " verify the SMILES,"
-        + " check if it already known, and calculate its density and"
-        + " synthetic accessibility. Only return molecules with higher density and"
-        + " the same or lower synthetic accessibility."
-        + " If a molecule is known or doesn't fit the criteria, move on and"
-        + " generate a different one and try again."
-        + " Output a list of the unique molecules \n\n"
+    prompt = (
+        "Generate a new reaction SMARTS and reactants"
+        + " for the product c1cc(ccc1N)O \n\n"
     )
-    print(chat_prompt)
+    print(prompt)
 
-    async with McpWorkbench(mol_server) as workbench:  # type: ignore
+    async with McpWorkbench(reaction_server) as workbench:  # type: ignore
 
         agent_loop = AssistantAgent(
-            name="Molecule_Generator",
+            name="Reaction_Generator",
             model_client=model_client,
             system_message=system_prompt,
             workbench=workbench,
@@ -91,7 +94,7 @@ async def main() -> None:
             max_tool_iterations=15,
         )
         result = await agent_loop.run(
-            task=chat_prompt,
+            task=prompt,
         )
         assert isinstance(result.messages[-1], TextMessage)
 
