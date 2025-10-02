@@ -37,7 +37,9 @@ def experiment_to_mcp(class_info, methods_list) -> str:
         return_str += "@mcp.tool()\n"
         return_str += f"def {method.__name__}({', '.join(params)}){return_annot}:\n"
         if method.__doc__:
-            docstring = textwrap.indent(f'"""{method.__doc__}"""', "    ")
+            docstring = textwrap.indent(
+                f'"""{textwrap.dedent(method.__doc__)}"""', "    "
+            )
             return_str += f"{docstring}\n"
         return_str += f"    return obj.{method.__name__}({', '.join(call_args)})\n\n"
 
