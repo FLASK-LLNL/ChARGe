@@ -12,9 +12,10 @@ from autogen_agentchat.messages import TextMessage
 import asyncio
 import os
 import argparse
+import httpx
 
 parser = argparse.ArgumentParser(description="Molecule Generation")
-backends = ["openai", "gemini", "ollama"]
+backends = ["openai", "gemini", "ollama", "livchat"]
 parser.add_argument(
     "--backend",
     type=str,
@@ -39,22 +40,31 @@ async def main() -> None:
         "structured_output": True,
     }
 
-    if backend == "openai" or backend == "gemini":
+    if backend == "openai" or backend == "gemini" or backend == "livchat":
         from autogen_ext.models.openai import OpenAIChatCompletionClient
 
+        kwargs = {}
         if backend == "openai":
             API_KEY = os.getenv("OPENAI_API_KEY")
             model = "gpt-4"
+            kwargs["parallel_tool_calls"] = False
+            kwargs["reasoning_effort"] = "high"
+        elif backend == "livchat":
+            API_KEY = os.getenv("OPENAI_API_KEY")
+            model = "gpt-4.1"
+            kwargs["base_url"] = "https://livai-api.llnl.gov/v1"
+            kwargs["http_client"] = httpx.AsyncClient(verify=False)
         else:
             API_KEY = os.getenv("GOOGLE_API_KEY")
             model = "gemini-flash-latest"
+            kwargs["parallel_tool_calls"] = False
+            kwargs["reasoning_effort"] = "high"
         assert API_KEY is not None, "API key must be set in environment variable"
         model_client = OpenAIChatCompletionClient(
             model=model,
             api_key=API_KEY,
-            parallel_tool_calls=False,
-            reasoning_effort="high",
             model_info=model_info,
+            **kwargs,
         )
     else:
         from autogen_ext.models.ollama import OllamaChatCompletionClient
