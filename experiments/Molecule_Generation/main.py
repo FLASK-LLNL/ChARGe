@@ -20,11 +20,20 @@ parser.add_argument(
     "--model", type=str, default="gpt-4", help="Model to use for the autogen backend"
 )
 
+parser.add_argument(
+    "--server-path",
+    type=str,
+    default="mol_server.py",
+    help="Path to an existing MCP server script",
+)
+
 args = parser.parse_args()
 
 if __name__ == "__main__":
 
     myexperiment = LeadMoleculeOptimization(lead_molecule=args.lead_molecule)
+    server_path = args.server_path
+    assert server_path is not None, "Server path must be provided"
 
     if args.client == "gemini":
         from charge.clients.gemini import GeminiClient
@@ -49,7 +58,9 @@ if __name__ == "__main__":
             elif backend == "livai" or backend == "livchat":
                 API_KEY = os.getenv("OPENAI_API_KEY")
                 BASE_URL = os.getenv("LIVAI_BASE_URL")
-                assert BASE_URL is not None, "LivAI Base URL must be set in environment variable"
+                assert (
+                    BASE_URL is not None
+                ), "LivAI Base URL must be set in environment variable"
                 model = "gpt-4.1"
                 kwargs["base_url"] = BASE_URL
                 kwargs["http_client"] = httpx.AsyncClient(verify=False)
@@ -65,12 +76,9 @@ if __name__ == "__main__":
             backend=backend,
             api_key=API_KEY,
             model_kwargs=kwargs,
+            server_path=server_path,
         )
 
-    # results = asyncio.run(runner.run(myexperiment))
-    # print(results)
+    results = asyncio.run(runner.run())
 
-    # while True:
-    #     cont = input("Additional refinement? ...")
-    #     results = asyncio.run(runner.refine(cont))
-    #     print(results)
+    print(f"Experiment completed. Results: {results}")

@@ -6,6 +6,7 @@ from charge.inspector import inspect_class
 import inspect
 import os
 from charge._to_mcp import experiment_to_mcp
+import warnings
 
 
 class Client:
@@ -27,9 +28,12 @@ class Client:
             if is_verifier(method):
                 verifier_methods.append(method)
         if len(verifier_methods) < 1:
-            raise ValueError(
-                f"Experiment class {name} must have at least one verifier method."
+            warnings.warn(
+                f"Experiment class {name} has no verifier methods. "
+                + "It's recommended to have at least one verifier method."
+                + "Automatic verification will fail without any verifier methods."
             )
+
         self.verifier_methods = verifier_methods
 
     def setup_mcp_servers(self):
@@ -57,10 +61,10 @@ class Client:
             self.hypothesis_server_path = filename
 
         # Not used but generated for future
-        verifier_filename = os.path.join(self.path, f"{name}_verifiers.py")
-        with open(verifier_filename, "w") as f:
-            f.write(experiment_to_mcp(class_info, verifier_methods))
-        self.verifier_server_path = verifier_filename
+        # verifier_filename = os.path.join(self.path, f"{name}_verifiers.py")
+        # with open(verifier_filename, "w") as f:
+        #     f.write(experiment_to_mcp(class_info, verifier_methods))
+        # self.verifier_server_path = verifier_filename
 
     @abstractmethod
     async def run(self):

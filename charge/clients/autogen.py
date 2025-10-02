@@ -30,6 +30,7 @@ class AutoGenClient(Client):
         server_url: Optional[str] = None,
         server_kwargs: Optional[dict] = None,
         max_tool_calls: int = 15,
+        check_response: bool = False,
     ):
         """Initializes the AutoGenClient.
 
@@ -52,6 +53,8 @@ class AutoGenClient(Client):
                                                   new ones. Defaults to None.
             server_kwargs (Optional[dict], optional): Additional keyword arguments for the server client. Defaults to None.
             max_tool_calls (int, optional): Maximum number of tool calls per task. Defaults to 15.
+            check_response (bool, optional): Whether to check the response using verifier methods.
+                                             Defaults to False (Will be set to True in the future).
         Raises:
             ValueError: If neither `server_path` nor `server_url` is provided and MCP servers cannot be generated.
         """
@@ -62,6 +65,7 @@ class AutoGenClient(Client):
         self.model_info = model_info
         self.model_kwargs = model_kwargs if model_kwargs is not None else {}
         self.max_tool_calls = max_tool_calls
+        self.check_response = check_response
 
         if model_client is not None:
             self.model_client = model_client
@@ -100,6 +104,7 @@ class AutoGenClient(Client):
                 self.server = StdioServerParams(command="python3", args=[server_path])
             elif server_url is not None:
                 self.server = SseServerParams(url=server_url, **(server_kwargs or {}))
+        self.messages = []
 
     async def run(self):
         system_prompt = self.experiment_type.get_system_prompt()
@@ -115,6 +120,14 @@ class AutoGenClient(Client):
             )
 
             result = await agent.run(task=user_prompt)
+
+            for msg in result.messages:
+                if isinstance(msg, TextMessage):
+                    self.messages.append(msg.content)
+
+            if not self.check_response:
+                assert isinstance(result.messages[-1], TextMessage)
+                return result.messages[-1].content
 
             def check_invalid_response(result) -> bool:
                 answer_invalid = False

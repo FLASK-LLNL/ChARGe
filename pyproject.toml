@@ -8,7 +8,9 @@ readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
     "mcp>=1.9.0",
-    "jsonschema>=4.17.3",]
+    "jsonschema>=4.17.3",
+    "loguru>=0.7.0",
+]
 
 [tool.setuptools]
 packages = ["charge"]
