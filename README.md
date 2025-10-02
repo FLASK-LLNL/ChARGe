@@ -26,6 +26,7 @@ if __name__ == "__main__":
     )
 
     runner = GeminiClient()
+    runner.setup_mcp_servers(myexperiment)
     results = runner.run(myexperiment)
     print(results)
 
