@@ -58,6 +58,36 @@ class AutoGenClient(Client):
         self.model_kwargs = model_kwargs if model_kwargs is not None else {}
         self.max_tool_calls = max_tool_calls
 
+        if model_client is not None:
+            self.model_client = model_client
+        else:
+            model_info = {
+                "vision": False,
+                "function_calling": True,
+                "json_output": True,
+                "family": ModelFamily.UNKNOWN,
+                "structured_output": True,
+            }
+            if backend == "ollama":
+                from autogen_ext.models.ollama import OllamaChatCompletionClient
+
+                self.model_client = OllamaChatCompletionClient(
+                    model=model,
+                    model_info=model_info,
+                )
+            else:
+                from autogen_ext.models.openai import OpenAIChatCompletionClient
+
+                assert (
+                    api_key is not None
+                ), "API key must be provided for OpenAI or Gemini backend"
+                self.model_client = OpenAIChatCompletionClient(
+                    model=model,
+                    api_key=api_key,
+                    model_info=model_info,
+                    **self.model_kwargs,
+                )
+
         if server_path is None and server_url is None:
             self.setup_mcp_servers()
         else:
@@ -73,7 +103,7 @@ class AutoGenClient(Client):
             # TODO: Convert this to use custom agent in the future
             agent = AssistantAgent(
                 name="Assistant",
-                model_client=self.model,
+                model_client=self.model_client,
                 system_message=system_prompt,
                 workbench=workbench,
                 max_tool_iterations=self.max_tool_calls,
@@ -119,3 +149,8 @@ class AutoGenClient(Client):
                 )
             else:
                 return result.messages[-1].content
+
+    async def refine(self, feedback: str):
+        raise NotImplementedError(
+            "TODO: Multi-turn refine currently not supported. - S.Z."
+        )

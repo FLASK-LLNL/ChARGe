@@ -15,25 +15,26 @@ class LMOExperiment(Experiment):
         self,
         user_prompt,
         lead_molecule: str,
+        system_prompt=SYSTEM_PROMPT,
         verification_prompt=None,
         refinement_prompt=None,
     ):
 
         super().__init__(
-            SYSTEM_PROMPT,
-            user_prompt,
-            verification_prompt,
-            refinement_prompt,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            verification_prompt=verification_prompt,
+            refinement_prompt=refinement_prompt,
         )
 
         print("LMOExperiment initialized with the provided prompts.")
         self.lead_molecule = lead_molecule
-        self.system_prompt = SYSTEM_PROMPT
+        self.system_prompt = system_prompt
         self.user_prompt = user_prompt
         self.verification_prompt = verification_prompt
         self.refinement_prompt = refinement_prompt
         self.max_synth_score = helper_funcs.get_synthesizability(lead_molecule)
-        self.min_density
+        self.min_density = helper_funcs.get_density(lead_molecule)
 
     @charge.hypothesis
     def canonicalize_smiles(self, smiles: str) -> str:
