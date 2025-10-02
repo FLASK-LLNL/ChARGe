@@ -31,30 +31,37 @@ if not backend:
 
 
 async def main() -> None:
+    model_info = {
+        "vision": False,
+        "function_calling": True,
+        "json_output": True,
+        "family": ModelFamily.UNKNOWN,
+        "structured_output": True,
+    }
 
     if backend == "openai" or backend == "gemini":
         from autogen_ext.models.openai import OpenAIChatCompletionClient
 
         if backend == "openai":
             API_KEY = os.getenv("OPENAI_API_KEY")
+            model = "gpt-4"
         else:
             API_KEY = os.getenv("GOOGLE_API_KEY")
+            model = "gemini-flash-latest"
         assert API_KEY is not None, "API key must be set in environment variable"
         model_client = OpenAIChatCompletionClient(
-            model="gpt-4", api_key=API_KEY, parallel_tool_calls=False
+            model=model,
+            api_key=API_KEY,
+            parallel_tool_calls=False,
+            reasoning_effort="high",
+            model_info=model_info,
         )
     else:
         from autogen_ext.models.ollama import OllamaChatCompletionClient
 
         model_client = OllamaChatCompletionClient(
             model="gpt-oss:latest",
-            model_info={
-                "vision": False,
-                "function_calling": True,
-                "json_output": True,
-                "family": ModelFamily.UNKNOWN,
-                "structured_output": True,
-            },
+            model_info=model_info,
         )
 
     mol_server = StdioServerParams(command="python3", args=["mol_server.py"], env=None)
