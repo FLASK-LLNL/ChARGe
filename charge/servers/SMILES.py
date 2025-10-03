@@ -60,20 +60,6 @@ def verify_smiles(smiles: str) -> bool:
     except Exception as e:
         return False
 
-# @mcp.tool()
-# def verify_smiles(smiles: str) -> Tuple[bool, str]:
-#     """
-#     Verify if a SMILES string is valid.
-#     Returns a tuple of (bool, str).
-#     The bool indicates if the SMILES is valid, and the str is an error message if it is not.
-#     """
-#     try:
-#         logger.info(f"Verifying SMILES: {smiles}")
-#         Chem.MolFromSmiles(smiles)
-#         return True, "SMILES is valid."
-#     except Exception as e:
-#         return False, f"Invalid SMILES string: {e}"
-
 
 @SMILES_mcp.tool()
 def get_synthesizability(smiles: str) -> float:
