@@ -75,5 +75,9 @@ class Client:
         raise NotImplementedError("Subclasses must implement this method.")
 
     @abstractmethod
+    async def chat(self):
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    @abstractmethod
     async def refine(self, feedback: str):
         raise NotImplementedError("Subclasses must implement this method.")

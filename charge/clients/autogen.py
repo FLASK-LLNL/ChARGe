@@ -12,6 +12,8 @@ import os
 from charge.clients.Client import Client
 from typing import Type, Optional, Dict
 from charge.Experiment import Experiment
+from autogen_agentchat.teams import RoundRobinGroupChat
+from autogen_agentchat.ui import Console
 
 
 class AutoGenClient(Client):
@@ -209,8 +211,10 @@ class AutoGenClient(Client):
             else:
                 return result.messages[-1].content
 
-    async def multi_turn(self, user_prompt: str):
+    async def chat(self):
+        system_prompt = self.experiment_type.get_system_prompt()
 
+        user_prompt = input(">")
         async with McpWorkbench(self.server) as workbench:
             # TODO: Convert this to use custom agent in the future
             agent = AssistantAgent(
@@ -220,10 +224,20 @@ class AutoGenClient(Client):
                 workbench=workbench,
                 max_tool_iterations=self.max_tool_calls,
             )
-            for _ in range(self.max_multi_turns):
-                answer_invalid, result = await self.step(agent, user_prompt)
-                if not answer_invalid:
-                    return result.messages[-1].content
+
+            team = RoundRobinGroupChat(
+                [agent],
+                max_turns=self.max_multi_turns,
+            )
+            while True:
+                stream = team.run_stream(task=user_prompt)
+
+                await Console(stream)
+                user_prompt = input('> (or "exit" to quit): ')
+                if user_prompt.lower() == "exit":
+                    break
+
+        await self.model_client.close()
 
     async def refine(self, feedback: str):
         raise NotImplementedError(
