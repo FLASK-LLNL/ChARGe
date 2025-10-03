@@ -5,31 +5,8 @@
 ## SPDX-License-Identifier: Apache-2.0
 ################################################################################
 
-from mcp.server.fastmcp import FastMCP
-from loguru import logger
-
-mcp = FastMCP("Chemistry and reaction verification MCP Server")
-
-logger.info("Starting Chemistry and reaction verification MCP Server")
-
-# Persistent counter to demonstrate statefulness
-COUNTER = 0
-
-
-@mcp.tool()
-def verify_smiles(smiles: str) -> bool:
-    """
-    Verify if a SMILES string is valid.
-    """
-    try:
-        global COUNTER
-        COUNTER += 1
-        logger.info(f"Verifying SMILES: {smiles} used {COUNTER} times")
-        return True
-    except Exception as e:
-        return False
-
+from charge.servers.SMILES import SMILES_mcp
 
 if __name__ == "__main__":
+    SMILES_mcp.run(transport="sse")
 
-    mcp.run(transport="sse")

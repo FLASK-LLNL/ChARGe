@@ -37,13 +37,18 @@ def canonicalize_smiles(smiles: str) -> str:
         return smiles
 
 
+# Persistent counter to demonstrate statefulness
+SMILES_VERIFICATION_COUNTER = 0
+
 @SMILES_mcp.tool()
 def verify_smiles(smiles: str) -> bool:
     """
     Verify if a SMILES string is valid.
     """
     try:
-        logger.info(f"Verifying SMILES: {smiles}")
+        global SMILES_VERIFICATION_COUNTER
+        SMILES_VERIFICATION_COUNTER += 1
+        logger.info(f"Verifying SMILES: {smiles} used {SMILES_VERIFICATION_COUNTER} times")
         Chem.MolFromSmiles(smiles)
         return True
     except Exception as e:
