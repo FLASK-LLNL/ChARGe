@@ -2,32 +2,17 @@ import argparse
 import asyncio
 from charge.Experiment import Experiment
 import httpx
+from charge.clients.Client import Client
 from charge.clients.autogen import AutoGenClient
 import os
+from typing import Optional
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--lead-molecule", type=str, default="CC(=O)O[C@H](C)CCN")
 parser.add_argument("--server-url", type=str, default="http://127.0.0.1:8000/sse")
-parser.add_argument(
-    "--model",
-    type=str,
-    default="gpt-oss:latest",
-    help="Model to use for the ollama backend",
-)
-parser.add_argument(
-    "--backend",
-    type=str,
-    default="ollama",
-    choices=[
-        "ollama",
-        "openai",
-        "gemini",
-        "livai",
-        "livchat",
-    ],
-    help="Backend to use for the autogen client",
-)
 
+# Add standard CLI arguments
+Client.add_std_parser_arguments(parser)
 
 class UniqueMoleculeExperiment(Experiment):
     def __init__(self, lead_molecule: str):
@@ -75,4 +60,4 @@ if __name__ == "__main__":
 
     results = asyncio.run(runner.run())
 
-    print(f"Experiment completed. Results: {results}")
+    print(f"[{model} orchestrated] Experiment completed. Results: {results}")

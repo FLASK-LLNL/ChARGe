@@ -53,7 +53,7 @@ async def main():
             BASE_URL = os.getenv("LIVAI_BASE_URL")
             assert BASE_URL is not None, "LivAI Base URL must be set in environment variable"
             model = "gpt-4.1"
-            kwargs["base_url"] = "https://livai-api.llnl.gov/v1"
+            kwargs["base_url"] = BASE_URL
             kwargs["http_client"] = httpx.AsyncClient(verify=False)
         else:
             API_KEY = os.getenv("GOOGLE_API_KEY")

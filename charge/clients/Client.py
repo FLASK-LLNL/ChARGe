@@ -1,4 +1,4 @@
-from typing import Type, Dict
+from typing import Type, Dict, Optional
 from abc import ABC, abstractmethod
 from charge.Experiment import Experiment
 from charge._tags import is_verifier, is_hypothesis
@@ -7,6 +7,7 @@ import inspect
 import os
 from charge._to_mcp import experiment_to_mcp
 import warnings
+import argparse
 
 
 class Client:
@@ -85,3 +86,24 @@ class Client:
     @abstractmethod
     async def refine(self, feedback: str):
         raise NotImplementedError("Subclasses must implement this method.")
+
+    def add_std_parser_arguments(parser: argparse.ArgumentParser):
+        parser.add_argument(
+            "--model",
+            type=str,
+            default=None,
+            help="Model to use for the orchestrator",
+        )
+        parser.add_argument(
+            "--backend",
+            type=str,
+            default="ollama",
+            choices=[
+                "ollama",
+                "openai",
+                "gemini",
+                "livai",
+                "livchat",
+            ],
+            help="Backend to use for the orchestrator client",
+        )

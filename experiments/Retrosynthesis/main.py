@@ -2,24 +2,13 @@ import argparse
 import asyncio
 from RetrosynthesisExperiment import RetrosynthesisExperiment as Retrosynthesis
 import os
+from charge.clients.Client import Client
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--lead-molecule", type=str, default="CC(=O)O[C@H](C)CCN")
 parser.add_argument(
     "--client", type=str, default="autogen", choices=["autogen", "gemini"]
 )
-
-parser.add_argument(
-    "--backend",
-    type=str,
-    default="openai",
-    choices=["openai", "gemini", "ollama", "livai", "livchat"],
-    help="Backend to use for the autogen client",
-)
-parser.add_argument(
-    "--model", type=str, default="gpt-4", help="Model to use for the autogen backend"
-)
-
 
 parser.add_argument(
     "--server-path",
@@ -35,6 +24,9 @@ parser.add_argument(
     help="The product to perform retrosynthesis on, "
     + "including any further constraints",
 )
+
+# Add standard CLI arguments
+Client.add_std_parser_arguments(parser)
 
 args = parser.parse_args()
 

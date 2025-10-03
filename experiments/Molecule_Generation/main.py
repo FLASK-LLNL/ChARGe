@@ -2,6 +2,7 @@ import argparse
 import asyncio
 from LMOExperiment import LMOExperiment as LeadMoleculeOptimization
 import os
+from charge.clients.Client import Client
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--lead-molecule", type=str, default="CC(=O)O[C@H](C)CCN")
@@ -10,22 +11,14 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--backend",
-    type=str,
-    default="openai",
-    choices=["openai", "gemini", "ollama", "livai", "livchat"],
-    help="Backend to use for the autogen client",
-)
-parser.add_argument(
-    "--model", type=str, default="gpt-4", help="Model to use for the autogen backend"
-)
-
-parser.add_argument(
     "--server-path",
     type=str,
     default="mol_server.py",
     help="Path to an existing MCP server script",
 )
+
+# Add standard CLI arguments
+Client.add_std_parser_arguments(parser)
 
 args = parser.parse_args()
 

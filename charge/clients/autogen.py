@@ -119,15 +119,16 @@ class AutoGenClient(Client):
                 self.server = SseServerParams(url=server_url, **(server_kwargs or {}))
         self.messages = []
 
-    def configure(model: str, backend: str) -> (str, str, str, Dict[str, str]):
+    def configure(model: Optional[str], backend: str) -> (str, str, str, Dict[str, str]):
         import httpx
 
         kwargs = {}
         API_KEY = None
+        default_model = None
         if backend in ["openai", "gemini", "livai", "livchat"]:
             if backend == "openai":
                 API_KEY = os.getenv("OPENAI_API_KEY")
-                model = "gpt-4"
+                default_model = "gpt-4"
                 kwargs["parallel_tool_calls"] = False
                 kwargs["reasoning_effort"] = "high"
             elif backend == "livai" or backend == "livchat":
@@ -136,14 +137,19 @@ class AutoGenClient(Client):
                 assert (
                     BASE_URL is not None
                 ), "LivAI Base URL must be set in environment variable"
-                model = "gpt-4.1"
+                default_model = "gpt-4.1"
                 kwargs["base_url"] = BASE_URL
                 kwargs["http_client"] = httpx.AsyncClient(verify=False)
             else:
                 API_KEY = os.getenv("GOOGLE_API_KEY")
-                model = "gemini-flash-latest"
+                default_model = "gemini-flash-latest"
                 kwargs["parallel_tool_calls"] = False
                 kwargs["reasoning_effort"] = "high"
+        elif backend in ["ollama"]:
+            default_model = "gpt-oss:latest"
+
+        if not model:
+            model = default_model
         return (model, backend, API_KEY, kwargs)
 
     def check_invalid_response(self, result) -> bool:
