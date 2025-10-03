@@ -3,17 +3,18 @@ try:
     from autogen_core.models import ModelFamily, ChatCompletionClient
     from autogen_ext.tools.mcp import StdioServerParams, McpWorkbench, SseServerParams
     from autogen_agentchat.messages import TextMessage
+    from autogen_agentchat.conditions import HandoffTermination, TextMentionTermination
+    from autogen_agentchat.teams import RoundRobinGroupChat
+    from autogen_agentchat.ui import Console
 except ImportError:
     raise ImportError(
         "Please install the autogen-agentchat package to use this module."
     )
-import asyncio
+
 import os
 from charge.clients.Client import Client
 from typing import Type, Optional, Dict
 from charge.Experiment import Experiment
-from autogen_agentchat.teams import RoundRobinGroupChat
-from autogen_agentchat.ui import Console
 
 
 class AutoGenClient(Client):
@@ -214,7 +215,10 @@ class AutoGenClient(Client):
     async def chat(self):
         system_prompt = self.experiment_type.get_system_prompt()
 
-        user_prompt = input(">")
+        handoff_termination = HandoffTermination(target="user")
+        # Define a termination condition that checks for a specific text mention.
+        text_termination = TextMentionTermination("TERMINATE")
+
         async with McpWorkbench(self.server) as workbench:
             # TODO: Convert this to use custom agent in the future
             agent = AssistantAgent(
@@ -222,20 +226,21 @@ class AutoGenClient(Client):
                 model_client=self.model_client,
                 system_message=system_prompt,
                 workbench=workbench,
-                max_tool_iterations=self.max_tool_calls,
+                max_tool_iterations=1,
             )
 
             team = RoundRobinGroupChat(
                 [agent],
                 max_turns=self.max_multi_turns,
+                termination_condition=handoff_termination | text_termination,
             )
             while True:
-                stream = team.run_stream(task=user_prompt)
-
-                await Console(stream)
                 user_prompt = input('> (or "exit" to quit): ')
                 if user_prompt.lower() == "exit":
                     break
+                result = await team.run(task=user_prompt)
+                breakpoint()
+                print(result)
 
         await self.model_client.close()
 
