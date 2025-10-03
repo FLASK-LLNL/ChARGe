@@ -114,9 +114,9 @@ class AutoGenClient(Client):
                 self.server = SseServerParams(url=server_url, **(server_kwargs or {}))
         self.messages = []
 
-<<<<<<< HEAD
     def configure(model: str, backend: str) -> (str, str, str, Dict[str, str]):
         import httpx
+
         kwargs = {}
         API_KEY = None
         if backend in ["openai", "gemini", "livai", "livchat"]:
@@ -140,7 +140,7 @@ class AutoGenClient(Client):
                 kwargs["parallel_tool_calls"] = False
                 kwargs["reasoning_effort"] = "high"
         return (model, backend, API_KEY, kwargs)
-=======
+
     def check_invalid_response(self, result) -> bool:
         answer_invalid = False
         for method in self.verifier_methods:
@@ -186,7 +186,6 @@ class AutoGenClient(Client):
                 answer_invalid = True
             retries += 1
         return answer_invalid, result
->>>>>>> a389f64 (Seperating out single step logic so it can be reused with multi-turn experiment)
 
     async def run(self):
         system_prompt = self.experiment_type.get_system_prompt()
