@@ -13,7 +13,7 @@ parser.add_argument(
     "--backend",
     type=str,
     default="openai",
-    choices=["openai", "gemini", "ollama", "livchat"],
+    choices=["openai", "gemini", "ollama", "livai", "livchat"],
     help="Backend to use for the autogen client",
 )
 parser.add_argument(
@@ -31,7 +31,7 @@ parser.add_argument(
 parser.add_argument(
     "--user-prompt",
     type=str,
-    default=None,
+    default="Generate a new reaction SMARTS and reactants for the product c1cc(ccc1N)O \n\n",
     help="The product to perform retrosynthesis on, "
     + "including any further constraints",
 )
