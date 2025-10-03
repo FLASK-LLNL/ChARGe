@@ -228,12 +228,9 @@ class AutoGenClient(Client):
                 model_client=self.model_client,
                 system_message=system_prompt,
                 workbench=workbench,
-                max_tool_iterations=1,
+                max_tool_iterations=self.max_tool_calls,
                 reflect_on_tool_use=True,
             )
-            # user = UserProxyAgent(
-            #     "USER", input_func=partial(input, prompt="> (or 'exit' to quit): ")
-            # )
 
             user = UserProxyAgent("USER", input_func=input)
             team = RoundRobinGroupChat(
