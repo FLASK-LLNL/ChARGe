@@ -17,9 +17,9 @@ except ImportError:
 from loguru import logger
 from typing import Tuple
 
-SMARTS_mcp = FastMCP("[RDKit] Chemistry and reaction verification MCP Server")
+SMARTS_mcp = FastMCP("[RDKit-SMARTS] Chemistry and reaction verification MCP Server")
 
-logger.info("[RDKit] Starting Chemistry and reaction verification MCP Server")
+logger.info("[RDKit-SMARTS] Starting Chemistry and reaction verification MCP Server")
 
 @SMARTS_mcp.tool()
 def verify_reaction_SMARTS(smarts: str) -> Tuple[bool, str]:

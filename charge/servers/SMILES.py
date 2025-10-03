@@ -18,9 +18,9 @@ except ImportError:
 from loguru import logger
 import logging
 
-SMILES_mcp = FastMCP("[RDKit] Chem and BioInformatics MCP Server")
+SMILES_mcp = FastMCP("[RDKit-SMILES] Chem and BioInformatics MCP Server")
 
-logger.info("[RDKit] Starting Chem and BioInformatics MCP Server")
+logger.info("[RDKit-SMILES] Starting Chem and BioInformatics MCP Server")
 
 logging.basicConfig(level=logging.DEBUG)
 
