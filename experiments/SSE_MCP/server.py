@@ -6,15 +6,13 @@
 ################################################################################
 
 from mcp.server.fastmcp import FastMCP
-from rdkit import Chem
-from rdkit.Chem import AllChem, rdChemReactions
 from loguru import logger
-from typing import Tuple
 
 mcp = FastMCP("Chemistry and reaction verification MCP Server")
 
 logger.info("Starting Chemistry and reaction verification MCP Server")
 
+# Persistent counter to demonstrate statefulness
 COUNTER = 0
 
 
@@ -27,11 +25,11 @@ def verify_smiles(smiles: str) -> bool:
         global COUNTER
         COUNTER += 1
         logger.info(f"Verifying SMILES: {smiles} used {COUNTER} times")
-        Chem.MolFromSmiles(smiles)
         return True
     except Exception as e:
         return False
 
 
 if __name__ == "__main__":
+
     mcp.run(transport="sse")
