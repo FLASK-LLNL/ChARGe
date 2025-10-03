@@ -169,7 +169,7 @@ class AutoGenClient(Client):
 
         if not self.check_response:
             assert isinstance(result.messages[-1], TextMessage)
-            return result.messages[-1].content
+            return False, result
 
         answer_invalid = False
         if isinstance(result.messages[-1], TextMessage):
