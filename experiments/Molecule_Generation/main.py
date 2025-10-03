@@ -42,33 +42,9 @@ if __name__ == "__main__":
         assert client_key is not None, "GOOGLE_API_KEY must be set in environment"
         runner = GeminiClient(experiment_type=myexperiment, api_key=client_key)
     elif args.client == "autogen":
-        import httpx
         from charge.clients.autogen import AutoGenClient
 
-        backend = args.backend
-        model = args.model
-        kwargs = {}
-        API_KEY = None
-        if backend in ["openai", "gemini", "livai", "livchat"]:
-            if backend == "openai":
-                API_KEY = os.getenv("OPENAI_API_KEY")
-                model = "gpt-4"
-                kwargs["parallel_tool_calls"] = False
-                kwargs["reasoning_effort"] = "high"
-            elif backend == "livai" or backend == "livchat":
-                API_KEY = os.getenv("OPENAI_API_KEY")
-                BASE_URL = os.getenv("LIVAI_BASE_URL")
-                assert (
-                    BASE_URL is not None
-                ), "LivAI Base URL must be set in environment variable"
-                model = "gpt-4.1"
-                kwargs["base_url"] = BASE_URL
-                kwargs["http_client"] = httpx.AsyncClient(verify=False)
-            else:
-                API_KEY = os.getenv("GOOGLE_API_KEY")
-                model = "gemini-flash-latest"
-                kwargs["parallel_tool_calls"] = False
-                kwargs["reasoning_effort"] = "high"
+        (model, backend, API_KEY, kwargs) = AutoGenClient.configure(args.model, args.backend)
 
         runner = AutoGenClient(
             experiment_type=myexperiment,
