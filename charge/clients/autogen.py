@@ -31,6 +31,7 @@ class AutoGenClient(Client):
         server_kwargs: Optional[dict] = None,
         max_tool_calls: int = 15,
         check_response: bool = False,
+        max_multi_turns: int = 100,
     ):
         """Initializes the AutoGenClient.
 
@@ -55,6 +56,7 @@ class AutoGenClient(Client):
             max_tool_calls (int, optional): Maximum number of tool calls per task. Defaults to 15.
             check_response (bool, optional): Whether to check the response using verifier methods.
                                              Defaults to False (Will be set to True in the future).
+            max_multi_turns (int, optional): Maximum number of multi-turn interactions. Defaults to 100.
         Raises:
             ValueError: If neither `server_path` nor `server_url` is provided and MCP servers cannot be generated.
         """
@@ -66,6 +68,7 @@ class AutoGenClient(Client):
         self.model_kwargs = model_kwargs if model_kwargs is not None else {}
         self.max_tool_calls = max_tool_calls
         self.check_response = check_response
+        self.max_multi_turns = max_multi_turns
 
         if model_client is not None:
             self.model_client = model_client
@@ -87,6 +90,11 @@ class AutoGenClient(Client):
             else:
                 from autogen_ext.models.openai import OpenAIChatCompletionClient
 
+                if api_key is None:
+                    if backend == "gemini":
+                        api_key = os.getenv("GOOGLE_API_KEY")
+                    else:
+                        api_key = os.getenv("OPENAI_API_KEY")
                 assert (
                     api_key is not None
                 ), "API key must be provided for OpenAI or Gemini backend"
@@ -106,6 +114,7 @@ class AutoGenClient(Client):
                 self.server = SseServerParams(url=server_url, **(server_kwargs or {}))
         self.messages = []
 
+<<<<<<< HEAD
     def configure(model: str, backend: str) -> (str, str, str, Dict[str, str]):
         import httpx
         kwargs = {}
@@ -131,6 +140,53 @@ class AutoGenClient(Client):
                 kwargs["parallel_tool_calls"] = False
                 kwargs["reasoning_effort"] = "high"
         return (model, backend, API_KEY, kwargs)
+=======
+    def check_invalid_response(self, result) -> bool:
+        answer_invalid = False
+        for method in self.verifier_methods:
+            try:
+                is_valid = method(result.messages[-1].content)
+                if not is_valid:
+                    answer_invalid = True
+                    break
+            except Exception as e:
+                print(f"Error during verification with {method.__name__}: {e}")
+                answer_invalid = True
+                break
+        return answer_invalid
+
+    async def step(self, agent, task: str):
+        result = await agent.run(task=task)
+
+        for msg in result.messages:
+            if isinstance(msg, TextMessage):
+                self.messages.append(msg.content)
+
+        if not self.check_response:
+            assert isinstance(result.messages[-1], TextMessage)
+            return result.messages[-1].content
+
+        answer_invalid = False
+        if isinstance(result.messages[-1], TextMessage):
+            answer_invalid = self.check_invalid_response(result.messages[-1].content)
+        else:
+            answer_invalid = True
+        retries = 0
+        while answer_invalid and retries < self.max_retries:
+            new_user_prompt = (
+                "The previous response was invalid. Please try again.\n\n" + task
+            )
+            # print("Retrying with new prompt...")
+            result = await agent.run(task=new_user_prompt)
+            if isinstance(result.messages[-1], TextMessage):
+                answer_invalid = self.check_invalid_response(
+                    result.messages[-1].content
+                )
+            else:
+                answer_invalid = True
+            retries += 1
+        return answer_invalid, result
+>>>>>>> a389f64 (Seperating out single step logic so it can be reused with multi-turn experiment)
 
     async def run(self):
         system_prompt = self.experiment_type.get_system_prompt()
@@ -145,54 +201,30 @@ class AutoGenClient(Client):
                 max_tool_iterations=self.max_tool_calls,
             )
 
-            result = await agent.run(task=user_prompt)
+            answer_invalid, result = await self.step(agent, user_prompt)
 
-            for msg in result.messages:
-                if isinstance(msg, TextMessage):
-                    self.messages.append(msg.content)
-
-            if not self.check_response:
-                assert isinstance(result.messages[-1], TextMessage)
-                return result.messages[-1].content
-
-            def check_invalid_response(result) -> bool:
-                answer_invalid = False
-                for method in self.verifier_methods:
-                    try:
-                        is_valid = method(result.messages[-1].content)
-                        if not is_valid:
-                            answer_invalid = True
-                            break
-                    except Exception as e:
-                        print(f"Error during verification with {method.__name__}: {e}")
-                        answer_invalid = True
-                        break
-                return answer_invalid
-
-            answer_invalid = False
-            if isinstance(result.messages[-1], TextMessage):
-                answer_invalid = check_invalid_response(result.messages[-1].content)
-            else:
-                answer_invalid = True
-            retries = 0
-            while answer_invalid and retries < self.max_retries:
-                new_user_prompt = (
-                    "The previous response was invalid. Please try again.\n\n"
-                    + user_prompt
-                )
-                # print("Retrying with new prompt...")
-                result = await agent.run(task=new_user_prompt)
-                if isinstance(result.messages[-1], TextMessage):
-                    answer_invalid = check_invalid_response(result.messages[-1].content)
-                else:
-                    answer_invalid = True
-                retries += 1
             if answer_invalid:
                 raise ValueError(
                     "Failed to get a valid response after maximum retries."
                 )
             else:
                 return result.messages[-1].content
+
+    async def multi_turn(self, user_prompt: str):
+
+        async with McpWorkbench(self.server) as workbench:
+            # TODO: Convert this to use custom agent in the future
+            agent = AssistantAgent(
+                name="Assistant",
+                model_client=self.model_client,
+                system_message=system_prompt,
+                workbench=workbench,
+                max_tool_iterations=self.max_tool_calls,
+            )
+            for _ in range(self.max_multi_turns):
+                answer_invalid, result = await self.step(agent, user_prompt)
+                if not answer_invalid:
+                    return result.messages[-1].content
 
     async def refine(self, feedback: str):
         raise NotImplementedError(
