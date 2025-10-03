@@ -1,4 +1,4 @@
-from typing import Type
+from typing import Type, Dict
 from abc import ABC, abstractmethod
 from charge.Experiment import Experiment
 from charge._tags import is_verifier, is_hypothesis
@@ -65,6 +65,10 @@ class Client:
         # with open(verifier_filename, "w") as f:
         #     f.write(experiment_to_mcp(class_info, verifier_methods))
         # self.verifier_server_path = verifier_filename
+
+    @abstractmethod
+    def configure(model: str, backend: str) -> (str, str, str, Dict[str, str]):
+        raise NotImplementedError("Subclasses must implement this method.")
 
     @abstractmethod
     async def run(self):

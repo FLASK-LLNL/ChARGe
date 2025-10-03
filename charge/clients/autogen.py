@@ -10,7 +10,7 @@ except ImportError:
 import asyncio
 import os
 from charge.clients.Client import Client
-from typing import Type, Optional
+from typing import Type, Optional, Dict
 from charge.Experiment import Experiment
 
 
@@ -38,7 +38,7 @@ class AutoGenClient(Client):
             experiment_type (Type[Experiment]): The experiment class to use.
             path (str, optional): Path to save generated MCP server files. Defaults to ".".
             max_retries (int, optional): Maximum number of retries for failed tasks. Defaults to 3.
-            backend (str, optional): Backend to use: "openai", "gemini", "ollama", or "livchat". Defaults to "openai".
+            backend (str, optional): Backend to use: "openai", "gemini", "ollama", "liveai" or "livchat". Defaults to "openai".
             model (str, optional): Model name to use. Defaults to "gpt-4".
             model_client (Optional[ChatCompletionClient], optional): Pre-initialized model client. If provided, `backend`, `model`, and `api_key` are ignored. Defaults to None.
             api_key (Optional[str], optional): API key for the model. Defaults to None.
@@ -105,6 +105,32 @@ class AutoGenClient(Client):
             elif server_url is not None:
                 self.server = SseServerParams(url=server_url, **(server_kwargs or {}))
         self.messages = []
+
+    def configure(model: str, backend: str) -> (str, str, str, Dict[str, str]):
+        import httpx
+        kwargs = {}
+        API_KEY = None
+        if backend in ["openai", "gemini", "livai", "livchat"]:
+            if backend == "openai":
+                API_KEY = os.getenv("OPENAI_API_KEY")
+                model = "gpt-4"
+                kwargs["parallel_tool_calls"] = False
+                kwargs["reasoning_effort"] = "high"
+            elif backend == "livai" or backend == "livchat":
+                API_KEY = os.getenv("OPENAI_API_KEY")
+                BASE_URL = os.getenv("LIVAI_BASE_URL")
+                assert (
+                    BASE_URL is not None
+                ), "LivAI Base URL must be set in environment variable"
+                model = "gpt-4.1"
+                kwargs["base_url"] = BASE_URL
+                kwargs["http_client"] = httpx.AsyncClient(verify=False)
+            else:
+                API_KEY = os.getenv("GOOGLE_API_KEY")
+                model = "gemini-flash-latest"
+                kwargs["parallel_tool_calls"] = False
+                kwargs["reasoning_effort"] = "high"
+        return (model, backend, API_KEY, kwargs)
 
     async def run(self):
         system_prompt = self.experiment_type.get_system_prompt()
