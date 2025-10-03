@@ -1,16 +1,18 @@
 try:
-    from autogen_agentchat.agents import AssistantAgent
+    from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
     from autogen_core.models import ModelFamily, ChatCompletionClient
     from autogen_ext.tools.mcp import StdioServerParams, McpWorkbench, SseServerParams
     from autogen_agentchat.messages import TextMessage
     from autogen_agentchat.conditions import HandoffTermination, TextMentionTermination
     from autogen_agentchat.teams import RoundRobinGroupChat
     from autogen_agentchat.ui import Console
+    from autogen_agentchat.conditions import TextMentionTermination
 except ImportError:
     raise ImportError(
         "Please install the autogen-agentchat package to use this module."
     )
 
+from functools import partial
 import os
 from charge.clients.Client import Client
 from typing import Type, Optional, Dict
@@ -227,20 +229,21 @@ class AutoGenClient(Client):
                 system_message=system_prompt,
                 workbench=workbench,
                 max_tool_iterations=1,
+                reflect_on_tool_use=True,
+            )
+            # user = UserProxyAgent(
+            #     "USER", input_func=partial(input, prompt="> (or 'exit' to quit): ")
+            # )
+
+            user = UserProxyAgent("USER", input_func=input)
+            team = RoundRobinGroupChat(
+                [agent, user],
+                max_turns=self.max_multi_turns,
+                # termination_condition=text_termination,
             )
 
-            team = RoundRobinGroupChat(
-                [agent],
-                max_turns=self.max_multi_turns,
-                termination_condition=handoff_termination | text_termination,
-            )
-            while True:
-                user_prompt = input('> (or "exit" to quit): ')
-                if user_prompt.lower() == "exit":
-                    break
-                result = await team.run(task=user_prompt)
-                breakpoint()
-                print(result)
+            result = team.run_stream()
+            await Console(result)
 
         await self.model_client.close()
 
