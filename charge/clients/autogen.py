@@ -15,7 +15,7 @@ except ImportError:
 from functools import partial
 import os
 from charge.clients.Client import Client
-from typing import Type, Optional, Dict
+from typing import Type, Optional, Dict, Union
 from charge.Experiment import Experiment
 
 
@@ -31,8 +31,8 @@ class AutoGenClient(Client):
         api_key: Optional[str] = None,
         model_info: Optional[dict] = None,
         model_kwargs: Optional[dict] = None,
-        server_path: Optional[str] = None,
-        server_url: Optional[str] = None,
+        server_path: Optional[Union[str, list[str]]] = None,
+        server_url: Optional[Union[str, list[str]]] = None,
         server_kwargs: Optional[dict] = None,
         max_tool_calls: int = 15,
         check_response: bool = False,
@@ -51,10 +51,10 @@ class AutoGenClient(Client):
             model_info (Optional[dict], optional): Additional model info. Defaults to None.
             model_kwargs (Optional[dict], optional): Additional keyword arguments for the model client.
                                                      Defaults to None.
-            server_path (Optional[str], optional): Path to an existing MCP server script. If provided, this
+            server_path (Optional[Union[str, list[str]]], optional): Path or list of paths to existing MCP server script. If provided, this
                                                    server will be used instead of generating
                                                    new ones. Defaults to None.
-            server_url (Optional[str], optional): URL of an existing MCP server over the SSE transport.
+            server_url (Optional[Union[str, list[str]]], optional): URL or list URLs of existing MCP server over the SSE transport.
                                                   If provided, this server will be used instead of generating
                                                   new ones. Defaults to None.
             server_kwargs (Optional[dict], optional): Additional keyword arguments for the server client. Defaults to None.
@@ -114,9 +114,17 @@ class AutoGenClient(Client):
             self.setup_mcp_servers()
         else:
             if server_path is not None:
-                self.server = StdioServerParams(command="python3", args=[server_path])
-            elif server_url is not None:
-                self.server = SseServerParams(url=server_url, **(server_kwargs or {}))
+                if isinstance(server_path, str):
+                    server_path = [server_path]
+                for sp in server_path:
+                    self.servers.append(StdioServerParams(command="python3", args=[sp]))
+            if server_url is not None:
+                if isinstance(server_url, str):
+                    server_url = [server_url]
+                for su in server_url:
+                    self.servers.append(
+                        SseServerParams(url=su, **(server_kwargs or {}))
+                    )
         self.messages = []
 
     def configure(model: Optional[str], backend: str) -> (str, str, str, Dict[str, str]):
@@ -201,24 +209,39 @@ class AutoGenClient(Client):
     async def run(self):
         system_prompt = self.experiment_type.get_system_prompt()
         user_prompt = self.experiment_type.get_user_prompt()
-        async with McpWorkbench(self.server) as workbench:
-            # TODO: Convert this to use custom agent in the future
-            agent = AssistantAgent(
-                name="Assistant",
-                model_client=self.model_client,
-                system_message=system_prompt,
-                workbench=workbench,
-                max_tool_iterations=self.max_tool_calls,
-            )
+        assert (
+            user_prompt is not None
+        ), "User prompt must be provided for single-turn run."
 
-            answer_invalid, result = await self.step(agent, user_prompt)
+        assert (
+            len(self.servers) > 0
+        ), "No MCP servers available. Please provide server_path or server_url."
 
-            if answer_invalid:
-                raise ValueError(
-                    "Failed to get a valid response after maximum retries."
-                )
-            else:
-                return result.messages[-1].content
+        wokbenches = [McpWorkbench(server) for server in self.servers]
+
+        # Start the servers
+        for workbench in wokbenches:
+            await workbench.start()
+
+        # async with McpWorkbench(self.server) as workbench:
+        #     # TODO: Convert this to use custom agent in the future
+        agent = AssistantAgent(
+            name="Assistant",
+            model_client=self.model_client,
+            system_message=system_prompt,
+            workbench=wokbenches,
+            max_tool_iterations=self.max_tool_calls,
+        )
+
+        answer_invalid, result = await self.step(agent, user_prompt)
+
+        for workbench in wokbenches:
+            await workbench.stop()
+
+        if answer_invalid:
+            raise ValueError("Failed to get a valid response after maximum retries.")
+        else:
+            return result.messages[-1].content
 
     async def chat(self):
         system_prompt = self.experiment_type.get_system_prompt()
@@ -227,26 +250,37 @@ class AutoGenClient(Client):
         # Define a termination condition that checks for a specific text mention.
         text_termination = TextMentionTermination("TERMINATE")
 
-        async with McpWorkbench(self.server) as workbench:
-            # TODO: Convert this to use custom agent in the future
-            agent = AssistantAgent(
-                name="Assistant",
-                model_client=self.model_client,
-                system_message=system_prompt,
-                workbench=workbench,
-                max_tool_iterations=self.max_tool_calls,
-                reflect_on_tool_use=True,
-            )
+        assert (
+            len(self.servers) > 0
+        ), "No MCP servers available. Please provide server_path or server_url."
 
-            user = UserProxyAgent("USER", input_func=input)
-            team = RoundRobinGroupChat(
-                [agent, user],
-                max_turns=self.max_multi_turns,
-                # termination_condition=text_termination,
-            )
+        wokbenches = [McpWorkbench(server) for server in self.servers]
 
-            result = team.run_stream()
-            await Console(result)
+        # Start the servers
+        for workbench in wokbenches:
+            await workbench.start()
+
+        # TODO: Convert this to use custom agent in the future
+        agent = AssistantAgent(
+            name="Assistant",
+            model_client=self.model_client,
+            system_message=system_prompt,
+            workbench=workbench,
+            max_tool_iterations=self.max_tool_calls,
+            reflect_on_tool_use=True,
+        )
+
+        user = UserProxyAgent("USER", input_func=input)
+        team = RoundRobinGroupChat(
+            [agent, user],
+            max_turns=self.max_multi_turns,
+            # termination_condition=text_termination,
+        )
+
+        result = team.run_stream()
+        await Console(result)
+        for workbench in wokbenches:
+            await workbench.stop()
 
         await self.model_client.close()
 

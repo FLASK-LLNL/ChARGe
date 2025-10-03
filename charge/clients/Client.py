@@ -17,6 +17,8 @@ class Client:
         self.experiment_type = experiment_type
         self.path = path
         self.max_retries = max_retries
+        self.servers = []
+        self.messages = []
         self._setup()
 
     def _setup(self):
