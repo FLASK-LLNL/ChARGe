@@ -5,11 +5,11 @@ This directory contains an example of a multi-server application using the ChARG
 ## SSE and STDIO Servers
 To run the multi-server application, you need to start SSE server on a different process:
 ```bash
-python3 sse_server_1.py
+python3 sse_server_1.py --port 8000 --host http://127.0.0.1
 ```
 and 
 ```bash
-python3 sse_server_2.py
+python3 sse_server_2.py --port 8001 --host http://127.0.0.1
 ```
 
 The STDIO servers will be started automatically by the client.

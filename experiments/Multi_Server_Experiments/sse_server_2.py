@@ -2,9 +2,21 @@ from mcp.server.fastmcp import FastMCP
 from rdkit import Chem
 
 from loguru import logger
+import argparse
 
 
-mcp = FastMCP("Database MCP Server that returns price of molecules", port=8001)
+parser = argparse.ArgumentParser(description="Run the Database MCP Server")
+parser.add_argument("--port", type=int, default=8000, help="Port to run the server on")
+parser.add_argument(
+    "--host", type=str, default="http://127.0.0.1", help="Host to run the server on"
+)
+args = parser.parse_args()
+
+mcp = FastMCP(
+    "Database MCP Server that returns price of molecules",
+    port=args.port,
+    website_url=f"{args.host}",
+)
 logger.info("Starting Molecule Price MCP Server")
 
 
