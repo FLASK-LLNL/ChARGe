@@ -109,3 +109,6 @@ class Client:
             ],
             help="Backend to use for the orchestrator client",
         )
+        parser.add_argument(
+            "--server-urls", nargs="*", type=str, default="http://127.0.0.1:8000/sse"
+        )

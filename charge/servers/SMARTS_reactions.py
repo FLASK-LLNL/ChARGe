@@ -17,7 +17,13 @@ except ImportError:
 from loguru import logger
 from typing import Tuple
 
-SMARTS_mcp = FastMCP("[RDKit-SMARTS] Chemistry and reaction verification MCP Server")
+from charge.servers.server_utils import args
+
+SMARTS_mcp = FastMCP(
+    "[RDKit-SMARTS] Chemistry and reaction verification MCP Server",
+    port=args.port,
+    website_url=f"{args.host}",
+)
 
 logger.info("[RDKit-SMARTS] Starting Chemistry and reaction verification MCP Server")
 

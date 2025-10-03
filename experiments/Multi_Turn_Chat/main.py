@@ -6,8 +6,6 @@ from charge.clients.autogen import AutoGenClient
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--server-url", type=str, default="http://127.0.0.1:8000/sse")
-
 # Add standard CLI arguments
 Client.add_std_parser_arguments(parser)
 
@@ -33,7 +31,7 @@ class ChargeChatExperiment(Experiment):
 if __name__ == "__main__":
 
     args = parser.parse_args()
-    server_url = args.server_url
+    server_url = args.server_urls[0]
     assert server_url is not None, "Server URL must be provided"
     assert server_url.endswith("/sse"), "Server URL must end with /sse"
     myexperiment = ChargeChatExperiment()

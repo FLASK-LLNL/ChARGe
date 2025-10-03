@@ -18,7 +18,13 @@ except ImportError:
 from loguru import logger
 import logging
 
-SMILES_mcp = FastMCP("[RDKit-SMILES] Chem and BioInformatics MCP Server")
+from charge.servers.server_utils import args
+
+SMILES_mcp = FastMCP(
+    "[RDKit-SMILES] Chem and BioInformatics MCP Server",
+    port=args.port,
+    website_url=f"{args.host}",
+)
 
 logger.info("[RDKit-SMILES] Starting Chem and BioInformatics MCP Server")
 

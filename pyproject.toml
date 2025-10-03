@@ -5,7 +5,7 @@ description = "ChARGe: Chemistry-tool for Automated Reasoning and Generation"
 authors = []
 license = {file = "LICENSE"}
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dependencies = [
     "mcp>=1.10.0",
     "jsonschema>=4.17.3",

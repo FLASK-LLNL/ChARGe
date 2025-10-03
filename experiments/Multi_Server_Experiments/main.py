@@ -1,34 +1,13 @@
 import argparse
 import asyncio
 from charge.Experiment import Experiment
+from charge.clients.Client import Client
 from charge.clients.autogen import AutoGenClient
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument(
-    "--model",
-    type=str,
-    default="gpt-oss:latest",
-    help="Model to use for the ollama backend",
-)
-parser.add_argument(
-    "--backend",
-    type=str,
-    default="ollama",
-    choices=[
-        "ollama",
-        "openai",
-        "gemini",
-        "livai",
-        "livchat",
-    ],
-    help="Backend to use for the autogen client",
-)
-
-parser.add_argument(
-    "--server-urls", nargs="*", type=str, default="http://127.0.0.1:8000/sse"
-)
-
+# Add standard CLI arguments
+Client.add_std_parser_arguments(parser)
 
 class ChargeMultiServerExperiment(Experiment):
     def __init__(
