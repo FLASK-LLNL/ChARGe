@@ -12,7 +12,8 @@ try:
 except ImportError:
     raise ImportError("Please install the rdkit package to use this module.")
 from loguru import logger
-from charge.servers.SMILES import SMILES_mcp, _synthesizability_helper
+from charge.servers.SMILES import SMILES_mcp
+from charge.servers.SMILES_utils import get_synthesizability
 
 
 # Add some custom tools to the server
@@ -56,7 +57,7 @@ def get_density_and_synthesizability(smiles: str) -> tuple[float, float]:
     """
 
     density = get_density(smiles)
-    synthesizability = _synthesizability_helper(smiles)
+    synthesizability = get_synthesizability(smiles)
     return density, synthesizability
 
 

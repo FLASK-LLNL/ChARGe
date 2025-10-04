@@ -4,6 +4,15 @@ from rdkit.Chem import AllChem
 
 
 def canonicalize_smiles(smiles: str) -> str:
+    """
+    Canonicalize a SMILES string. Returns the canonical SMILES.
+    If the SMILES is invalid, returns "Invalid SMILES".
+
+    Args:
+        smiles (str): The input SMILES string.
+    Returns:
+        str: The canonicalized SMILES string.
+    """
     try:
         mol = Chem.MolFromSmiles(smiles)
         return Chem.MolToSmiles(mol)
