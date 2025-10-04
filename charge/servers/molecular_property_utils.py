@@ -18,6 +18,12 @@ from charge.servers.SMILES_utils import get_synthesizability
 def get_density(smiles: str) -> float:
     """
     Calculate the density of a molecule given its SMILES string.
+    Density is the molecular weight of the molecule per unit volume.
+
+    Args:
+        smiles (str): The input SMILES string.
+    Returns:
+        float: Density of the molecule, returns 0.0 if there is an error.
     """
     try:
         # logger.info(f"Calculating density for SMILES: {smiles}")
@@ -50,6 +56,13 @@ def get_density_and_synthesizability(smiles: str) -> tuple[float, float]:
     """
     Calculate the density and synthesizability of a molecule given its SMILES string.
     Returns a tuple of (density, synthesizability).
+
+    Args:
+        smiles (str): The input SMILES string.
+    Returns:
+        A tuple containing:
+            float: Density of the molecule, returns 0.0 if there is an error.
+            float: Synthesizable score of the molecule, returns 10.0 if there is an error.
     """
 
     density = get_density(smiles)
