@@ -19,6 +19,7 @@ def get_density(smiles: str) -> float:
     """
     Calculate the density of a molecule given its SMILES string.
     Density is the molecular weight of the molecule per unit volume.
+    In units of unified atomic mass (u) per cubic Angstroms (A^3)
 
     Args:
         smiles (str): The input SMILES string.
