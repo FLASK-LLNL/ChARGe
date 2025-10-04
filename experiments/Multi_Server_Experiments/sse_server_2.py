@@ -12,7 +12,6 @@ mcp = FastMCP(
 )
 logger.info("Starting Molecule Price MCP Server")
 
-
 NUM_HITS = 1
 
 

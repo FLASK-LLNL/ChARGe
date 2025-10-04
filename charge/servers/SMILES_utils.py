@@ -83,6 +83,7 @@ def get_synthesizability(smiles: str) -> float:
         return 10.0
 
 database_of_smiles = []
+NUM_HITS = 1
 
 def known_smiles(smiles: str) -> bool:
     """
@@ -95,6 +96,10 @@ def known_smiles(smiles: str) -> bool:
     """
 
     try:
+        global NUM_HITS
+        logger.info(f"Tool has been call: {NUM_HITS} times")
+
+        NUM_HITS += 1
         logger.info(f"Checking if SMILES is known: {smiles}")
         mol = Chem.MolFromSmiles(smiles)
         smiles = Chem.MolToSmiles(mol, isomericSmiles=True)
