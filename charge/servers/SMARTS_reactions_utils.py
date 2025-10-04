@@ -27,7 +27,9 @@ def verify_reaction_SMARTS(smarts: str) -> Tuple[bool, str]:
     Args:
         smiles (str): The input SMILES string.
     Returns:
-        (bool, str): True if the SMARTS is valid, and the str is an error message if it is not..
+        A tuple containing:
+            bool: True if the SMARTS is valid, False if it is invalid.
+            str: Error message if the SMARTS reaction is valid.
     """
     try:
         logger.info(f"Verifying SMARTS: {smarts}")
@@ -68,7 +70,8 @@ def verify_reaction(
         products (list[str]): The input list of products created by the reaction in SMILES strings
     Returns:
         A tuple containing:
-            bool: True if the SMARTS is valid, False if it is invalid.
+            bool: True if a reaction can be performed given the SMARTS and reactants.
+                  False if it cannot..
             str: Error message if the SMARTS reaction is valid.
     """
     try:
