@@ -14,6 +14,9 @@ except ImportError:
 
 from loguru import logger
 from charge.servers.SMILES_utils import get_synthesizability
+from charge.servers.chemprop_make_prediction import get_chemprop_preds
+import sys
+import os
 
 def get_density(smiles: str) -> float:
     """
@@ -74,3 +77,16 @@ def get_density_and_synthesizability(smiles: str) -> tuple[float, float]:
     synthesizability = get_synthesizability(smiles)
     return density, synthesizability
 
+def chemprop_preds_server(smiles,property):
+    valid_properties = {'10k_density', '10k_hof', 'qm9_alpha','qm9_cv','qm9_gap','qm9_homo','qm9_lumo','qm9_mu','qm9_r2','qm9_zpve','lipo'}
+    if property not in valid_properties:
+        raise ValueError(
+            f"Invalid property '{property}'. Must be one of {valid_properties}."
+        )
+    chemprop_base_path=os.environ.get("CHEMPROP_BASE_PATH")
+    if(chemprop_base_path):
+        model_path=chemprop_base_path+property+'_OOD/fold_0/'
+        return(get_chemprop_preds(smiles,model_path))
+    else:
+        print('CHEMPROP_BASE_PATH environment variable not set!')
+        sys.exit(2)
