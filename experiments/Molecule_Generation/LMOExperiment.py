@@ -1,7 +1,8 @@
 import charge
 from charge.Experiment import Experiment
+from charge.servers import SMILES_utils
 import helper_funcs
-from typing import Optional
+from typing import Optional, Tuple
 
 SYSTEM_PROMPT = """
 You are a world-class medicinal chemist with expertise in drug discovery and molecular design. Your task is to propose novel small molecules that are likely to exhibit high binding affinity to a specified biological target, while also being synthetically accessible. 
@@ -52,47 +53,16 @@ class LMOExperiment(Experiment):
         self.user_prompt = user_prompt
         self.verification_prompt = verification_prompt
         self.refinement_prompt = refinement_prompt
-        self.max_synth_score = helper_funcs.get_synthesizability(lead_molecule)
+        self.max_synth_score = SMILES_utils.get_synthesizability(lead_molecule)
         self.min_density = helper_funcs.get_density(lead_molecule)
 
-    @charge.hypothesis
-    def canonicalize_smiles(self, smiles: str) -> str:
-        """
-        Canonicalize a SMILES string. Returns the canonical SMILES.
-        If the SMILES is invalid, returns "Invalid SMILES".
+        # Registering some pre-written hypothesis tools
+        self.register_hypothesis_tool(SMILES_utils.verify_smiles)
+        self.register_hypothesis_tool(SMILES_utils.canonicalize_smiles)
+        self.register_hypothesis_tool(SMILES_utils.get_synthesizability)
+        self.register_hypothesis_tool(helper_funcs.get_density)
 
-        Args:
-            smiles (str): The input SMILES string.
-        Returns:
-            str: The canonicalized SMILES string.
-        """
-        return helper_funcs.canonicalize_smiles(smiles)
-
-    @charge.hypothesis
-    def verify_smiles(self, smiles: str) -> bool:
-        """
-        Verify if a SMILES string is valid. Returns True if valid, False otherwise.
-
-        Args:
-            smiles (str): The input SMILES string.
-        Returns:
-            bool: True if the SMILES is valid, False otherwise.
-        """
-        return helper_funcs.verify_smiles(smiles)
-
-    @charge.hypothesis
-    def get_synthesizability(self, smiles: str) -> float:
-        """
-        Calculate the synthesizability of a molecule given its SMILES string.
-        Values range from 1.0 (highly synthesizable) to 10.0 (not synthesizable).
-
-        Args:
-            smiles (str): The input SMILES string.
-        Returns:
-            float: The synthesizability score.
-        """
-
-        return helper_funcs.get_synthesizability(smiles)
+    # Define some hypothesis and verifier methods
 
     @charge.hypothesis
     def check_proposal(self, smiles: str) -> bool:
@@ -110,10 +80,10 @@ class LMOExperiment(Experiment):
         # NOTE: This is used both by the LLM and during verification in the final
         # step of the experiment. So it needs to be deterministic and not
         # rely on any LLM calls.
-        if not self.verify_smiles(smiles):
+        if not SMILES_utils.verify_smiles(smiles):
             raise ValueError(f"Invalid SMILES string: {smiles}")
 
-        synth_score = self.get_synthesizability(smiles)
+        synth_score = SMILES_utils.get_synthesizability(smiles)
         if synth_score > self.max_synth_score:
             raise ValueError(
                 f"Synthesizability score too high: {synth_score} > {self.max_synth_score}"
@@ -125,7 +95,7 @@ class LMOExperiment(Experiment):
         return True
 
     @charge.verifier
-    def check_final_proposal(self, smiles_list_as_string: str) -> bool:
+    def check_final_proposal(self, smiles_list_as_string: str) -> Tuple[bool, str]:
         """
         Check if the proposed SMILES strings are valid and meet the criteria.
         The criteria are:
@@ -137,10 +107,6 @@ class LMOExperiment(Experiment):
             smiles (str): The proposed  list of SMILES strings.
         Returns:
             bool: True if the proposal is valid and meets the criteria, False otherwise.
-
-        Raises:
-            ValueError: If the output is not a valid list of SMILES strings or if any
-                        SMILES string is invalid or does not meet the criteria.
         """
 
         # NOTE: This is used both by the LLM and during verification in the final
@@ -149,10 +115,9 @@ class LMOExperiment(Experiment):
         try:
             smiles_list = eval(smiles_list_as_string)
             if not isinstance(smiles_list, list):
-                return False
+                return False, "Output is not a proper Python list."
         except Exception as e:
-            raise ValueError("Output is not a valid list of SMILES strings.")
-
+            return False, f"Output is not a valid Python list: {e}"
         for smiles in smiles_list:
             self.check_proposal(smiles)
-        return True
+        return True, "All proposed SMILES are valid and meet the criteria."

@@ -13,8 +13,6 @@ def experiment_to_mcp(class_info, methods_list) -> str:
     return_str += f"from {class_info['file']} import {class_info['name']}\n\n"
 
     return_str += 'mcp = FastMCP("Hypothesis MCP Server")\n\n'
-    return_str += f"# Instance of the class\n"
-    return_str += f"obj = {class_info['name']}()\n\n"
 
     for method in methods_list:
         sig = inspect.signature(method)
@@ -41,7 +39,7 @@ def experiment_to_mcp(class_info, methods_list) -> str:
                 f'"""{textwrap.dedent(method.__doc__)}"""', "    "
             )
             return_str += f"{docstring}\n"
-        return_str += f"    return obj.{method.__name__}({', '.join(call_args)})\n\n"
+        return_str += f"    return class_info['name'].{method.__name__}({', '.join(call_args)})\n\n"
 
     return_str += "\n"
     return_str += 'if __name__ == "__main__":\n'

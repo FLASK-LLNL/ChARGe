@@ -1,6 +1,6 @@
 try:
     from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
-    from autogen_core.models import ModelFamily, ChatCompletionClient
+    from autogen_core.models import ModelFamily, ChatCompletionClient, ModelInfo
     from autogen_ext.tools.mcp import StdioServerParams, McpWorkbench, SseServerParams
     from autogen_agentchat.messages import TextMessage
     from autogen_agentchat.conditions import HandoffTermination, TextMentionTermination
@@ -15,7 +15,7 @@ except ImportError:
 from functools import partial
 import os
 from charge.clients.Client import Client
-from typing import Type, Optional, Dict, Union
+from typing import Tuple, Type, Optional, Dict, Union
 from charge.Experiment import Experiment
 
 
@@ -29,7 +29,7 @@ class AutoGenClient(Client):
         model: str = "gpt-4",
         model_client: Optional[ChatCompletionClient] = None,
         api_key: Optional[str] = None,
-        model_info: Optional[dict] = None,
+        model_info: Optional[ModelInfo] = None,
         model_kwargs: Optional[dict] = None,
         server_path: Optional[Union[str, list[str]]] = None,
         server_url: Optional[Union[str, list[str]]] = None,
@@ -48,7 +48,7 @@ class AutoGenClient(Client):
             model (str, optional): Model name to use. Defaults to "gpt-4".
             model_client (Optional[ChatCompletionClient], optional): Pre-initialized model client. If provided, `backend`, `model`, and `api_key` are ignored. Defaults to None.
             api_key (Optional[str], optional): API key for the model. Defaults to None.
-            model_info (Optional[dict], optional): Additional model info. Defaults to None.
+            model_info (Optional[ModelInfo], optional): Additional model info. Defaults to None.
             model_kwargs (Optional[dict], optional): Additional keyword arguments for the model client.
                                                      Defaults to None.
             server_path (Optional[Union[str, list[str]]], optional): Path or list of paths to existing MCP server script. If provided, this
@@ -65,32 +65,35 @@ class AutoGenClient(Client):
         Raises:
             ValueError: If neither `server_path` nor `server_url` is provided and MCP servers cannot be generated.
         """
-        super().__init__(experiment_type, path, max_retries)
+        super().__init__(experiment_type, path, max_retries, check_response)
         self.backend = backend
         self.model = model
         self.api_key = api_key
         self.model_info = model_info
         self.model_kwargs = model_kwargs if model_kwargs is not None else {}
         self.max_tool_calls = max_tool_calls
-        self.check_response = check_response
         self.max_multi_turns = max_multi_turns
 
         if model_client is not None:
             self.model_client = model_client
         else:
-            model_info = {
-                "vision": False,
-                "function_calling": True,
-                "json_output": True,
-                "family": ModelFamily.UNKNOWN,
-                "structured_output": True,
-            }
+            obj_model_info: ModelInfo = (
+                ModelInfo(
+                    vision=False,
+                    function_calling=True,
+                    json_output=True,
+                    family=ModelFamily.UNKNOWN,
+                    structured_output=True,
+                )
+                if model_info is None
+                else model_info
+            )
             if backend == "ollama":
                 from autogen_ext.models.ollama import OllamaChatCompletionClient
 
                 self.model_client = OllamaChatCompletionClient(
                     model=model,
-                    model_info=model_info,
+                    model_info=obj_model_info,
                 )
             else:
                 from autogen_ext.models.openai import OpenAIChatCompletionClient
@@ -106,28 +109,29 @@ class AutoGenClient(Client):
                 self.model_client = OpenAIChatCompletionClient(
                     model=model,
                     api_key=api_key,
-                    model_info=model_info,
+                    model_info=obj_model_info,
                     **self.model_kwargs,
                 )
 
         if server_path is None and server_url is None:
             self.setup_mcp_servers()
-        else:
-            if server_path is not None:
-                if isinstance(server_path, str):
-                    server_path = [server_path]
-                for sp in server_path:
-                    self.servers.append(StdioServerParams(command="python3", args=[sp]))
-            if server_url is not None:
-                if isinstance(server_url, str):
-                    server_url = [server_url]
-                for su in server_url:
-                    self.servers.append(
-                        SseServerParams(url=su, **(server_kwargs or {}))
-                    )
+
+        if server_path is not None:
+            if isinstance(server_path, str):
+                server_path = [server_path]
+            for sp in server_path:
+                self.servers.append(StdioServerParams(command="python3", args=[sp]))
+        if server_url is not None:
+            if isinstance(server_url, str):
+                server_url = [server_url]
+            for su in server_url:
+                self.servers.append(SseServerParams(url=su, **(server_kwargs or {})))
         self.messages = []
 
-    def configure(model: Optional[str], backend: str) -> (str, str, str, Dict[str, str]):
+    @staticmethod
+    def configure(
+        model: Optional[str], backend: str
+    ) -> Tuple[str, str, Optional[str], Dict[str, str]]:
         import httpx
 
         kwargs = {}
@@ -158,6 +162,7 @@ class AutoGenClient(Client):
 
         if not model:
             model = default_model
+        assert model is not None, "Model must be specified"
         return (model, backend, API_KEY, kwargs)
 
     def check_invalid_response(self, result) -> bool:
@@ -175,14 +180,23 @@ class AutoGenClient(Client):
         return answer_invalid
 
     async def step(self, agent, task: str):
+        """
+        Perform a single step with the agent on the given task / prompt.
+        """
         result = await agent.run(task=task)
+        # Store all messages for debugging
+        self.messages.append(result)
 
         for msg in result.messages:
             if isinstance(msg, TextMessage):
                 self.messages.append(msg.content)
 
         if not self.check_response:
-            assert isinstance(result.messages[-1], TextMessage)
+            assert isinstance(result.messages[-1], TextMessage), (
+                "The final message by the agent must be a TextMessage."
+                + "This is likely due to the agent not being able to complete the task."
+                + "Try catching exception and investigating the stored messages."
+            )
             return False, result
 
         answer_invalid = False
@@ -243,12 +257,8 @@ class AutoGenClient(Client):
         else:
             return result.messages[-1].content
 
-    async def chat(self):
+    async def chat(self) -> None:
         system_prompt = self.experiment_type.get_system_prompt()
-
-        handoff_termination = HandoffTermination(target="user")
-        # Define a termination condition that checks for a specific text mention.
-        text_termination = TextMentionTermination("TERMINATE")
 
         assert (
             len(self.servers) > 0
