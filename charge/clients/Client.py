@@ -8,7 +8,8 @@ import os
 from charge._to_mcp import experiment_to_mcp
 import warnings
 import argparse
-
+import atexit
+import readline
 
 class Client:
     def __init__(
@@ -112,3 +113,15 @@ class Client:
         parser.add_argument(
             "--server-urls", nargs="*", type=str, default=["http://127.0.0.1:8000/sse"]
         )
+        parser.add_argument(
+            "--history", action="store", type=str, default=".charge-chat-client-history"
+        )
+
+    def enable_cmd_history_and_shell_integration(history: str):
+        try:
+            readline.read_history_file(history)
+            readline.set_history_length(1000)
+        except FileNotFoundError:
+            pass
+
+        atexit.register(readline.write_history_file, history)

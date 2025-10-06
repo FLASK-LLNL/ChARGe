@@ -38,10 +38,13 @@ class ChargeMultiServerExperiment(Experiment):
 if __name__ == "__main__":
 
     args = parser.parse_args()
+    Client.enable_cmd_history_and_shell_integration(args.history)
     server_urls = args.server_urls
     assert server_urls is not None, "Server URLs must be provided"
     for url in server_urls:
-        assert url.endswith("/sse"), "Server URL must end with /sse"
+        assert url.endswith("/sse"), f"Server URL {url} must end with /sse"
+
+    exit
     myexperiment = ChargeMultiServerExperiment()
 
     (model, backend, API_KEY, kwargs) = AutoGenClient.configure(
