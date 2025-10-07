@@ -4,6 +4,11 @@ from RetrosynthesisExperiment import RetrosynthesisExperiment as Retrosynthesis
 import os
 from charge.clients.Client import Client
 
+#from dotenv import load_dotenv
+#load_dotenv(dotenv_path="OPENAI_KEY_20250618.env")
+#livAI_api_key = os.getenv("LIVAI_KEY")
+#API_KEY = livAI_api_key
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--lead-molecule", type=str, default="CC(=O)O[C@H](C)CCN")
 parser.add_argument(
@@ -49,7 +54,7 @@ if __name__ == "__main__":
         from charge.clients.autogen import AutoGenClient
 
         (model, backend, API_KEY, kwargs) = AutoGenClient.configure(args.model, args.backend)
-
+       # print(f"[DEBUG] main.py Using backend={backend}, base_url={kwargs.get('base_url')}")
         runner = AutoGenClient(
             experiment_type=myexperiment,
             model=model,

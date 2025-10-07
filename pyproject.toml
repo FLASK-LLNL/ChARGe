@@ -10,6 +10,12 @@ dependencies = [
     "mcp>=1.10.0",
     "jsonschema>=4.17.3",
     "loguru>=0.7.0",
+    "rdkit>=2025.3.6",
+    "autogen-agentchat>=0.7.5",
+    "autogen-ext>=0.7.5",
+    "openai>=2.1.0",
+    "tiktoken>=0.11.0",
+    "ollama>=0.6.0",
 ]
 
 [tool.setuptools]

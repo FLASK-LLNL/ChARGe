@@ -44,7 +44,7 @@ class AutoGenClient(Client):
             experiment_type (Type[Experiment]): The experiment class to use.
             path (str, optional): Path to save generated MCP server files. Defaults to ".".
             max_retries (int, optional): Maximum number of retries for failed tasks. Defaults to 3.
-            backend (str, optional): Backend to use: "openai", "gemini", "ollama", "liveai" or "livchat". Defaults to "openai".
+            backend (str, optional): Backend to use: "openai", "gemini", "ollama", "livai" or "livchat". Defaults to "openai".
             model (str, optional): Model name to use. Defaults to "gpt-4".
             model_client (Optional[ChatCompletionClient], optional): Pre-initialized model client. If provided, `backend`, `model`, and `api_key` are ignored. Defaults to None.
             api_key (Optional[str], optional): API key for the model. Defaults to None.
@@ -103,6 +103,8 @@ class AutoGenClient(Client):
                 assert (
                     api_key is not None
                 ), "API key must be provided for OpenAI or Gemini backend"
+                #os.environ["OPENAI_BASE_URL"] = self.model_kwargs.get("base_url", "")
+                #print("[DEBUG] env OPENAI_BASE_URL =", os.environ.get("OPENAI_BASE_URL"))
                 self.model_client = OpenAIChatCompletionClient(
                     model=model,
                     api_key=api_key,
@@ -126,6 +128,7 @@ class AutoGenClient(Client):
                         SseServerParams(url=su, **(server_kwargs or {}))
                     )
         self.messages = []
+        #(f"[DEBUG] Using backend={self.backend}, base_url={self.model_kwargs.get('base_url')}")
 
     def configure(model: Optional[str], backend: str) -> (str, str, str, Dict[str, str]):
         import httpx
@@ -147,7 +150,12 @@ class AutoGenClient(Client):
                 ), "LivAI Base URL must be set in environment variable"
                 default_model = "gpt-4.1"
                 kwargs["base_url"] = BASE_URL
-                kwargs["http_client"] = httpx.AsyncClient(verify=False)
+                kwargs["http_client"] = httpx.AsyncClient(
+                    verify=False,
+                    trust_env=False,
+                    http2=False,
+                    timeout=60,
+                )
             else:
                 API_KEY = os.getenv("GOOGLE_API_KEY")
                 default_model = "gemini-flash-latest"
