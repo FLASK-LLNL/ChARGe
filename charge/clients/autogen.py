@@ -325,7 +325,7 @@ class AutoGenClient(Client):
         check_response: bool = False,
         max_multi_turns: int = 100,
         # New parameters for local HuggingFace models
-        local_model_path: Optional[str] = "/p/lustre5/chrundle/huggingface-models/gpt-oss-20b/", #"/p/vast1/flask/models/gpt-oss-120b",
+        local_model_path: Optional[str] = "/p/vast1/flask/models/gpt-oss-120b",
         device: str = "auto",
         torch_dtype: str = "auto",
         quantization: Optional[str] = "4bit",
