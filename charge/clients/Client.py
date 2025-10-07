@@ -113,6 +113,8 @@ class Client:
                 "gemini",
                 "livai",
                 "livchat",
+                "huggingface",
+                "vllm",
             ],
             help="Backend to use for the orchestrator client",
         )
@@ -121,6 +123,13 @@ class Client:
         )
         parser.add_argument(
             "--history", action="store", type=str, default=".charge-chat-client-history"
+        )
+        parser.add_argument(
+            "--reasoning-effort",
+            type=str,
+            choices=["low", "medium", "high"],
+            default="medium",
+            help="Effort level for reasoning models",
         )
 
     def enable_cmd_history_and_shell_integration(history: str):

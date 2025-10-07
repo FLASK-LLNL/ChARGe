@@ -12,6 +12,7 @@ try:
         ChatCompletionClient,
         LLMMessage,
         AssistantMessage,
+        CreateResult,
     )
     from openai import AsyncOpenAI
 
@@ -32,10 +33,11 @@ from functools import partial
 import os
 from charge.clients.Client import Client
 from charge.clients.autogen_utils import generate_agent, list_client_tools
-from typing import Type, Optional, Dict, Union, List, Callable
+from typing import Type, Optional, Dict, Union, List, Callable, Any
 from charge.experiments.Experiment import Experiment
+from charge.clients.hf import HuggingFaceLocalClient
+from charge.clients.vllm import VLLMClient
 from loguru import logger
-
 
 class AutoGenClient(Client):
     def __init__(
@@ -57,6 +59,11 @@ class AutoGenClient(Client):
         max_multi_turns: int = 100,
         mcp_timeout: int = 60,
         thoughts_callback: Optional[Callable] = None,
+        # New parameters for local HuggingFace models
+        local_model_path: Optional[str] = "/p/vast1/flask/models/gpt-oss-120b",
+        device: str = "auto",
+        torch_dtype: str = "auto",
+        quantization: Optional[str] = "4bit",
     ):
         """Initializes the AutoGenClient.
 
@@ -64,7 +71,7 @@ class AutoGenClient(Client):
             experiment_type (Type[Experiment]): The experiment class to use.
             path (str, optional): Path to save generated MCP server files. Defaults to ".".
             max_retries (int, optional): Maximum number of retries for failed tasks. Defaults to 3.
-            backend (str, optional): Backend to use: "openai", "gemini", "ollama", "liveai" or "livchat". Defaults to "openai".
+            backend (str, optional): Backend to use: "openai", "gemini", "ollama", "huggingface", "livai" or "livchat". Defaults to "openai".
             model (str, optional): Model name to use. Defaults to "gpt-4".
             model_client (Optional[ChatCompletionClient], optional): Pre-initialized model client. If provided, `backend`, `model`, and `api_key` are ignored. Defaults to None.
             api_key (Optional[str], optional): API key for the model. Defaults to None.
@@ -85,6 +92,12 @@ class AutoGenClient(Client):
             mcp_timeout (int, optional): Timeout in seconds for MCP server responses. Defaults to 60 s.
             thoughts_callback (Optional[Callable], optional): Optional callback function to handle model thoughts.
                                                             Defaults to None.
+            local_model_path (Optional[str], optional): Path to local HuggingFace model directory. 
+                                                       Required when backend="huggingface". Defaults to local FLASK gpt-oss-120b.
+            device (str, optional): Device to load model on ("auto", "cuda", "cpu"). Defaults to "auto".
+            torch_dtype (str, optional): Torch dtype for model ("auto", "float16", "bfloat16"). Defaults to "auto".
+            quantization (Optional[str], optional): Quantization method ("4bit", "8bit", None). Defaults to "4bit".
+        
         Raises:
             ValueError: If neither `server_path` nor `server_url` is provided and MCP servers cannot be generated.
         """
@@ -99,6 +112,10 @@ class AutoGenClient(Client):
         self.max_multi_turns = max_multi_turns
         self.mcp_timeout = mcp_timeout
         self.thoughts_callback = thoughts_callback
+        
+        # Initialize servers list if not already done by parent
+        if not hasattr(self, 'servers'):
+            self.servers = []
 
         if model_client is not None:
             self.model_client = model_client
@@ -110,7 +127,47 @@ class AutoGenClient(Client):
                 "family": ModelFamily.UNKNOWN,
                 "structured_output": True,
             }
-            if backend == "ollama":
+            
+            if backend == "huggingface":
+                # Use local HuggingFace model
+                if local_model_path is None:
+                    raise ValueError(
+                        "local_model_path must be provided when backend='huggingface'"
+                    )
+                
+                self.model_client = HuggingFaceLocalClient(
+                    model_path=local_model_path,
+                    model_info=model_info,
+                    device=device,
+                    torch_dtype=torch_dtype,
+                    quantization=quantization,
+                    **self.model_kwargs,
+                )
+            elif backend == "vllm":
+                # Use vLLM server
+                vllm_url = self.model_kwargs.get(
+                    "vllm_url", 
+                    os.getenv("VLLM_URL", "http://localhost:8000/v1")
+                )
+                vllm_model = self.model_kwargs.get(
+                    "vllm_model", 
+                    os.getenv("VLLM_MODEL", model or "/p/vast1/flask/models/gpt-oss-120b")
+                )
+                reasoning_effort = self.model_kwargs.get(
+                    "reasoning_effort", 
+                    "medium"
+                )
+                print(f"\n  ==> vllm backend vllm_url: {vllm_url}")
+                print(f"\n  ==> vllm backend vllm_model: {vllm_model}")
+                print(f"\n  ==> oss reasoning: {reasoning_effort}")
+
+                self.model_client = VLLMClient(
+                    base_url=vllm_url,
+                    model_name=vllm_model,
+                    model_info=model_info,
+                    reasoning_effort=reasoning_effort,
+                )
+            elif backend == "ollama":
                 from autogen_ext.models.ollama import OllamaChatCompletionClient
 
                 self.model_client = OllamaChatCompletionClient(
@@ -172,7 +229,7 @@ class AutoGenClient(Client):
     @staticmethod
     def configure(
         model: Optional[str], backend: str
-    ) -> (str, str, str, Dict[str, str]):
+    ) -> tuple[str, str, Optional[str], Dict[str, str]]:
         import httpx
 
         kwargs = {}
@@ -200,6 +257,11 @@ class AutoGenClient(Client):
                 kwargs["reasoning_effort"] = "high"
         elif backend in ["ollama"]:
             default_model = "gpt-oss:latest"
+        elif backend in ["huggingface"]:
+            default_model = None  # Must be provided via local_model_path
+        elif backend in ["vllm"]:
+            kwargs["reasoning_effort"] = "medium"
+            default_model = "gpt-oss"  # Default vLLM model name
 
         if not model:
             model = default_model
@@ -280,6 +342,7 @@ class AutoGenClient(Client):
                 system_prompt,
                 workbenches,
                 self.max_tool_calls,
+                true,
                 self.thoughts_callback,
             )
             answer_invalid, result = await self.step(agent, user_prompt)
@@ -325,14 +388,14 @@ class AutoGenClient(Client):
             len(self.servers) > 0
         ), "No MCP servers available. Please provide server_path or server_url."
 
-        wokbenches = [McpWorkbench(server) for server in self.servers]
+        workbenches = [McpWorkbench(server) for server in self.servers]
 
         # Start the servers
-        for workbench in wokbenches:
+        for workbench in workbenches:
             await workbench.start()
 
         agent = generate_agent(
-            self.model_client, self.model, system_prompt, [], self.max_tool_calls
+            self.model_client, self.model, system_prompt, workbenches, self.max_tool_calls, reflect_on_tool_use=True
         )
 
         user = UserProxyAgent("USER", input_func=input)
@@ -344,7 +407,7 @@ class AutoGenClient(Client):
 
         result = team.run_stream()
         await Console(result)
-        for workbench in wokbenches:
+        for workbench in workbenches:
             await workbench.stop()
 
         await self.model_client.close()
