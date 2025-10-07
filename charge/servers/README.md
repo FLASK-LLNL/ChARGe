@@ -14,7 +14,6 @@ export CHEMPROP_BASE_PATH=<LC_PATH_TO_CHEMPROP_MODELS>
 ```
 ## Testing Chemprop Installation
 ```python
-from charge.servers.chemprop_make_prediction import get_chemprop_preds
 from charge.servers.molecular_property_utils import chemprop_preds_server
 smiles = [['CC(NCC1CO1)C#N'], ['CN(C)c1ccc(cc1)C(=C(C#N)C#N)C(c1ccc(cc1)N(=O)=O)=C1C(=O)c2ccccc2C1=O'], ['CC#CCC(OC(=O)c1ccc(cc1)N(=O)=O)C1(O)C(=O)OCC1(C)C=C']]
 property='10k_density'

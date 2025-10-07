@@ -85,7 +85,8 @@ def chemprop_preds_server(smiles,property):
         )
     chemprop_base_path=os.environ.get("CHEMPROP_BASE_PATH")
     if(chemprop_base_path):
-        model_path=chemprop_base_path+property+'_OOD/fold_0/'
+        model_path=os.path.join(chemprop_base_path, property+'_OOD')
+        model_path=os.path.join(model_path, 'fold_0')
         return(get_chemprop_preds(smiles,model_path))
     else:
         print('CHEMPROP_BASE_PATH environment variable not set!')
