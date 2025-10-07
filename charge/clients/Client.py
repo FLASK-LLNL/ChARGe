@@ -117,7 +117,7 @@ class Client:
             help="Backend to use for the orchestrator client",
         )
         parser.add_argument(
-            "--server-urls", nargs="*", type=str, default=["http://127.0.0.1:8000/sse"]
+            "--server_urls", nargs="*", type=str, default=["http://127.0.0.1:8000/sse"]
         )
         parser.add_argument(
             "--history", action="store", type=str, default=".charge-chat-client-history"
