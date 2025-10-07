@@ -78,6 +78,69 @@ def get_density_and_synthesizability(smiles: str) -> tuple[float, float]:
     return density, synthesizability
 
 def chemprop_preds_server(smiles,property):
+    
+    """
+    Predict molecular properties using pre-trained Chemprop models.
+
+    This function serves as a server-side entry point for ChARGe to obtain property
+    predictions from Chemprop models. It validates the requested property name,
+    constructs the appropriate model path based on the `CHEMPROP_BASE_PATH`
+    environment variable, and returns predictions for the provided SMILES input.
+
+    Valid properties
+    ----------------
+    ChARGe can request any of the following property names:
+      - 10k_density : Predicted density (g/cm³) from 10k dataset model
+      - 10k_hof     : Heat of formation (kJ/mol) from 10k dataset model
+      - qm9_alpha   : Polarizability (Bohr³)
+      - qm9_cv      : Heat capacity at constant volume (cal/mol·K)
+      - qm9_gap     : HOMO–LUMO energy gap (eV)
+      - qm9_homo    : HOMO energy (eV)
+      - qm9_lumo    : LUMO energy (eV)
+      - qm9_mu      : Dipole moment (Debye)
+      - qm9_r2      : Radius of gyration or related structural metric
+      - qm9_zpve    : Zero-point vibrational energy (Hartree)
+      - lipo        : Octanol–water partition coefficient (logP)
+
+    Parameters
+    ----------
+    smiles : str
+        A SMILES string representing the molecule to be evaluated.
+    property : str
+        The property to predict. Must be one of the valid property names listed above.
+
+    Returns
+    -------
+    list[list[float]]
+        A list of single-entry lists, where each inner list contains one float representing
+        the predicted value for the specified property. For example:
+        [[1.2158], [1.4041], [1.3984]].
+        The outer list length corresponds to the number of input SMILES strings, and each
+        inner list contains exactly one float prediction.
+
+    Raises
+    ------
+    ValueError
+        If the given property name is not recognized.
+    SystemExit
+        If the environment variable `CHEMPROP_BASE_PATH` is not set.
+
+    Requirements
+    ------------
+    - The environment variable `CHEMPROP_BASE_PATH` must point to the base directory
+      containing Chemprop model folders (e.g., ".../chemprop/Saved_Models/").
+    - Each property model must exist under a path of the form:
+      `{CHEMPROP_BASE_PATH}/{property}_OOD/fold_0/`.
+
+    Examples
+    --------
+    >>> chemprop_preds_server("CCO", "qm9_gap")
+    6.73
+
+    >>> chemprop_preds_server("c1ccccc1", "lipo")
+    [[2.94]]
+    """
+    
     valid_properties = {'10k_density', '10k_hof', 'qm9_alpha','qm9_cv','qm9_gap','qm9_homo','qm9_lumo','qm9_mu','qm9_r2','qm9_zpve','lipo'}
     if property not in valid_properties:
         raise ValueError(
