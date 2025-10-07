@@ -1,6 +1,6 @@
 try:
     from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
-    from autogen_core.models import ModelFamily, ChatCompletionClient
+    from autogen_core.models import ModelFamily, ChatCompletionClient, CreateResult
     from autogen_ext.tools.mcp import StdioServerParams, McpWorkbench, SseServerParams
     from autogen_agentchat.messages import TextMessage
     from autogen_agentchat.conditions import HandoffTermination, TextMentionTermination
@@ -15,8 +15,295 @@ except ImportError:
 from functools import partial
 import os
 from charge.clients.Client import Client
-from typing import Type, Optional, Dict, Union
+from typing import Type, Optional, Dict, Union, List, Any
 from charge.Experiment import Experiment
+
+
+# Custom HuggingFace Model Client
+class HuggingFaceLocalClient(ChatCompletionClient):
+    """Custom ChatCompletionClient for local HuggingFace models"""
+    
+    def __init__(
+        self,
+        model_path: str,
+        model_info: Optional[Dict[str, Any]] = None,
+        device: str = "auto",
+        torch_dtype: str = "auto",
+        quantization: Optional[str] = "4bit",
+        trust_remote_code: bool = True,
+        **kwargs
+    ):
+        """
+        Initialize a local HuggingFace model client.
+        
+        Args:
+            model_path: Path to local model directory or HuggingFace model ID
+            model_info: Model information dict
+            device: Device to load model on ("auto", "cuda", "cpu")
+            torch_dtype: Torch dtype for model ("auto", "float16", "bfloat16")
+            quantization: Quantization method ("4bit", "8bit", None). Defaults to "4bit"
+            trust_remote_code: Whether to trust remote code
+            **kwargs: Additional arguments for model/tokenizer
+        """
+        try:
+            from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+            import torch
+        except ImportError:
+            raise ImportError(
+                "Please install transformers and torch: "
+                "pip install transformers torch"
+            )
+        
+        self._model_path = model_path
+        self._model_info = model_info or {
+            "vision": False,
+            "function_calling": True,
+            "json_output": True,
+            "family": ModelFamily.UNKNOWN,
+            "structured_output": True,
+        }
+        
+        # Convert string dtype to torch dtype
+        dtype_map = {
+            "auto": "auto",
+            "float16": torch.float16,
+            "bfloat16": torch.bfloat16,
+            "float32": torch.float32,
+        }
+        torch_dtype_obj = dtype_map.get(torch_dtype, "auto")
+        
+        quantization_config = None
+        
+        # Load tokenizer
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            model_path,
+            trust_remote_code=trust_remote_code,
+            **kwargs
+        )
+        # Prepare model loading arguments
+        model_kwargs = {
+            "device_map": device,
+            "trust_remote_code": trust_remote_code,
+        }
+        
+        ## Add quantization config if specified
+        #if quantization_config is not None:
+        #    model_kwargs["quantization_config"] = quantization_config
+        #else:
+        #    # Only set torch_dtype if not quantizing
+        #    model_kwargs["torch_dtype"] = torch_dtype_obj
+        model_kwargs["torch_dtype"] = torch_dtype_obj
+        
+        # Load model
+        self._model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            **model_kwargs,
+            **kwargs
+        )
+
+        # Set pad token if not set
+        if self._tokenizer.pad_token is None:
+            self._tokenizer.pad_token = self._tokenizer.eos_token
+    
+    async def create(
+        self,
+        messages: List[Any],
+        **kwargs
+    ) -> Any:
+        """
+        Create a completion from messages.
+        
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+            **kwargs: Additional generation parameters
+        """
+        import asyncio
+        
+        # Run inference in thread pool to avoid blocking event loop
+        def _generate():
+            try:
+                # Convert messages to prompt
+                prompt = self._format_messages(messages)
+                
+                ## Tokenize
+                #inputs = self._tokenizer(
+                #    prompt,
+                #    return_tensors="pt",
+                #    padding=True,
+                #    truncation=True,
+                #).to(self._model.device)
+
+                # Tokenize with proper max_length
+                max_length = getattr(self._model.config, 'max_position_embeddings', 2048)
+                inputs = self._tokenizer(
+                    prompt,
+                    return_tensors="pt",
+                    padding=True,
+                    truncation=True,
+                    max_length=max_length - 512,  # Leave room for generation
+                ).to(self._model.device)
+        
+                # Generate
+                gen_kwargs = {
+                    "max_new_tokens": kwargs.get("max_tokens", 4096),
+                    "temperature": kwargs.get("temperature", 0.7),
+                    "top_p": kwargs.get("top_p", 0.9),
+                    "do_sample": kwargs.get("temperature", 0.7) > 0,
+                    "pad_token_id": self._tokenizer.pad_token_id,
+                    "eos_token_id": self._tokenizer.eos_token_id,
+                }
+                
+                outputs = self._model.generate(**inputs, **gen_kwargs)
+                
+                # Decode - ensure we have valid output
+                if len(outputs[0]) <= inputs['input_ids'].shape[1]:
+                    # Model didn't generate anything new
+                    response = "[Model produced no output]"
+                else:
+                    response = self._tokenizer.decode(
+                        outputs[0][inputs['input_ids'].shape[1]:],
+                        skip_special_tokens=True
+                    )
+                
+                # Ensure we have some response
+                if not response or not response.strip():
+                    response = "[Empty response from model]"
+                    
+                return response.strip()
+            except Exception as e:
+                raise RuntimeError(f"Error during model generation: {e}")
+        
+        # Run in thread pool to not block event loop
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(None, _generate)
+
+        ## Debug: see what we're returning
+        #print(f"DEBUG: Generated response length: {len(response)}")
+        #print(f"DEBUG: Generated response preview: {response[:200]}...")
+
+        # Parse out the final answer if present
+        if '<|start|>assistant<|channel|>final' in response or 'assistantfinal' in response:
+            # Extract only the final channel content
+            if 'assistantfinal' in response:
+                final_content = response.split('assistantfinal', 1)[1].strip()
+            else:
+                final_content = response.split('<|channel|>final', 1)[1].strip()
+            #print(f"DEBUG: Extracted 'final' channel content:")
+            #print(final_content[:500] + "...\n")
+            response_to_return = final_content
+        else:
+            response_to_return = response
+            #print(f"DEBUG: No 'final' channel found, using full response\n")
+        
+        return CreateResult(
+            content=response_to_return,
+            usage=self.actual_usage(),
+            finish_reason="stop",
+            cached=False
+        )
+
+    def _format_messages(self, messages: List[Any]) -> str:
+        """Format messages into a single prompt string"""
+        # Convert AutoGen message objects to dicts
+        formatted_messages = []
+        for msg in messages:
+            if hasattr(msg, 'content') and hasattr(msg, 'source'):
+                # AutoGen message object
+                role = 'system' if msg.source == 'system' else 'user' if msg.source == 'user' else 'assistant'
+                formatted_messages.append({
+                    'role': role,
+                    'content': msg.content
+                })
+            elif isinstance(msg, dict):
+                # Already a dict
+                formatted_messages.append(msg)
+            else:
+                # Try to extract content
+                content = getattr(msg, 'content', str(msg))
+                formatted_messages.append({
+                    'role': 'user',
+                    'content': content
+                })
+        
+        ## DEBUG: Print all messages
+        #print(f"DEBUG: Formatting {len(formatted_messages)} messages:")
+        #for i, msg in enumerate(formatted_messages):
+        #    print(f"  Message {i}: role={msg['role']}, content_length={len(msg['content'])}")
+        #    print(f"    Content preview: {msg['content'][:200]}...")
+        
+        # Try to use chat template if available
+        if hasattr(self._tokenizer, 'apply_chat_template'):
+            try:
+                formatted = self._tokenizer.apply_chat_template(
+                    formatted_messages,
+                    tokenize=False,
+                    add_generation_prompt=True
+                )
+                #print(f"\nDEBUG: Full formatted prompt:\n{formatted}\n")
+                return formatted
+            except Exception as e:
+                print(f"DEBUG: Chat template failed: {e}, using fallback")
+        
+        # Fallback to simple formatting
+        formatted = []
+        for msg in formatted_messages:
+            role = msg['role']
+            content = msg['content']
+            if role == 'system':
+                formatted.append(f"System: {content}")
+            elif role == 'user':
+                formatted.append(f"User: {content}")
+            elif role == 'assistant':
+                formatted.append(f"Assistant: {content}")
+        
+        formatted.append("Assistant:")
+        result = "\n\n".join(formatted)
+        #print(f"DEBUG: Using fallback format. Prompt preview:\n{result[:500]}...\n")
+        return result
+    
+    @property
+    def model_info(self) -> Dict[str, Any]:
+        """Return model information"""
+        return self._model_info
+    
+    async def close(self):
+        """Clean up resources"""
+        # Clean up model and tokenizer if needed
+        if hasattr(self, '_model'):
+            del self._model
+        if hasattr(self, '_tokenizer'):
+            del self._tokenizer
+    
+    def capabilities(self) -> dict:
+        """Return model capabilities"""
+        return self._model_info
+    
+    def count_tokens(self, messages: List[Dict[str, str]], **kwargs) -> int:
+        """Count tokens in messages"""
+        prompt = self._format_messages(messages)
+        tokens = self._tokenizer.encode(prompt)
+        return len(tokens)
+    
+    def remaining_tokens(self, messages: List[Dict[str, str]], **kwargs) -> int:
+        """Return remaining tokens available"""
+        # Most models have ~4096 context, but this varies
+        # Return a safe estimate
+        used = self.count_tokens(messages, **kwargs)
+        return max(0, 4096 - used)
+    
+    def total_usage(self) -> dict:
+        """Return total token usage"""
+        # Simple implementation - could be enhanced to track actual usage
+        return {"prompt_tokens": 0, "completion_tokens": 0}
+    
+    def actual_usage(self) -> dict:
+        """Return actual token usage for last request"""
+        # Simple implementation - could be enhanced to track actual usage
+        return {"prompt_tokens": 0, "completion_tokens": 0}
+    
+    async def create_stream(self, messages: List[Dict[str, str]], **kwargs):
+        """Stream completion - not implemented for local models"""
+        raise NotImplementedError("Streaming not supported for local HuggingFace models")
 
 
 class AutoGenClient(Client):
@@ -37,6 +324,11 @@ class AutoGenClient(Client):
         max_tool_calls: int = 15,
         check_response: bool = False,
         max_multi_turns: int = 100,
+        # New parameters for local HuggingFace models
+        local_model_path: Optional[str] = "/p/lustre5/chrundle/huggingface-models/gpt-oss-20b/", #"/p/vast1/flask/models/gpt-oss-120b",
+        device: str = "auto",
+        torch_dtype: str = "auto",
+        quantization: Optional[str] = "4bit",
     ):
         """Initializes the AutoGenClient.
 
@@ -44,7 +336,7 @@ class AutoGenClient(Client):
             experiment_type (Type[Experiment]): The experiment class to use.
             path (str, optional): Path to save generated MCP server files. Defaults to ".".
             max_retries (int, optional): Maximum number of retries for failed tasks. Defaults to 3.
-            backend (str, optional): Backend to use: "openai", "gemini", "ollama", "liveai" or "livchat". Defaults to "openai".
+            backend (str, optional): Backend to use: "openai", "gemini", "ollama", "huggingface", "livai" or "livchat". Defaults to "openai".
             model (str, optional): Model name to use. Defaults to "gpt-4".
             model_client (Optional[ChatCompletionClient], optional): Pre-initialized model client. If provided, `backend`, `model`, and `api_key` are ignored. Defaults to None.
             api_key (Optional[str], optional): API key for the model. Defaults to None.
@@ -62,6 +354,12 @@ class AutoGenClient(Client):
             check_response (bool, optional): Whether to check the response using verifier methods.
                                              Defaults to False (Will be set to True in the future).
             max_multi_turns (int, optional): Maximum number of multi-turn interactions. Defaults to 100.
+            local_model_path (Optional[str], optional): Path to local HuggingFace model directory. 
+                                                       Required when backend="huggingface". Defaults to local FLASK gpt-oss-120b.
+            device (str, optional): Device to load model on ("auto", "cuda", "cpu"). Defaults to "auto".
+            torch_dtype (str, optional): Torch dtype for model ("auto", "float16", "bfloat16"). Defaults to "auto".
+            quantization (Optional[str], optional): Quantization method ("4bit", "8bit", None). Defaults to "4bit".
+        
         Raises:
             ValueError: If neither `server_path` nor `server_url` is provided and MCP servers cannot be generated.
         """
@@ -74,6 +372,10 @@ class AutoGenClient(Client):
         self.max_tool_calls = max_tool_calls
         self.check_response = check_response
         self.max_multi_turns = max_multi_turns
+        
+        # Initialize servers list if not already done by parent
+        if not hasattr(self, 'servers'):
+            self.servers = []
 
         if model_client is not None:
             self.model_client = model_client
@@ -85,7 +387,23 @@ class AutoGenClient(Client):
                 "family": ModelFamily.UNKNOWN,
                 "structured_output": True,
             }
-            if backend == "ollama":
+            
+            if backend == "huggingface":
+                # Use local HuggingFace model
+                if local_model_path is None:
+                    raise ValueError(
+                        "local_model_path must be provided when backend='huggingface'"
+                    )
+                
+                self.model_client = HuggingFaceLocalClient(
+                    model_path=local_model_path,
+                    model_info=model_info,
+                    device=device,
+                    torch_dtype=torch_dtype,
+                    quantization=quantization,
+                    **self.model_kwargs,
+                )
+            elif backend == "ollama":
                 from autogen_ext.models.ollama import OllamaChatCompletionClient
 
                 self.model_client = OllamaChatCompletionClient(
@@ -127,7 +445,8 @@ class AutoGenClient(Client):
                     )
         self.messages = []
 
-    def configure(model: Optional[str], backend: str) -> (str, str, str, Dict[str, str]):
+    @staticmethod
+    def configure(model: Optional[str], backend: str) -> tuple[str, str, Optional[str], Dict[str, str]]:
         import httpx
 
         kwargs = {}
@@ -155,6 +474,8 @@ class AutoGenClient(Client):
                 kwargs["reasoning_effort"] = "high"
         elif backend in ["ollama"]:
             default_model = "gpt-oss:latest"
+        elif backend in ["huggingface"]:
+            default_model = None  # Must be provided via local_model_path
 
         if not model:
             model = default_model
@@ -265,7 +586,7 @@ class AutoGenClient(Client):
             name="Assistant",
             model_client=self.model_client,
             system_message=system_prompt,
-            workbench=workbench,
+            workbench=wokbenches,
             max_tool_iterations=self.max_tool_calls,
             reflect_on_tool_use=True,
         )
