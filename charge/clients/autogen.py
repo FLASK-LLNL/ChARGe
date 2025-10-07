@@ -34,6 +34,7 @@ import os
 import warnings
 from charge.clients.AgentPool import AgentPool, Agent
 from charge.clients.Client import Client
+from charge.clients.huggingface_client import HuggingFaceLocalClient
 from charge.clients.autogen_utils import (
     _list_wb_tools,
     generate_agent,
@@ -78,6 +79,8 @@ def model_configure(
         assert API_KEY is not None, f"API key must be set for backend {backend}"
     elif backend in ["ollama"]:
         default_model = "gpt-oss:latest"
+    elif backend in ["huggingface"]:
+        default_model = None  # Must be provided via model path
 
     if not model:
         model = default_model
@@ -95,13 +98,16 @@ def create_autogen_model_client(
     Creates an AutoGen model client based on the specified backend and model.
 
     Args:
-        backend (str): The backend to use: "openai", "gemini", "ollama", "liveai" or "livchat".
+        backend (str): The backend to use: "openai", "gemini", "ollama", "huggingface", "liveai" or "livchat".
         model (str): The model name to use.
         api_key (Optional[str], optional): API key for the model. Defaults to None.
         model_kwargs (Optional[dict], optional): Additional keyword arguments for the model client. Defaults to None.
     Returns:
         Union[AsyncOpenAI, ChatCompletionClient]: The created model client.
     """
+    if model_kwargs is None:
+        model_kwargs = {}
+    
     model_info = ModelInfo(
         vision=False,
         function_calling=True,
@@ -115,6 +121,21 @@ def create_autogen_model_client(
         model_client = OllamaChatCompletionClient(
             model=model,
             model_info=model_info,
+        )
+    elif backend == "huggingface":
+        # Extract HuggingFace-specific kwargs
+        model_path = model_kwargs.pop("local_model_path", model)
+        device = model_kwargs.pop("device", "auto")
+        torch_dtype = model_kwargs.pop("torch_dtype", "auto")
+        quantization = model_kwargs.pop("quantization", "4bit")
+        
+        model_client = HuggingFaceLocalClient(
+            model_path=model_path,
+            model_info=model_info,
+            device=device,
+            torch_dtype=torch_dtype,
+            quantization=quantization,
+            **model_kwargs,
         )
     else:
         if api_key is None:
@@ -138,7 +159,7 @@ def create_autogen_model_client(
             model=model,
             api_key=api_key,
             model_info=model_info,
-            **model_kwargs if model_kwargs is not None else {},
+            **model_kwargs,
         )
     return model_client
 
@@ -422,7 +443,7 @@ class AutoGenPool(AgentPool):
     Args:
         model_client (Union[AsyncOpenAI, ChatCompletionClient]): The model client to use.
         model (str): The model name to use.
-        backend (str, optional): Backend to use: "openai", "gemini", "ollama", "liveai" or "livchat". Defaults to "openai".
+        backend (str, optional): Backend to use: "openai", "gemini", "ollama", "huggingface", "liveai" or "livchat". Defaults to "openai".
     """
 
     AGENT_COUNT = 0
@@ -533,257 +554,3 @@ class AutoGenPool(AgentPool):
         """
         assert name in self.agent_dict, f"Agent with name {name} does not exist."
         return self.agent_dict[name]
-
-
-class AutoGenClient(Client):
-    def __init__(
-        self,
-        task: Task,
-        path: str = ".",
-        max_retries: int = 3,
-        backend: str = "openai",
-        model: str = "gpt-4",
-        model_client: Optional[Union[AsyncOpenAI, ChatCompletionClient]] = None,
-        api_key: Optional[str] = None,
-        model_info: Optional[dict] = None,
-        model_kwargs: Optional[dict] = None,
-        server_path: Optional[Union[str, list[str]]] = None,
-        server_url: Optional[Union[str, list[str]]] = None,
-        server_kwargs: Optional[dict] = None,
-        max_tool_calls: int = 30,
-        check_response: bool = False,
-        max_multi_turns: int = 100,
-        mcp_timeout: int = 60,
-        thoughts_callback: Optional[Callable] = None,
-    ):
-        """Initializes the AutoGenClient.
-
-        Args:
-            task (Type[Task]): The task class to use.
-            path (str, optional): Path to save generated MCP server files. Defaults to ".".
-            max_retries (int, optional): Maximum number of retries for failed tasks. Defaults to 3.
-            backend (str, optional): Backend to use: "openai", "gemini", "ollama", "liveai" or "livchat". Defaults to "openai".
-            model (str, optional): Model name to use. Defaults to "gpt-4".
-            model_client (Optional[ChatCompletionClient], optional): Pre-initialized model client. If provided, `backend`, `model`, and `api_key` are ignored. Defaults to None.
-            api_key (Optional[str], optional): API key for the model. Defaults to None.
-            model_info (Optional[dict], optional): Additional model info. Defaults to None.
-            model_kwargs (Optional[dict], optional): Additional keyword arguments for the model client.
-                                                     Defaults to None.
-            server_path (Optional[Union[str, list[str]]], optional): Path or list of paths to existing MCP server script. If provided, this
-                                                   server will be used instead of generating
-                                                   new ones. Defaults to None.
-            server_url (Optional[Union[str, list[str]]], optional): URL or list URLs of existing MCP server over the SSE transport.
-                                                  If provided, this server will be used instead of generating
-                                                  new ones. Defaults to None.
-            server_kwargs (Optional[dict], optional): Additional keyword arguments for the server client. Defaults to None.
-            max_tool_calls (int, optional): Maximum number of tool calls per task. Defaults to 15.
-            check_response (bool, optional): Whether to check the response using verifier methods.
-                                             Defaults to False (Will be set to True in the future).
-            max_multi_turns (int, optional): Maximum number of multi-turn interactions. Defaults to 100.
-            mcp_timeout (int, optional): Timeout in seconds for MCP server responses. Defaults to 60 s.
-            thoughts_callback (Optional[Callable], optional): Optional callback function to handle model thoughts.
-                                                            Defaults to None.
-        Raises:
-            ValueError: If neither `server_path` nor `server_url` is provided and MCP servers cannot be generated.
-        """
-        super().__init__(task, path, max_retries)
-        self.backend = backend
-        self.model = model
-        self.api_key = api_key
-        self.model_info = model_info
-        self.model_kwargs = model_kwargs if model_kwargs is not None else {}
-        self.max_tool_calls = max_tool_calls
-        self.check_response = check_response
-        self.max_multi_turns = max_multi_turns
-        self.mcp_timeout = mcp_timeout
-        self.thoughts_callback = thoughts_callback
-
-        if model_client is not None:
-            self.model_client = model_client
-        else:
-            self.model_client = create_autogen_model_client(
-                backend=backend,
-                model=model,
-                api_key=api_key,
-                model_kwargs=self.model_kwargs,
-            )
-
-        if server_path is None and server_url is None:
-            self.setup_mcp_servers()
-        else:
-            if server_path is not None:
-                if isinstance(server_path, str):
-                    server_path = [server_path]
-                for sp in server_path:
-                    self.servers.append(
-                        StdioServerParams(
-                            command="python3",
-                            args=[sp],
-                            read_timeout_seconds=self.mcp_timeout,
-                        )
-                    )
-            if server_url is not None:
-                if isinstance(server_url, str):
-                    server_url = [server_url]
-                for su in server_url:
-                    self.servers.append(
-                        SseServerParams(
-                            url=su,
-                            timeout=self.mcp_timeout,
-                            sse_read_timeout=self.mcp_timeout,
-                            **(server_kwargs or {}),
-                        )
-                    )
-
-    @staticmethod
-    def configure(
-        model: Optional[str], backend: str
-    ) -> Tuple[str, str, Optional[str], Dict[str, str]]:
-        return model_configure(model=model, backend=backend)
-
-    def check_invalid_response(self, result) -> bool:
-        answer_invalid = False
-        for method in self.verifier_methods:
-            try:
-                is_valid = method(result.messages[-1].content)
-                if not is_valid:
-                    answer_invalid = True
-                    break
-            except Exception as e:
-                print(f"Error during verification with {method.__name__}: {e}")
-                answer_invalid = True
-                break
-        return answer_invalid
-
-    async def step(self, agent, task: str):
-        result = await agent.run(task=task)
-
-        for msg in result.messages:
-            if isinstance(msg, TextMessage):
-                self.messages.append(msg.content)
-
-        if not self.check_response:
-            assert isinstance(result.messages[-1], TextMessage)
-            return False, result
-
-        answer_invalid = False
-        if isinstance(result.messages[-1], TextMessage):
-            answer_invalid = self.check_invalid_response(result.messages[-1].content)
-        else:
-            answer_invalid = True
-        retries = 0
-        while answer_invalid and retries < self.max_retries:
-            new_user_prompt = (
-                "The previous response was invalid. Please try again.\n\n" + task
-            )
-            # print("Retrying with new prompt...")
-            result = await agent.run(task=new_user_prompt)
-            if isinstance(result.messages[-1], TextMessage):
-                answer_invalid = self.check_invalid_response(
-                    result.messages[-1].content
-                )
-            else:
-                answer_invalid = True
-            retries += 1
-        return answer_invalid, result
-
-    async def run(self):
-        system_prompt = self.task.get_system_prompt()
-        user_prompt = self.task.get_user_prompt()
-        structured_output_schema = None
-        if self.task.has_structured_output_schema():
-            structured_output_schema = self.task.get_structured_output_schema()
-
-        assert (
-            user_prompt is not None
-        ), "User prompt must be provided for single-turn run."
-
-        workbenches = [McpWorkbench(server) for server in self.servers]
-
-        # Report on which tools are available
-        await list_client_tools(self)
-
-        # Start the servers
-
-        await asyncio.gather(*[workbench.start() for workbench in workbenches])
-
-        try:
-            agent = generate_agent(
-                self.model_client,
-                self.model,
-                system_prompt,
-                workbenches,
-                self.max_tool_calls,
-                self.thoughts_callback,
-            )
-            answer_invalid, result = await self.step(agent, user_prompt)
-
-        finally:
-
-            await asyncio.gather(*[workbench.stop() for workbench in workbenches])
-
-        if answer_invalid:
-            # Maybe convert this to a warning and let the user handle it
-            # warnings.warn("Failed to get a valid response after maximum retries.")
-            # return None
-            raise ValueError("Failed to get a valid response after maximum retries.")
-        else:
-            if structured_output_schema is not None:
-                # Parse the output using the structured output schema
-                assert isinstance(result.messages[-1], TextMessage)
-                content = result.messages[-1].content
-                try:
-                    parsed_output = structured_output_schema.model_validate_json(
-                        content
-                    )
-                    return parsed_output
-                except Exception as e:
-                    # warnings.warn(f"Failed to parse output: {e}")
-                    # return result.messages[-1].content
-
-                    # We could also potentially reprompt the model to fix the output
-                    # but for now, we just raise an error
-                    raise ValueError(f"Failed to parse output: {e}")
-            # gracefully close the
-            await agent.close()
-            return result.messages[-1].content
-
-    async def chat(self):
-        system_prompt = self.task.get_system_prompt()
-
-        handoff_termination = HandoffTermination(target="user")
-        # Define a termination condition that checks for a specific text mention.
-        text_termination = TextMentionTermination("TERMINATE")
-
-        assert (
-            len(self.servers) > 0
-        ), "No MCP servers available. Please provide server_path or server_url."
-
-        wokbenches = [McpWorkbench(server) for server in self.servers]
-
-        # Start the servers
-        for workbench in wokbenches:
-            await workbench.start()
-
-        agent = generate_agent(
-            self.model_client, self.model, system_prompt, [], self.max_tool_calls
-        )
-
-        user = UserProxyAgent("USER", input_func=input)
-        team = RoundRobinGroupChat(
-            [agent, user],
-            max_turns=self.max_multi_turns,
-            # termination_condition=text_termination,
-        )
-
-        result = team.run_stream()
-        await Console(result)
-        for workbench in wokbenches:
-            await workbench.stop()
-
-        await self.model_client.close()
-
-    async def refine(self, feedback: str):
-        raise NotImplementedError(
-            "TODO: Multi-turn refine currently not supported. - S.Z."
-        )
