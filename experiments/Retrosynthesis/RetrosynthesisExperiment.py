@@ -1,3 +1,4 @@
+from typing import Optional
 from charge.Experiment import Experiment
 
 
@@ -22,11 +23,16 @@ class RetrosynthesisExperiment(Experiment):
     def __init__(
         self,
         user_prompt,
+        system_prompt: Optional[str] = None,  # Add optional parameter
     ):
+        # Use provided system prompt or fall back to default
+        if system_prompt is None:
+            system_prompt = SYSTEM_PROMPT
+        
         super().__init__(
-            system_prompt=SYSTEM_PROMPT,
+            system_prompt=system_prompt,
             user_prompt=user_prompt,
         )
         print("RetrosynthesisExperiment initialized with the provided prompts.")
-        self.system_prompt = SYSTEM_PROMPT
+        self.system_prompt = system_prompt
         self.user_prompt = user_prompt

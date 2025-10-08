@@ -25,6 +25,13 @@ parser.add_argument(
     + "including any further constraints",
 )
 
+parser.add_argument(
+    "--system-prompt",
+    type=str,
+    default=None,
+    help="Custom system prompt (optional, uses default retrosynthesis prompt if not provided)",
+)
+
 # Add standard CLI arguments
 Client.add_std_parser_arguments(parser)
 
@@ -37,7 +44,10 @@ if __name__ == "__main__":
     user_prompt = args.user_prompt
     assert user_prompt is not None, "User prompt must be provided"
 
-    myexperiment = Retrosynthesis(user_prompt=user_prompt)
+    myexperiment = Retrosynthesis(
+        user_prompt=user_prompt,
+        system_prompt=args.system_prompt,
+    )
 
     if args.client == "gemini":
         from charge.clients.gemini import GeminiClient

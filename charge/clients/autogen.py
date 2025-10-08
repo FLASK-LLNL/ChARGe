@@ -145,7 +145,7 @@ class HuggingFaceLocalClient(ChatCompletionClient):
         
                 # Generate
                 gen_kwargs = {
-                    "max_new_tokens": kwargs.get("max_tokens", 4096),
+                    "max_new_tokens": kwargs.get("max_tokens", 8192),
                     "temperature": kwargs.get("temperature", 0.7),
                     "top_p": kwargs.get("top_p", 0.9),
                     "do_sample": kwargs.get("temperature", 0.7) > 0,
@@ -383,7 +383,7 @@ class VLLMClient(ChatCompletionClient):
             response = await self._client.chat.completions.create(
                 model=self._model_name,
                 messages=formatted_messages,
-                max_tokens=kwargs.get("max_tokens", 4096),
+                max_tokens=kwargs.get("max_tokens", 8192),
                 temperature=kwargs.get("temperature", 0.7),
                 top_p=kwargs.get("top_p", 0.9),
                 stream=False,
