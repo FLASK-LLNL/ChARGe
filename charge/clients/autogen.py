@@ -82,6 +82,8 @@ def model_configure(
         default_model = "gpt-oss:latest"
     elif backend in ["huggingface"]:
         default_model = None  # Must be provided via model path
+    elif backend in ["vllm"]:
+        default_model = "gpt-oss"  # Default vLLM model name
 
     if not model:
         model = default_model
@@ -99,7 +101,7 @@ def create_autogen_model_client(
     Creates an AutoGen model client based on the specified backend and model.
 
     Args:
-        backend (str): The backend to use: "openai", "gemini", "ollama", "huggingface", "liveai" or "livchat".
+        backend (str): The backend to use: "openai", "gemini", "ollama", "huggingface", "vllm", "liveai" or "livchat".
         model (str): The model name to use.
         api_key (Optional[str], optional): API key for the model. Defaults to None.
         model_kwargs (Optional[dict], optional): Additional keyword arguments for the model client. Defaults to None.
@@ -136,6 +138,17 @@ def create_autogen_model_client(
             device=device,
             torch_dtype=torch_dtype,
             quantization=quantization,
+            **model_kwargs,
+        )
+    elif backend == "vllm":
+        # Extract vLLM-specific kwargs
+        vllm_url = model_kwargs.pop("vllm_url", os.getenv("VLLM_URL", "http://localhost:8000/v1"))
+        vllm_model = model_kwargs.pop("vllm_model", os.getenv("VLLM_MODEL", model))
+        
+        model_client = VLLMClient(
+            base_url=vllm_url,
+            model_name=vllm_model,
+            model_info=model_info,
             **model_kwargs,
         )
     else:
