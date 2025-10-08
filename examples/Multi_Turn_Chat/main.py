@@ -1,25 +1,40 @@
 import argparse
 import asyncio
 from charge.experiments.Experiment import Experiment
+from typing import Optional
 from charge.clients.Client import Client
 from charge.clients.autogen import AutoGenClient
 
 parser = argparse.ArgumentParser()
 
+# Add system prompt argument
+parser.add_argument(
+    "--system-prompt",
+    type=str,
+    default=None,
+    help="Custom system prompt (optional, uses default chemistry prompt if not provided)",
+)
+
 # Add standard CLI arguments
 Client.add_std_parser_arguments(parser)
+
+# Default system prompt
+DEFAULT_SYSTEM_PROMPT = (
+    "You are a world-class chemist. Your task is to generate unique molecules "
+    "based on the lead molecule provided by the user. The generated molecules "
+    "should be chemically valid and diverse, exploring different chemical spaces "
+    "while maintaining some structural similarity to the lead molecule. "
+    "Provide the final answer in a clear and concise manner."
+)
 
 class ChargeChatExperiment(Experiment):
     def __init__(
         self,
+        system_prompt: Optional[str] = None,
     ):
-        system_prompt = (
-            "You are a world-class chemist. Your task is to generate unique molecules "
-            "based on the lead molecule provided by the user. The generated molecules "
-            "should be chemically valid and diverse, exploring different chemical spaces "
-            "while maintaining some structural similarity to the lead molecule. "
-            "Provide the final answer in a clear and concise manner."
-        )
+        # Use provided system prompt or fall back to default
+        if system_prompt is None:
+            system_prompt = DEFAULT_SYSTEM_PROMPT
 
         super().__init__(system_prompt=system_prompt, user_prompt=None)
         print("ChargeChatExperiment initialized with the provided prompts.")
@@ -34,7 +49,10 @@ if __name__ == "__main__":
     server_url = args.server_urls[0]
     assert server_url is not None, "Server URL must be provided"
     assert server_url.endswith("/sse"), "Server URL must end with /sse"
-    myexperiment = ChargeChatExperiment()
+
+    myexperiment = ChargeChatExperiment(
+        system_prompt=args.system_prompt,
+    )
 
     (model, backend, API_KEY, kwargs) = AutoGenClient.configure(
         args.model, args.backend

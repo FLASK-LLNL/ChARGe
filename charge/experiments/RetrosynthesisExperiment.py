@@ -123,12 +123,17 @@ class RetrosynthesisExperiment(Experiment):
     def __init__(
         self,
         user_prompt,
+        system_prompt: Optional[str] = None,  # Add optional parameter
     ):
+        # Use provided system prompt or fall back to default
+        if system_prompt is None:
+            system_prompt = TEMPLATE_SYSTEM_PROMPT
+
         super().__init__(
-            system_prompt=TEMPLATE_SYSTEM_PROMPT,
+            system_prompt=system_prompt,
             user_prompt=user_prompt,
         )
-        self.system_prompt = TEMPLATE_SYSTEM_PROMPT
+        self.system_prompt = system_prompt
         self.user_prompt = user_prompt + TEMPLATE_REACTION_SCHEMA_PROMPT
         self.set_structured_output_schema(ReactionOutputSchema)
         print(
@@ -155,12 +160,17 @@ class TemplateFreeRetrosynthesisExperiment(Experiment):
     def __init__(
         self,
         user_prompt,
+        system_prompt: Optional[str] = None,  # Add optional parameter
     ):
+        # Use provided system prompt or fall back to default
+        if system_prompt is None:
+            system_prompt = TEMPLATE_FREE_SYSTEM_PROMPT
+
         super().__init__(
-            system_prompt=TEMPLATE_FREE_SYSTEM_PROMPT,
+            system_prompt=system_prompt,
             user_prompt=user_prompt,
         )
-        self.system_prompt = TEMPLATE_FREE_SYSTEM_PROMPT
+        self.system_prompt = system_prompt
         self.user_prompt = user_prompt + TEMPLATE_FREE_REACTION_SCHEMA_PROMPT
         self.set_structured_output_schema(TemplateFreeReactionOutputSchema)
         print(

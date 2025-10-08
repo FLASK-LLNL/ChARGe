@@ -28,6 +28,12 @@ parser.add_argument(
     + "including any further constraints",
 )
 
+parser.add_argument(
+    "--system-prompt",
+    type=str,
+    default=None,
+    help="Custom system prompt (optional, uses default retrosynthesis prompt if not provided)",
+)
 
 # Add standard CLI arguments
 Client.add_std_parser_arguments(parser)
@@ -54,9 +60,15 @@ if __name__ == "__main__":
 
     if args.exp_type == "template":
 
-        myexperiment = RetrosynthesisExperiment(user_prompt=user_prompt)
+        myexperiment = RetrosynthesisExperiment(
+            user_prompt=user_prompt,
+            system_prompt=args.system_prompt,
+        )
     elif args.exp_type == "template-free":
-        myexperiment = TemplateFreeRetrosynthesisExperiment(user_prompt=user_prompt)
+        myexperiment = TemplateFreeRetrosynthesisExperiment(
+            user_prompt=user_prompt,
+            system_prompt=args.system_prompt,
+        )
     else:
         raise ValueError(f"Unknown experiment type: {args.exp_type}")
 
