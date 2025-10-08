@@ -34,7 +34,6 @@ pip install mcp
 echo "Installing RDKit..."
 pip install rdkit
 
-# Install kernels (needed for MXFP4)
 echo "Installing kernels for MXFP4 support..."
 pip install kernels
 
