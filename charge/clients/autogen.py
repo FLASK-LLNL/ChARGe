@@ -35,6 +35,7 @@ import warnings
 from charge.clients.AgentPool import AgentPool, Agent
 from charge.clients.Client import Client
 from charge.clients.huggingface_client import HuggingFaceLocalClient
+from charge.clients.vllm_client import VLLMClient
 from charge.clients.autogen_utils import (
     _list_wb_tools,
     generate_agent,
