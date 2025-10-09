@@ -14,7 +14,7 @@ except ImportError:
 
 from loguru import logger
 from charge.servers.SMILES_utils import get_synthesizability
-from charge.servers.chemprop_make_prediction import get_chemprop_preds
+from charge.servers.get_chemprop2_preds import predict_with_chemprop
 import sys
 import os
 
@@ -91,16 +91,16 @@ def chemprop_preds_server(smiles,property):
     ----------------
     ChARGe can request any of the following property names:
       - 10k_density : Predicted density (g/cm³) from 10k dataset model
-      - 10k_hof     : Heat of formation (kJ/mol) from 10k dataset model
-      - qm9_alpha   : Polarizability (Bohr³)
+      - 10k_hof     : Heat of formation (kcal/mol) from 10k dataset model
+      - qm9_alpha   : Polarizability (a0³)
       - qm9_cv      : Heat capacity at constant volume (cal/mol·K)
-      - qm9_gap     : HOMO–LUMO energy gap (eV)
-      - qm9_homo    : HOMO energy (eV)
-      - qm9_lumo    : LUMO energy (eV)
+      - qm9_gap     : HOMO–LUMO energy gap (Hartree)
+      - qm9_homo    : HOMO energy (Hartree)
+      - qm9_lumo    : LUMO energy (Hartree)
       - qm9_mu      : Dipole moment (Debye)
-      - qm9_r2      : Radius of gyration or related structural metric
+      - qm9_r2      : Electronic spatial extent (a0^2)
       - qm9_zpve    : Zero-point vibrational energy (Hartree)
-      - lipo        : Octanol–water partition coefficient (logP)
+      - lipo        : Octanol–water partition coefficient (logD)
 
     Parameters
     ----------
@@ -130,7 +130,7 @@ def chemprop_preds_server(smiles,property):
     - The environment variable `CHEMPROP_BASE_PATH` must point to the base directory
       containing Chemprop model folders (e.g., ".../chemprop/Saved_Models/").
     - Each property model must exist under a path of the form:
-      `{CHEMPROP_BASE_PATH}/{property}_OOD/fold_0/`.
+      `{CHEMPROP_BASE_PATH}/{property}/model_0/best.pt`.
 
     Examples
     --------
@@ -148,9 +148,9 @@ def chemprop_preds_server(smiles,property):
         )
     chemprop_base_path=os.environ.get("CHEMPROP_BASE_PATH")
     if(chemprop_base_path):
-        model_path=os.path.join(chemprop_base_path, property+'_OOD')
-        model_path=os.path.join(model_path, 'fold_0')
-        return(get_chemprop_preds(smiles,model_path))
+        model_path=os.path.join(chemprop_base_path, property)
+        model_path=os.path.join(model_path, 'model_0/best.pt')
+        return(predict_with_chemprop(model_path,[smiles]))
     else:
         print('CHEMPROP_BASE_PATH environment variable not set!')
         sys.exit(2)
