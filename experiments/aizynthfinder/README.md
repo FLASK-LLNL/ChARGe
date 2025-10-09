@@ -36,12 +36,10 @@ You can then use the ChARGe client to connect to this server and perform operati
 python main.py --backend <backend> --model <model> --server-url <server_url>/sse
 ```
 
-**Note:** The `--server-url` should point to the address where your SSE MCP server is running, appended with `/sse`.
-
 
 ## Example output (work-in-progress)
 
-Here is one of the current output examplex for synthesizing caffeine:
+Here is one output example for synthesizing caffeine:
 
 ```
 Here are the distinct retrosynthetic disconnections returned by the tool, expressed as a nested list.  
