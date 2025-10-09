@@ -21,7 +21,7 @@ packages = ["charge"]
 [project.optional-dependencies]
 ollama = ["ollama>=0.5.0"]
 gemini = ["google-genai >=1.19.0"]
-autogen = ["autogen-agentchat>=0.7.0", "autogen-core>=0.7.0", "autogen-ext>=0.7.0", "openai>=2.0.0", "tiktoken>=0.10.0"]
+autogen = ["autogen-agentchat>=0.7.0", "autogen-core>=0.7.0", "autogen-ext>=0.7.0", "openai>=2.0.0", "tiktoken>=0.10.0", "autogen-ext[openai]"]
 rdkit = ["rdkit>=2025.3.6"]
 flask = ["transformers", "peft", "trl", "torch>=2.8.0"]
 # This is the manually identified set of necessary tools for AiZynthFinder 4.4.0 to work with a --no-deps install

@@ -13,6 +13,8 @@ try:
         LLMMessage,
         AssistantMessage,
     )
+    from openai import AsyncOpenAI
+    from autogen_ext.agents.openai import OpenAIAgent
     from autogen_ext.tools.mcp import StdioServerParams, McpWorkbench, SseServerParams
     from autogen_agentchat.messages import TextMessage, ThoughtEvent
     from autogen_agentchat.conditions import HandoffTermination, TextMentionTermination
@@ -74,7 +76,7 @@ class AutoGenClient(Client):
         max_retries: int = 3,
         backend: str = "openai",
         model: str = "gpt-4",
-        model_client: Optional[ChatCompletionClient] = None,
+        model_client: Optional[Union[AsyncOpenAI,ChatCompletionClient]] = None,
         api_key: Optional[str] = None,
         model_info: Optional[dict] = None,
         model_kwargs: Optional[dict] = None,
@@ -147,8 +149,6 @@ class AutoGenClient(Client):
                     model_info=model_info,
                 )
             else:
-                from autogen_ext.models.openai import OpenAIChatCompletionClient
-
                 if api_key is None:
                     if backend == "gemini":
                         api_key = os.getenv("GOOGLE_API_KEY")
@@ -157,12 +157,19 @@ class AutoGenClient(Client):
                 assert (
                     api_key is not None
                 ), "API key must be provided for OpenAI or Gemini backend"
-                self.model_client = OpenAIChatCompletionClient(
-                    model=model,
-                    api_key=api_key,
-                    model_info=model_info,
-                    **self.model_kwargs,
-                )
+
+                if backend in ["openai", "livai", "livchat"]:
+                    self.model_client = AsyncOpenAI(
+                        **self.model_kwargs,
+                    )
+                else:
+                    from autogen_ext.models.openai import OpenAIChatCompletionClient
+                    self.model_client = OpenAIChatCompletionClient(
+                        model=model,
+                        api_key=api_key,
+                        model_info=model_info,
+                        **self.model_kwargs,
+                    )
 
         if server_path is None and server_url is None:
             self.setup_mcp_servers()
@@ -204,8 +211,8 @@ class AutoGenClient(Client):
             if backend == "openai":
                 API_KEY = os.getenv("OPENAI_API_KEY")
                 default_model = "gpt-4"
-                kwargs["parallel_tool_calls"] = False
-                kwargs["reasoning_effort"] = "high"
+                # kwargs["parallel_tool_calls"] = False
+                # kwargs["reasoning_effort"] = "high"
             elif backend == "livai" or backend == "livchat":
                 API_KEY = os.getenv("OPENAI_API_KEY")
                 BASE_URL = os.getenv("LIVAI_BASE_URL")
@@ -293,17 +300,28 @@ class AutoGenClient(Client):
         await asyncio.gather(*[workbench.start() for workbench in workbenches])
 
         try:
-            # TODO: Convert this to use custom agent in the future
-            agent = AssistantAgent(
-                name="Assistant",
-                model_client=self.model_client,
-                system_message=system_prompt,
-                workbench=workbenches if len(workbenches) > 0 else None,
-                max_tool_iterations=self.max_tool_calls,
-                reflect_on_tool_use=True,
-                model_context=ReasoningModelContext(self.thoughts_callback),
-                # output_content_type=structured_output_schema,
-            )
+            if isinstance(self.model_client, AsyncOpenAI):
+                agent = OpenAIAgent(
+                    name="Assistant",
+                    description='ChARGe OpenAIAgent',
+                    client=self.model_client,
+                    model=self.model,
+                    instructions=system_prompt,
+                )
+            elif isinstance(self.model_client, ChatCompletionClient):
+                # TODO: Convert this to use custom agent in the future
+                agent = AssistantAgent(
+                    name="Assistant",
+                    model_client=self.model_client,
+                    system_message=system_prompt,
+                    workbench=workbenches if len(workbenches) > 0 else None,
+                    max_tool_iterations=self.max_tool_calls,
+                    reflect_on_tool_use=True,
+                    model_context=ReasoningModelContext(self.thoughts_callback),
+                    # output_content_type=structured_output_schema,
+                )
+            else:
+                raise ValueError("ERROR: Unknown model client type.")
 
             answer_invalid, result = await self.step(agent, user_prompt)
 
@@ -354,15 +372,27 @@ class AutoGenClient(Client):
         for workbench in wokbenches:
             await workbench.start()
 
-        # TODO: Convert this to use custom agent in the future
-        agent = AssistantAgent(
-            name="Assistant",
-            model_client=self.model_client,
-            system_message=system_prompt,
-            workbench=workbench,
-            max_tool_iterations=self.max_tool_calls,
-            reflect_on_tool_use=True,
-        )
+        if isinstance(self.model_client, AsyncOpenAI):
+            agent = OpenAIAgent(
+                name="Assistant",
+                description='ChARGe OpenAIAgent',
+                client=self.model_client,
+                model=self.model,
+                instructions=system_prompt,
+            )
+        elif isinstance(self.model_client, ChatCompletionClient):
+            # TODO: Convert this to use custom agent in the future
+            agent = AssistantAgent(
+                name="Assistant",
+                model_client=self.model_client,
+                system_message=system_prompt,
+                workbench=workbench,
+                max_tool_iterations=self.max_tool_calls,
+                reflect_on_tool_use=True,
+                model_context=ReasoningModelContext(self.thoughts_callback),
+            )
+        else:
+            raise ValueError("ERROR: Unknown model client type.")
 
         user = UserProxyAgent("USER", input_func=input)
         team = RoundRobinGroupChat(
