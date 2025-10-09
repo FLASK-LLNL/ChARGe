@@ -7,6 +7,10 @@ try:
         LLMMessage,
         AssistantMessage,
     )
+    
+    from openai import AsyncOpenAI
+    from autogen_ext.agents.openai import OpenAIAgent
+
     from autogen_ext.tools.mcp import StdioServerParams, McpWorkbench, SseServerParams
     from autogen_agentchat.messages import TextMessage
     from autogen_agentchat.conditions import HandoffTermination, TextMentionTermination
@@ -48,7 +52,8 @@ class AutoGenClient(Client):
         max_retries: int = 3,
         backend: str = "openai",
         model: str = "gpt-4",
-        model_client: Optional[ChatCompletionClient] = None,
+#        model_client: Optional[ChatCompletionClient] = None,
+        model_client: Optional[OpenAIAgent] = None,
         api_key: Optional[str] = None,
         model_info: Optional[dict] = None,
         model_kwargs: Optional[dict] = None,
@@ -119,7 +124,25 @@ class AutoGenClient(Client):
                 )
             else:
                 from autogen_ext.models.openai import OpenAIChatCompletionClient
+#                from autogen_ext.agents.openai import OpenAIAssistantAgent
+                # An agent implementation that uses the OpenAI Responses API to generate responses.
+                # pip install "autogen-ext[openai]
+                #from autogen_ext.agents.openai import OpenAIAgent
+        #   async def example():
+        #         cancellation_token = CancellationToken()
+        #         client = AsyncOpenAI()
+        #         agent = OpenAIAgent(
+        #             name="Simple Agent",
+        #             description="A simple OpenAI agent using the Responses API",
+        #             client=client,
+        #             model="gpt-4.1",
+        #             instructions="You are a helpful assistant.",
+        #         )
+        #         response = await agent.on_messages([TextMessage(source="user", content="Hello!")], cancellation_token)
+        #         print(response)
+        # asyncio.run(example())
 
+        
                 if api_key is None:
                     if backend == "gemini":
                         api_key = os.getenv("GOOGLE_API_KEY")
@@ -128,12 +151,18 @@ class AutoGenClient(Client):
                 assert (
                     api_key is not None
                 ), "API key must be provided for OpenAI or Gemini backend"
-                self.model_client = OpenAIChatCompletionClient(
-                    model=model,
-                    api_key=api_key,
-                    model_info=model_info,
+                self.model_client = AsyncOpenAI(
+                    # model=model,
+#                    api_key=api_key,
+#                    model_info=model_info,
                     **self.model_kwargs,
                 )
+                # self.model_client = OpenAIChatCompletionClient(
+                #     model=model,
+                #     api_key=api_key,
+                #     model_info=model_info,
+                #     **self.model_kwargs,
+                # )
 
         if server_path is None and server_url is None:
             self.setup_mcp_servers()
@@ -175,8 +204,8 @@ class AutoGenClient(Client):
             if backend == "openai":
                 API_KEY = os.getenv("OPENAI_API_KEY")
                 default_model = "gpt-4"
-                kwargs["parallel_tool_calls"] = False
-                kwargs["reasoning_effort"] = "high"
+                # kwargs["parallel_tool_calls"] = False
+                # kwargs["reasoning_effort"] = "high"
             elif backend == "livai" or backend == "livchat":
                 API_KEY = os.getenv("OPENAI_API_KEY")
                 BASE_URL = os.getenv("LIVAI_BASE_URL")
@@ -189,8 +218,8 @@ class AutoGenClient(Client):
             else:
                 API_KEY = os.getenv("GOOGLE_API_KEY")
                 default_model = "gemini-flash-latest"
-                kwargs["parallel_tool_calls"] = False
-                kwargs["reasoning_effort"] = "high"
+                # kwargs["parallel_tool_calls"] = False
+                # kwargs["reasoning_effort"] = "high"
         elif backend in ["ollama"]:
             default_model = "gpt-oss:latest"
 
@@ -264,6 +293,24 @@ class AutoGenClient(Client):
         await asyncio.gather(*[workbench.start() for workbench in workbenches])
 
         try:
+            foo = AsyncOpenAI()
+            agent = OpenAIAgent(
+                name="Assistant",
+                model_client=foo, #self.model_client,
+                system_message=system_prompt,
+                workbench=workbenches if len(workbenches) > 0 else None,
+                max_tool_iterations=self.max_tool_calls,
+                reflect_on_tool_use=True,
+                # output_content_type=structured_output_schema,
+                # name="Simple Agent",
+                # description="A simple OpenAI agent using the Responses API",
+                # client=self.model_client,
+                # model="gpt-4.1",
+                # instructions="You are a helpful assistant.",
+            )
+            response = await agent.on_messages([TextMessage(source="user", content="Hello!")], cancellation_token)
+            print(response)
+            
             # TODO: Convert this to use custom agent in the future
             agent = AssistantAgent(
                 name="Assistant",
@@ -325,14 +372,26 @@ class AutoGenClient(Client):
             await workbench.start()
 
         # TODO: Convert this to use custom agent in the future
-        agent = AssistantAgent(
+#        agent = AssistantAgent(
+        agent = OpenAIAgent(
             name="Assistant",
-            model_client=self.model_client,
-            system_message=system_prompt,
-            workbench=workbench,
-            max_tool_iterations=self.max_tool_calls,
-            reflect_on_tool_use=True,
+            description='BVE - OpenAIAgent',
+            client=self.model_client,
+            model=self.model,
+            instructions=system_prompt,
+##            system_message=system_prompt,
+#            workbench=workbench,
+#            max_tool_iterations=self.max_tool_calls,
+#            reflect_on_tool_use=True,
         )
+        # agent = AssistantAgent(
+        #     name="Assistant",
+        #     model_client=self.model_client,
+        #     system_message=system_prompt,
+        #     workbench=workbench,
+        #     max_tool_iterations=self.max_tool_calls,
+        #     reflect_on_tool_use=True,
+        # )
 
         user = UserProxyAgent("USER", input_func=input)
         team = RoundRobinGroupChat(
@@ -340,6 +399,7 @@ class AutoGenClient(Client):
             max_turns=self.max_multi_turns,
             # termination_condition=text_termination,
         )
+#        exit()
 
         result = team.run_stream()
         await Console(result)

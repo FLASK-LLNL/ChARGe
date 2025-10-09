@@ -36,6 +36,40 @@ if __name__ == "__main__":
     assert server_url.endswith("/sse"), "Server URL must end with /sse"
     myexperiment = ChargeChatExperiment()
 
+    from openai import AsyncOpenAI
+    from autogen_ext.agents.openai import OpenAIAgent
+    from autogen_core import CancellationToken
+    from autogen_agentchat.messages import TextMessage
+    import os
+    import httpx
+    async def example():
+        cancellation_token = CancellationToken()
+        client = AsyncOpenAI(
+            # api_key = os.getenv("OPENAI_API_KEY"),
+            # base_url = os.getenv("LIVAI_BASE_URL"),
+            # http_client = httpx.AsyncClient(verify=False),
+        )
+        client.api_key = os.getenv("OPENAI_API_KEY")
+        client.base_url = os.getenv("LIVAI_BASE_URL")
+        client.http_client = httpx.AsyncClient(verify=False)
+
+        agent = OpenAIAgent(
+            name="foo",
+            description='A simple OpenAI agent using the Responses API',
+            client=client,
+            model='gpt-4.1',
+            instructions='You are a helpful assistant.',
+#            parallel_tool_calls = False,
+#            reasoning_effort = "high",
+        )
+        response = await agent.on_messages([TextMessage(source="user", content="Hello!")], cancellation_token)
+        print(response)
+        response = await agent.on_messages([TextMessage(source="user", content="I need to design a new molecule!")], cancellation_token)
+        print(response)
+        
+    asyncio.run(example())
+##    exit()
+    
     (model, backend, API_KEY, kwargs) = AutoGenClient.configure(
         args.model, args.backend
     )
