@@ -19,6 +19,14 @@ def is_valid_smiles(smiles: str) -> bool:
 # Tools
 @mcp.tool()
 def find_synthesis_routes(product_smi: str) -> list[dict]:
+    """
+    Find synthesis routes for synthesizing a target molecule.
+
+    Args:
+        product_smi (str): the target molecule in SMILES representation.
+    Returns:
+        list[dict]: A list of synthesis routes, each of which is a reaction tree in json/dict format.
+    """
     # if not is_valid_smiles(product_smi):
     #     return {'isError': True, 'content': 'Invalid SMILES string'}
     finder.target_smiles = product_smi
