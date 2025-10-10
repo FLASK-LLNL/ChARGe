@@ -7,6 +7,7 @@ try:
         LLMMessage,
         AssistantMessage,
     )
+    from openai import AsyncOpenAI
     from autogen_ext.agents.openai import OpenAIAgent
     from autogen_ext.tools.mcp import StdioServerParams, McpWorkbench, SseServerParams
     from autogen_agentchat.messages import TextMessage
@@ -49,7 +50,7 @@ class AutoGenClient(Client):
         max_retries: int = 3,
         backend: str = "openai",
         model: str = "gpt-4",
-        model_client: Optional[Union[OpenAIAgent,ChatCompletionClient]] = None,
+        model_client: Optional[Union[AsyncOpenAI,ChatCompletionClient]] = None,
         api_key: Optional[str] = None,
         model_info: Optional[dict] = None,
         model_kwargs: Optional[dict] = None,
@@ -129,7 +130,6 @@ class AutoGenClient(Client):
                 ), "API key must be provided for OpenAI or Gemini backend"
 
                 if backend in ["openai", "livai", "livchat"]:
-                    from openai import AsyncOpenAI
                     self.model_client = AsyncOpenAI(
                         **self.model_kwargs,
                     )
@@ -271,7 +271,7 @@ class AutoGenClient(Client):
         await asyncio.gather(*[workbench.start() for workbench in workbenches])
 
         try:
-            if isinstance(self.model_client, OpenAIAgent):
+            if isinstance(self.model_client, AsyncOpenAI):
                 agent = OpenAIAgent(
                     name="Assistant",
                     description='ChARGe OpenAIAgent',
@@ -342,7 +342,7 @@ class AutoGenClient(Client):
         for workbench in wokbenches:
             await workbench.start()
 
-        if isinstance(self.model_client, OpenAIAgent):
+        if isinstance(self.model_client, AsyncOpenAI):
             agent = OpenAIAgent(
                 name="Assistant",
                 description='ChARGe OpenAIAgent',
