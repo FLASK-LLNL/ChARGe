@@ -15,6 +15,7 @@ except ImportError:
 from loguru import logger
 from charge.servers.SMILES_utils import get_synthesizability
 from charge.servers.get_chemprop2_preds import predict_with_chemprop
+from charge.servers.molecule_pricer import get_chemspace_prices
 import sys
 import os
 
@@ -138,3 +139,26 @@ def chemprop_preds_server(smiles: str,property:str) -> float:
     else:
         print('CHEMPROP_BASE_PATH environment variable not set!')
         sys.exit(2)
+
+def get_molecule_price(smiles):
+    """
+    Retrieve vendor pricing from ChemSpace for the molecule specified by the SMILES string, smiles.
+
+    Parameters
+    ----------
+    smiles : str
+        A SMILES string for the molecule of interest.
+
+    Returns
+    -------
+    float
+        Returns float representing the lowest price (in USD/g) among all vendors for the specified molecules in SMILES_list.
+
+    Examples
+    --------
+    >>> get_molecule_price("CCO")
+    0.1056
+    """
+
+    price=get_chemspace_prices([smiles])
+    return(price[0])    
