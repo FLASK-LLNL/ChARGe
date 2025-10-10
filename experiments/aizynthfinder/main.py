@@ -22,7 +22,7 @@ class AiZynFinderExperiment(Experiment):
             f"Use tools to find synthesis routes to make {lead_molecule}\n"
             "The `find_synthesis_routes` tool returns a list of routes to synthesize a given molecule. "
             "Each route is a 'reaction tree' expressed in json format, and the tree starts with the target molecule as the root node. "
-            "Provide your answer as a nested list of synthesis routes, where each route contains a list of reactions to perform. "
+            "Consider a few candidates routes and provide your answer in a clear and concise manner. "
         )
 
         super().__init__(system_prompt=system_prompt, user_prompt=user_prompt)
