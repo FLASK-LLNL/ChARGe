@@ -34,3 +34,26 @@ The `property` input variable in `chemprop_preds_server` must be set to one of t
 ```
 valid_properties = {'density', 'hof', 'alpha','cv','gap','homo','lumo','mu','r2','zpve','lipo'}
 ```
+# Using Chemprice tools
+## Installation
+After installing the ChARGe package, run the additional commands to use the Chemprice tools (getting the commercial price of a SMILES string).
+
+1.) Install chemprice with pip.
+```
+pip install chemprice
+```
+
+2.) Set API key for Chemspace as an environment variable
+```
+export CHEMSPACE_API_KEY=<ENTER_YOUR_CHEMSPACE_API_KEY>
+```
+## Testing Chemprice Installation
+```python
+from molecular_property_utils import get_molecule_price
+smiles='CCO'
+get_molecule_price(smiles)
+```
+Expected Result:
+```
+0.1056
+```
