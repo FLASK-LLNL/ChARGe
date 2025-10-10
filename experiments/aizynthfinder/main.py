@@ -10,7 +10,7 @@ class AiZynthFinderExperiment(Experiment):
         system_prompt = "You are a world-class chemist. Your task is to perform retrosynthesis for a target molecule."
 
         user_prompt = (
-            f"Use tools to find synthesis routes to make {lead_molecule}\n"
+            f"Use available tools to find synthesis routes to make {lead_molecule}\n"
             "The `find_synthesis_routes` tool returns a list of routes to synthesize a given molecule. "
             "Each route is a 'reaction tree' expressed in json format, and the tree starts with the target molecule as the root node. "
             "Consider a few candidates routes and provide your answer in a clear and concise manner. "
@@ -29,12 +29,9 @@ def main():
     Client.add_std_parser_arguments(parser)
     args = parser.parse_args()
 
-    experiment = AiZynthFinderExperiment(lead_molecule=args.lead_molecule)
-
     (model, backend, API_KEY, kwargs) = AutoGenClient.configure(args.model, args.backend)
-
     runner = AutoGenClient(
-        experiment_type=experiment,
+        experiment_type=AiZynthFinderExperiment(lead_molecule=args.lead_molecule),
         backend=backend,
         model=model,
         api_key=API_KEY,

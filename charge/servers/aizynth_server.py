@@ -4,8 +4,17 @@ from rdkit import Chem
 from mcp.server.fastmcp import FastMCP
 
 
+# CLI arguments
+parser = argparse.ArgumentParser()
+parser.add_argument('--config', type=str, help='Config yaml file for initializing AiZynthFinder')
+parser.add_argument('--host', type=str, help='Server host', default='127.0.0.1')
+parser.add_argument('--port', type=int, help='Server port', default=8000)
+parser.add_argument('--transport', type=str, help='MCP transport type', choices=['stdio', 'streamable-http', 'sse'], default='sse')
+args = parser.parse_args()
+
+
 # Initialize MCP server
-mcp = FastMCP("aizynthfinder")
+mcp = FastMCP('AiZynthFinder', host=args.host, port=args.port)
 
 
 # Helper functions
@@ -25,7 +34,7 @@ def find_synthesis_routes(product_smi: str) -> list[dict]:
     Args:
         product_smi (str): the target molecule in SMILES representation.
     Returns:
-        list[dict]: A list of synthesis routes, each of which is a reaction tree in json/dict format.
+        list[dict]: a list of synthesis routes, each of which is a reaction tree in json/dict format.
     """
     # if not is_valid_smiles(product_smi):
     #     return {'isError': True, 'content': 'Invalid SMILES string'}
@@ -36,19 +45,14 @@ def find_synthesis_routes(product_smi: str) -> list[dict]:
 
 
 def main():
-    # CLI arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, help='Config yaml file for initializing AiZynthFinder')
-    parser.add_argument('--transport', type=str, help='MCP transport type', choices=['stdio', 'streamable-http', 'sse'], default='stdio')
-    args = parser.parse_args()
-
-    # Initializer AiZynthFinder
+    # Initialize AiZynthFinder
     global finder
     finder = AiZynthFinder(configfile=args.config)
     finder.stock.select('zinc')
     finder.expansion_policy.select('uspto')
     finder.filter_policy.select("uspto")
 
+    # Run MCP server
     mcp.run(transport=args.transport)
 
 
