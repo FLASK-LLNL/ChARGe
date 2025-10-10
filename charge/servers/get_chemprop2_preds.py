@@ -54,6 +54,6 @@ def predict_with_chemprop(
 
 
 if __name__ == "__main__":
-    ckpt = "qm9_gap/model_0/best.pt"
+    ckpt = "gap/model_0/best.pt"
     smis = ["O=CC12C3CC1CCN23", "CCC", "c1ccccc1O"]
     print(predict_with_chemprop(ckpt, smis))
