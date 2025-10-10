@@ -14,8 +14,8 @@ export CHEMPROP_BASE_PATH=<LC_PATH_TO_CHEMPROP_MODELS>
 ## Testing Chemprop Installation
 ```python
 from molecular_property_utils import chemprop_preds_server
-property='10k_density'
-chemprop_preds_server('COC(=O)COC=O','10k_density')
+property='density'
+chemprop_preds_server('COC(=O)COC=O','density')
 ```
 Expected Result:
 ```
@@ -25,5 +25,5 @@ Expected Result:
 ## Usage
 The `property` input variable in `chemprop_preds_server` must be set to one of the below properties.
 ```
-valid_properties = {'10k_density', '10k_hof', 'qm9_alpha','qm9_cv','qm9_gap','qm9_homo','qm9_lumo','qm9_mu','qm9_r2','qm9_zpve','lipo'}
+valid_properties = {'density', 'hof', 'alpha','cv','gap','homo','lumo','mu','r2','zpve','lipo'}
 ```

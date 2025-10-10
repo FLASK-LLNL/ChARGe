@@ -81,26 +81,23 @@ def chemprop_preds_server(smiles,property):
     
     """
     Predict molecular properties using pre-trained Chemprop models.
-
-    This function serves as a server-side entry point for ChARGe to obtain property
-    predictions from Chemprop models. It validates the requested property name,
-    constructs the appropriate model path based on the `CHEMPROP_BASE_PATH`
-    environment variable, and returns predictions for the provided SMILES input.
+    This function returns property predictions from Chemprop models. It validates the requested property name,  
+    constructs the appropriate model, and returns predictions for the provided SMILES input.
 
     Valid properties
     ----------------
     ChARGe can request any of the following property names:
-      - 10k_density : Predicted density (g/cm³) from 10k dataset model
-      - 10k_hof     : Heat of formation (kcal/mol) from 10k dataset model
-      - qm9_alpha   : Polarizability (a0³)
-      - qm9_cv      : Heat capacity at constant volume (cal/mol·K)
-      - qm9_gap     : HOMO–LUMO energy gap (Hartree)
-      - qm9_homo    : HOMO energy (Hartree)
-      - qm9_lumo    : LUMO energy (Hartree)
-      - qm9_mu      : Dipole moment (Debye)
-      - qm9_r2      : Electronic spatial extent (a0^2)
-      - qm9_zpve    : Zero-point vibrational energy (Hartree)
-      - lipo        : Octanol–water partition coefficient (logD)
+      - density : Predicted density (g/cm³) 
+      - hof     : Heat of formation (kcal/mol) 
+      - alpha   : Polarizability (a0³)
+      - cv      : Heat capacity at constant volume (cal/mol·K)
+      - gap     : HOMO–LUMO energy gap (Hartree)
+      - homo    : HOMO energy (Hartree)
+      - lumo    : LUMO energy (Hartree)
+      - mu      : Dipole moment (Debye)
+      - r2      : Electronic spatial extent (a0^2)
+      - zpve    : Zero-point vibrational energy (Hartree)
+      - lipo    : Octanol–water partition coefficient (logD)
 
     Parameters
     ----------
@@ -111,37 +108,24 @@ def chemprop_preds_server(smiles,property):
 
     Returns
     -------
-    list[list[float]]
-        A list of single-entry lists, where each inner list contains one float representing
-        the predicted value for the specified property. For example:
-        [[1.2158], [1.4041], [1.3984]].
-        The outer list length corresponds to the number of input SMILES strings, and each
-        inner list contains exactly one float prediction.
+    float
+        A float representing the predicted value for the specified property.
 
     Raises
     ------
-    ValueError
-        If the given property name is not recognized.
     SystemExit
         If the environment variable `CHEMPROP_BASE_PATH` is not set.
 
-    Requirements
-    ------------
-    - The environment variable `CHEMPROP_BASE_PATH` must point to the base directory
-      containing Chemprop model folders (e.g., ".../chemprop/Saved_Models/").
-    - Each property model must exist under a path of the form:
-      `{CHEMPROP_BASE_PATH}/{property}/model_0/best.pt`.
-
     Examples
     --------
-    >>> chemprop_preds_server("CCO", "qm9_gap")
+    >>> chemprop_preds_server("CCO", "gap")
     6.73
 
     >>> chemprop_preds_server("c1ccccc1", "lipo")
-    [[2.94]]
+    2.94
     """
     
-    valid_properties = {'10k_density', '10k_hof', 'qm9_alpha','qm9_cv','qm9_gap','qm9_homo','qm9_lumo','qm9_mu','qm9_r2','qm9_zpve','lipo'}
+    valid_properties = {'density', 'hof', 'alpha','cv','gap','homo','lumo','mu','r2','zpve','lipo'}
     if property not in valid_properties:
         raise ValueError(
             f"Invalid property '{property}'. Must be one of {valid_properties}."
@@ -150,7 +134,7 @@ def chemprop_preds_server(smiles,property):
     if(chemprop_base_path):
         model_path=os.path.join(chemprop_base_path, property)
         model_path=os.path.join(model_path, 'model_0/best.pt')
-        return(predict_with_chemprop(model_path,[smiles]))
+        return(predict_with_chemprop(model_path,[smiles])[0][0])
     else:
         print('CHEMPROP_BASE_PATH environment variable not set!')
         sys.exit(2)
