@@ -3,10 +3,15 @@ Persistent server that serves one or two FLASKv2 LLMs for forward reaction predi
 """
 
 import click
-from transformers import AutoTokenizer, AutoModelForCausalLM, LlamaForCausalLM, PreTrainedTokenizer
-from peft import PeftModel
-from trl import apply_chat_template
-import torch
+try:
+    from transformers import AutoTokenizer, AutoModelForCausalLM, LlamaForCausalLM, PreTrainedTokenizer
+    from peft import PeftModel
+    from trl import apply_chat_template
+    import torch
+except ImportError:
+    raise ImportError(
+        "Please install the [flask] optional packages to use this module."
+    )
 from mcp.server.fastmcp import FastMCP
 from typing import List
 
