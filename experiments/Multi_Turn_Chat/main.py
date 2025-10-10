@@ -36,11 +36,6 @@ if __name__ == "__main__":
     assert server_url.endswith("/sse"), "Server URL must end with /sse"
     myexperiment = ChargeChatExperiment()
 
-    from openai import AsyncOpenAI
-    from autogen_ext.agents.openai import OpenAIAgent
-    from autogen_core import CancellationToken
-    from autogen_agentchat.messages import TextMessage
-
     (model, backend, API_KEY, kwargs) = AutoGenClient.configure(
         args.model, args.backend
     )
