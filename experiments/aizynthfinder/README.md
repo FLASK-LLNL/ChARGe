@@ -33,7 +33,7 @@ This will start an SSE MCP server locally. The URL by default should be `http://
 You can then use the ChARGe client to connect to this server and perform operations:
 
 ```bash
-python main.py --backend <backend> --model <model> --server-url <server_url>/sse
+python main.py --backend <backend> --model <model> --server-urls <server_url>/sse
 ```
 
 
