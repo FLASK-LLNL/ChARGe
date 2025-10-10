@@ -77,7 +77,7 @@ def get_density_and_synthesizability(smiles: str) -> tuple[float, float]:
     synthesizability = get_synthesizability(smiles)
     return density, synthesizability
 
-def def chemprop_preds_server(smiles: str,property:str) -> float:
+def chemprop_preds_server(smiles: str,property:str) -> float:
     
     """
     Predict molecular properties using pre-trained Chemprop models.
