@@ -21,6 +21,6 @@ ollama = ["ollama>=0.5.0"]
 gemini = ["google-genai >=1.19.0"]
 autogen = ["autogen-agentchat>=0.7.0", "autogen-core>=0.7.0", "autogen-ext>=0.7.0", "openai>=2.0.0", "tiktoken>=0.10.0"]
 rdkit = ["rdkit>=2025.3.6"]
-flask = ["transformers", "peft"]
+flask = ["transformers", "peft", "trl"]
 
 all = ["charge[ollama,gemini,autogen,rdkit,flask]"]
