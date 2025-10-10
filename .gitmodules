@@ -1,0 +1,3 @@
+[submodule "charge/servers/3rd_party_tools/chemprop"]
+	path = charge/servers/external_tools/chemprop
+	url = https://github.com/chemprop/chemprop.git
