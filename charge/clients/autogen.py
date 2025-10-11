@@ -17,293 +17,7 @@ import os
 from charge.clients.Client import Client
 from typing import Type, Optional, Dict, Union, List, Any
 from charge.Experiment import Experiment
-
-
-# Custom HuggingFace Model Client
-class HuggingFaceLocalClient(ChatCompletionClient):
-    """Custom ChatCompletionClient for local HuggingFace models"""
-    
-    def __init__(
-        self,
-        model_path: str,
-        model_info: Optional[Dict[str, Any]] = None,
-        device: str = "auto",
-        torch_dtype: str = "auto",
-        quantization: Optional[str] = "4bit",
-        trust_remote_code: bool = True,
-        **kwargs
-    ):
-        """
-        Initialize a local HuggingFace model client.
-        
-        Args:
-            model_path: Path to local model directory or HuggingFace model ID
-            model_info: Model information dict
-            device: Device to load model on ("auto", "cuda", "cpu")
-            torch_dtype: Torch dtype for model ("auto", "float16", "bfloat16")
-            quantization: Quantization method ("4bit", "8bit", None). Defaults to "4bit"
-            trust_remote_code: Whether to trust remote code
-            **kwargs: Additional arguments for model/tokenizer
-        """
-        try:
-            from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-            import torch
-        except ImportError:
-            raise ImportError(
-                "Please install transformers and torch: "
-                "pip install transformers torch"
-            )
-        
-        self._model_path = model_path
-        self._model_info = model_info or {
-            "vision": False,
-            "function_calling": True,
-            "json_output": True,
-            "family": ModelFamily.UNKNOWN,
-            "structured_output": True,
-        }
-        
-        # Convert string dtype to torch dtype
-        dtype_map = {
-            "auto": "auto",
-            "float16": torch.float16,
-            "bfloat16": torch.bfloat16,
-            "float32": torch.float32,
-        }
-        torch_dtype_obj = dtype_map.get(torch_dtype, "auto")
-        
-        quantization_config = None
-        
-        # Load tokenizer
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            model_path,
-            trust_remote_code=trust_remote_code,
-            **kwargs
-        )
-        # Prepare model loading arguments
-        model_kwargs = {
-            "device_map": device,
-            "trust_remote_code": trust_remote_code,
-        }
-        
-        ## Add quantization config if specified
-        #if quantization_config is not None:
-        #    model_kwargs["quantization_config"] = quantization_config
-        #else:
-        #    # Only set torch_dtype if not quantizing
-        #    model_kwargs["torch_dtype"] = torch_dtype_obj
-        model_kwargs["torch_dtype"] = torch_dtype_obj
-        
-        # Load model
-        self._model = AutoModelForCausalLM.from_pretrained(
-            model_path,
-            **model_kwargs,
-            **kwargs
-        )
-
-        # Set pad token if not set
-        if self._tokenizer.pad_token is None:
-            self._tokenizer.pad_token = self._tokenizer.eos_token
-    
-    async def create(
-        self,
-        messages: List[Any],
-        **kwargs
-    ) -> Any:
-        """
-        Create a completion from messages.
-        
-        Args:
-            messages: List of message dicts with 'role' and 'content'
-            **kwargs: Additional generation parameters
-        """
-        import asyncio
-        
-        # Run inference in thread pool to avoid blocking event loop
-        def _generate():
-            try:
-                # Convert messages to prompt
-                prompt = self._format_messages(messages)
-                
-                ## Tokenize
-                #inputs = self._tokenizer(
-                #    prompt,
-                #    return_tensors="pt",
-                #    padding=True,
-                #    truncation=True,
-                #).to(self._model.device)
-
-                # Tokenize with proper max_length
-                max_length = getattr(self._model.config, 'max_position_embeddings', 2048)
-                inputs = self._tokenizer(
-                    prompt,
-                    return_tensors="pt",
-                    padding=True,
-                    truncation=True,
-                    max_length=max_length - 512,  # Leave room for generation
-                ).to(self._model.device)
-        
-                # Generate
-                gen_kwargs = {
-                    "max_new_tokens": kwargs.get("max_tokens", 8192),
-                    "temperature": kwargs.get("temperature", 0.7),
-                    "top_p": kwargs.get("top_p", 0.9),
-                    "do_sample": kwargs.get("temperature", 0.7) > 0,
-                    "pad_token_id": self._tokenizer.pad_token_id,
-                    "eos_token_id": self._tokenizer.eos_token_id,
-                }
-                
-                outputs = self._model.generate(**inputs, **gen_kwargs)
-                
-                # Decode - ensure we have valid output
-                if len(outputs[0]) <= inputs['input_ids'].shape[1]:
-                    # Model didn't generate anything new
-                    response = "[Model produced no output]"
-                else:
-                    response = self._tokenizer.decode(
-                        outputs[0][inputs['input_ids'].shape[1]:],
-                        skip_special_tokens=True
-                    )
-                
-                # Ensure we have some response
-                if not response or not response.strip():
-                    response = "[Empty response from model]"
-                    
-                return response.strip()
-            except Exception as e:
-                raise RuntimeError(f"Error during model generation: {e}")
-        
-        # Run in thread pool to not block event loop
-        loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(None, _generate)
-
-        ## Debug: see what we're returning
-        #print(f"DEBUG: Generated response length: {len(response)}")
-        #print(f"DEBUG: Generated response preview: {response[:200]}...")
-
-        # Parse out the final answer if present
-        if '<|start|>assistant<|channel|>final' in response or 'assistantfinal' in response:
-            # Extract only the final channel content
-            if 'assistantfinal' in response:
-                final_content = response.split('assistantfinal', 1)[1].strip()
-            else:
-                final_content = response.split('<|channel|>final', 1)[1].strip()
-            #print(f"DEBUG: Extracted 'final' channel content:")
-            #print(final_content[:500] + "...\n")
-            response_to_return = final_content
-        else:
-            response_to_return = response
-            #print(f"DEBUG: No 'final' channel found, using full response\n")
-        
-        return CreateResult(
-            content=response_to_return,
-            usage=self.actual_usage(),
-            finish_reason="stop",
-            cached=False
-        )
-
-    def _format_messages(self, messages: List[Any]) -> str:
-        """Format messages into a single prompt string"""
-        # Convert AutoGen message objects to dicts
-        formatted_messages = []
-        for msg in messages:
-            if hasattr(msg, 'content') and hasattr(msg, 'source'):
-                # AutoGen message object
-                role = 'system' if msg.source == 'system' else 'user' if msg.source == 'user' else 'assistant'
-                formatted_messages.append({
-                    'role': role,
-                    'content': msg.content
-                })
-            elif isinstance(msg, dict):
-                # Already a dict
-                formatted_messages.append(msg)
-            else:
-                # Try to extract content
-                content = getattr(msg, 'content', str(msg))
-                formatted_messages.append({
-                    'role': 'user',
-                    'content': content
-                })
-        
-        ## DEBUG: Print all messages
-        #print(f"DEBUG: Formatting {len(formatted_messages)} messages:")
-        #for i, msg in enumerate(formatted_messages):
-        #    print(f"  Message {i}: role={msg['role']}, content_length={len(msg['content'])}")
-        #    print(f"    Content preview: {msg['content'][:200]}...")
-        
-        # Try to use chat template if available
-        if hasattr(self._tokenizer, 'apply_chat_template'):
-            try:
-                formatted = self._tokenizer.apply_chat_template(
-                    formatted_messages,
-                    tokenize=False,
-                    add_generation_prompt=True
-                )
-                #print(f"\nDEBUG: Full formatted prompt:\n{formatted}\n")
-                return formatted
-            except Exception as e:
-                print(f"DEBUG: Chat template failed: {e}, using fallback")
-        
-        # Fallback to simple formatting
-        formatted = []
-        for msg in formatted_messages:
-            role = msg['role']
-            content = msg['content']
-            if role == 'system':
-                formatted.append(f"System: {content}")
-            elif role == 'user':
-                formatted.append(f"User: {content}")
-            elif role == 'assistant':
-                formatted.append(f"Assistant: {content}")
-        
-        formatted.append("Assistant:")
-        result = "\n\n".join(formatted)
-        #print(f"DEBUG: Using fallback format. Prompt preview:\n{result[:500]}...\n")
-        return result
-    
-    @property
-    def model_info(self) -> Dict[str, Any]:
-        """Return model information"""
-        return self._model_info
-    
-    async def close(self):
-        """Clean up resources"""
-        # Clean up model and tokenizer if needed
-        if hasattr(self, '_model'):
-            del self._model
-        if hasattr(self, '_tokenizer'):
-            del self._tokenizer
-    
-    def capabilities(self) -> dict:
-        """Return model capabilities"""
-        return self._model_info
-    
-    def count_tokens(self, messages: List[Dict[str, str]], **kwargs) -> int:
-        """Count tokens in messages"""
-        prompt = self._format_messages(messages)
-        tokens = self._tokenizer.encode(prompt)
-        return len(tokens)
-    
-    def remaining_tokens(self, messages: List[Dict[str, str]], **kwargs) -> int:
-        """Return remaining tokens available"""
-        # Most models have ~4096 context, but this varies
-        # Return a safe estimate
-        used = self.count_tokens(messages, **kwargs)
-        return max(0, 4096 - used)
-    
-    def total_usage(self) -> dict:
-        """Return total token usage"""
-        # Simple implementation - could be enhanced to track actual usage
-        return {"prompt_tokens": 0, "completion_tokens": 0}
-    
-    def actual_usage(self) -> dict:
-        """Return actual token usage for last request"""
-        # Simple implementation - could be enhanced to track actual usage
-        return {"prompt_tokens": 0, "completion_tokens": 0}
-    
-    async def create_stream(self, messages: List[Dict[str, str]], **kwargs):
-        """Stream completion - not implemented for local models"""
-        raise NotImplementedError("Streaming not supported for local HuggingFace models")
+from charge.clients.hf import HuggingFaceLocalClient
 
 class VLLMClient(ChatCompletionClient):
     """Client for vLLM served models via OpenAI-compatible API"""
@@ -313,6 +27,7 @@ class VLLMClient(ChatCompletionClient):
         base_url: str = "http://localhost:8000/v1",
         model_name: str = "gpt-oss",
         api_key: str = "EMPTY",
+        reasoning_effort: str = "medium",
         model_info: Optional[Dict[str, Any]] = None,
         **kwargs
     ):
@@ -324,6 +39,7 @@ class VLLMClient(ChatCompletionClient):
             model_name: Model name as registered in vLLM
             api_key: API key (usually "EMPTY" for local vLLM)
             model_info: Model information dict
+            reasoning_effort: Reasoning level for GPT-OSS (low, medium, high)
             **kwargs: Additional arguments
         """
         try:
@@ -339,6 +55,7 @@ class VLLMClient(ChatCompletionClient):
             base_url=base_url,
             api_key=api_key,
         )
+        self._reasoning_effort = reasoning_effort
         self._model_info = model_info or {
             "vision": False,
             "function_calling": True,
@@ -346,7 +63,7 @@ class VLLMClient(ChatCompletionClient):
             "family": ModelFamily.UNKNOWN,
             "structured_output": True,
         }
-    
+
     async def create(
         self,
         messages: List[Any],
@@ -387,26 +104,35 @@ class VLLMClient(ChatCompletionClient):
                 temperature=kwargs.get("temperature", 0.7),
                 top_p=kwargs.get("top_p", 0.9),
                 stream=False,
+                extra_body={"reasoning_effort": self._reasoning_effort},
             )
             
             # Extract response content
-            content = response.choices[0].message.content
+            message = response.choices[0].message
+            final_content = message.content
             
-            # Parse out final channel if present (for GPT-OSS)
-            if 'assistantfinal' in content:
-                content = content.split('assistantfinal', 1)[1].strip()
-            elif '<|channel|>final' in content:
-                content = content.split('<|channel|>final', 1)[1].strip()
+            # Get reasoning from reasoning_content field if available
+            analysis_content = getattr(message, 'reasoning_content', None)
+
+            ## Debug: Check reasoning and final content
+            #print(f"\n=== DEBUG VLLMClient ===")
+            #print(f"Analysis captured: {analysis_content is not None}")
+            #if analysis_content:
+            #    print(f"Analysis length: {len(analysis_content)}")
+            #    print(f"Analysis preview: {analysis_content[:300]}...")
+            #print(f"Final content length: {len(final_content)}")
+            #print(f"======================\n")
             
-            # Return in AutoGen format
+            # Return in AutoGen format (with reasoning in thought field)
             return CreateResult(
-                content=content,
+                content=final_content,
                 usage={
                     "prompt_tokens": response.usage.prompt_tokens,
                     "completion_tokens": response.usage.completion_tokens,
                 },
                 finish_reason=response.choices[0].finish_reason,
                 cached=False,
+                thought=analysis_content,
             )
         except Exception as e:
             raise RuntimeError(f"Error calling vLLM: {e}")
@@ -554,13 +280,19 @@ class AutoGenClient(Client):
                     "vllm_model", 
                     os.getenv("VLLM_MODEL", model or "/p/vast1/flask/models/gpt-oss-120b")
                 )
-                print(f"\n  ==> VLLM backend vllm_url: {vllm_url}")
-                print(f"\n  ==> VLLM backend vllm_model: {vllm_model}")
+                reasoning_effort = self.model_kwargs.get(
+                    "reasoning_effort", 
+                    "medium"
+                )
+                print(f"\n  ==> vllm backend vllm_url: {vllm_url}")
+                print(f"\n  ==> vllm backend vllm_model: {vllm_model}")
+                print(f"\n  ==> oss reasoning: {reasoning_effort}")
 
                 self.model_client = VLLMClient(
                     base_url=vllm_url,
                     model_name=vllm_model,
                     model_info=model_info,
+                    reasoning_effort=reasoning_effort,
                 )
             elif backend == "ollama":
                 from autogen_ext.models.ollama import OllamaChatCompletionClient
@@ -636,6 +368,7 @@ class AutoGenClient(Client):
         elif backend in ["huggingface"]:
             default_model = None  # Must be provided via local_model_path
         elif backend in ["vllm"]:
+            kwargs["reasoning_effort"] = "medium"
             default_model = "gpt-oss"  # Default vLLM model name
 
         if not model:

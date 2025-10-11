@@ -59,6 +59,7 @@ if __name__ == "__main__":
         from charge.clients.autogen import AutoGenClient
 
         (model, backend, API_KEY, kwargs) = AutoGenClient.configure(args.model, args.backend)
+        kwargs["reasoning_effort"] = args.reasoning_effort
 
         runner = AutoGenClient(
             experiment_type=myexperiment,
