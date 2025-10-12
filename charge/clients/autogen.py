@@ -14,7 +14,7 @@ try:
         AssistantMessage,
     )
     from openai import AsyncOpenAI
-    from autogen_ext.agents.openai import OpenAIAgent
+    # from autogen_ext.agents.openai import OpenAIAgent
     from autogen_ext.tools.mcp import StdioServerParams, McpWorkbench, SseServerParams
     from autogen_agentchat.messages import TextMessage, ThoughtEvent
     from autogen_agentchat.conditions import HandoffTermination, TextMentionTermination
@@ -30,43 +30,9 @@ import asyncio
 from functools import partial
 import os
 from charge.clients.Client import Client
+from charge.clients.autogen_utils import generate_agent
 from typing import Type, Optional, Dict, Union, List, Callable
 from charge.Experiment import Experiment
-
-
-class ReasoningModelContext(UnboundedChatCompletionContext):
-    """A model context for reasoning models."""
-
-    def __init__(self, callback: Optional[Callable] = None):
-        super().__init__()
-        self.callback = callback
-
-    async def get_messages(self) -> List[LLMMessage]:
-        messages = await super().get_messages()
-        # Filter out thought field from AssistantMessage.
-        messages_out: List[LLMMessage] = []
-        for message in messages:
-            messages_out.append(message)
-        return messages_out
-
-    async def add_message(
-        self,
-        assistant_message: AssistantMessage,
-    ) -> None:
-
-        await super().add_message(assistant_message)
-
-        if self.callback:
-            self.callback(assistant_message)
-        else:
-            if (
-                hasattr(assistant_message, "thought")
-                and assistant_message.thought is not None
-            ):
-                print(f"Model thought: {assistant_message.thought}")
-            else:
-                print("Model: ", assistant_message.content)
-
 
 class AutoGenClient(Client):
     def __init__(
@@ -300,29 +266,7 @@ class AutoGenClient(Client):
         await asyncio.gather(*[workbench.start() for workbench in workbenches])
 
         try:
-            if isinstance(self.model_client, AsyncOpenAI):
-                agent = OpenAIAgent(
-                    name="Assistant",
-                    description='ChARGe OpenAIAgent',
-                    client=self.model_client,
-                    model=self.model,
-                    instructions=system_prompt,
-                )
-            elif isinstance(self.model_client, ChatCompletionClient):
-                # TODO: Convert this to use custom agent in the future
-                agent = AssistantAgent(
-                    name="Assistant",
-                    model_client=self.model_client,
-                    system_message=system_prompt,
-                    workbench=workbenches if len(workbenches) > 0 else None,
-                    max_tool_iterations=self.max_tool_calls,
-                    reflect_on_tool_use=True,
-                    model_context=ReasoningModelContext(self.thoughts_callback),
-                    # output_content_type=structured_output_schema,
-                )
-            else:
-                raise ValueError("ERROR: Unknown model client type.")
-
+            agent = generate_agent(self.model_client, self.model, system_prompt, workbenches, self.max_tool_calls)
             answer_invalid, result = await self.step(agent, user_prompt)
 
         finally:
@@ -372,27 +316,7 @@ class AutoGenClient(Client):
         for workbench in wokbenches:
             await workbench.start()
 
-        if isinstance(self.model_client, AsyncOpenAI):
-            agent = OpenAIAgent(
-                name="Assistant",
-                description='ChARGe OpenAIAgent',
-                client=self.model_client,
-                model=self.model,
-                instructions=system_prompt,
-            )
-        elif isinstance(self.model_client, ChatCompletionClient):
-            # TODO: Convert this to use custom agent in the future
-            agent = AssistantAgent(
-                name="Assistant",
-                model_client=self.model_client,
-                system_message=system_prompt,
-                workbench=workbench,
-                max_tool_iterations=self.max_tool_calls,
-                reflect_on_tool_use=True,
-                model_context=ReasoningModelContext(self.thoughts_callback),
-            )
-        else:
-            raise ValueError("ERROR: Unknown model client type.")
+        agent = generate_agent(self.model_client, self.model, system_prompt, [], self.max_tool_calls)
 
         user = UserProxyAgent("USER", input_func=input)
         team = RoundRobinGroupChat(
