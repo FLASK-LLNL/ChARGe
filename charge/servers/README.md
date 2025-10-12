@@ -40,7 +40,7 @@ After installing the ChARGe package, run the additional commands to use the Chem
 
 1.) Install chemprice with pip.
 ```
-pip install chemprice
+pip3 install --no-deps chemprice
 ```
 
 2.) Set API key for Chemspace as an environment variable
@@ -49,7 +49,7 @@ export CHEMSPACE_API_KEY=<ENTER_YOUR_CHEMSPACE_API_KEY>
 ```
 ## Testing Chemprice Installation
 ```python
-from molecular_property_utils import get_molecule_price
+from charge.servers.molecular_property_utils import get_molecule_price
 smiles='CCO'
 get_molecule_price(smiles)
 ```

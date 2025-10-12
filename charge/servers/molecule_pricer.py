@@ -1,6 +1,9 @@
-import chemprice
-from chemprice import PriceCollector
-import os
+try:
+    import chemprice
+    from chemprice import PriceCollector
+except ImportError:
+    raise ImportError("Please install the chemprop package to use this module.")
+import os, sys
 
 def get_chemspace_prices(SMILES_list,best_only=True):
     
@@ -45,7 +48,12 @@ def get_chemspace_prices(SMILES_list,best_only=True):
     """    
 
     pc = PriceCollector()
-    pc.setChemSpaceApiKey(os.getenv("CHEMSPACE_API_KEY"))
+    chemspace_api_key = os.getenv("CHEMSPACE_API_KEY")
+    if(chemspace_api_key):
+        pc.setChemSpaceApiKey(chemspace_api_key)
+    else:
+        print('CHEMPROP_API_KEY environment variable not set!')
+        sys.exit(2)
     print(pc.check())
     all_prices = pc.collect(SMILES_list)
     if(best_only):
