@@ -124,7 +124,7 @@ def chemprop_preds_server(smiles: str,property:str) -> float:
     >>> chemprop_preds_server("c1ccccc1", "lipo")
     2.94
     """
-    
+
     valid_properties = {'density', 'hof', 'alpha','cv','gap','homo','lumo','mu','r2','zpve','lipo'}
     if property not in valid_properties:
         raise ValueError(

@@ -1,18 +1,23 @@
 from __future__ import annotations
-import torch
-import pandas as pd
-from lightning import pytorch as pl
-from chemprop import data, models, featurizers
-from chemprop.models import MPNN
+try:
+    import click
+    import torch
+    import pandas as pd
+    from lightning import pytorch as pl
+    from chemprop import data, models, featurizers
+    from chemprop.models import MPNN
+except ImportError:
+    raise ImportError("Please install the chemprop package to use this module.")
 from typing import List
 import numpy as np
+import os, sys
 
 def predict_with_chemprop(
     checkpoint_path: str,
     smiles: list[str],
     device: str = "cpu",
     batch_size: int = 50,
-    accelerator: str = "cpu"
+    # accelerator: str = "cpu"
 ) -> list[list[float]]:
     """
     Load a Chemprop v2 model from a checkpoint and predict on a list of SMILES.
@@ -46,14 +51,25 @@ def predict_with_chemprop(
 
     # 3) Predict with Lightning Trainer
     with torch.inference_mode():
-        trainer = pl.Trainer(logger=None, enable_progress_bar=False, accelerator=accelerator, devices=1)
+        trainer = pl.Trainer(logger=None, enable_progress_bar=False, accelerator=device, devices=1)
         preds_batches = trainer.predict(mpnn, loader)
 
     preds = np.concatenate(preds_batches, axis=0).tolist()
     return preds
 
 
+@click.command()
+@click.option("--model-dir", envvar="CHEMPROP_BASE_PATH", help="Path to chemprop model")
+@click.option("--device", envvar="CHEMPROP_SERVER_DEVICE", default="cpu", help="Device to use for the chemprop server: cpu, cuda")
+def main(model_dir: str, device: str):
+    chemprop_base_path=model_dir
+    if(chemprop_base_path):
+        ckpt = os.path.join(chemprop_base_path, "gap/model_0/best.pt")
+        smis = ["O=CC12C3CC1CCN23", "CCC", "c1ccccc1O"]
+        print(predict_with_chemprop(ckpt, smis, device))
+    else:
+        print('CHEMPROP_BASE_PATH environment variable not set!')
+        sys.exit(2)
+
 if __name__ == "__main__":
-    ckpt = "gap/model_0/best.pt"
-    smis = ["O=CC12C3CC1CCN23", "CCC", "c1ccccc1O"]
-    print(predict_with_chemprop(ckpt, smis))
+    main()

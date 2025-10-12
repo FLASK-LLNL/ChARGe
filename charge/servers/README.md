@@ -13,7 +13,7 @@ export CHEMPROP_BASE_PATH=<LC_PATH_TO_CHEMPROP_MODELS>
 ```
 ## Testing Chemprop Installation
 ```python
-from molecular_property_utils import chemprop_preds_server
+from charge.servers.molecular_property_utils import chemprop_preds_server
 property='density'
 chemprop_preds_server('COC(=O)COC=O','density')
 ```
