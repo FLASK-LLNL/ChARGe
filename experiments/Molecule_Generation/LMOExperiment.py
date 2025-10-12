@@ -1,5 +1,6 @@
 import charge
 from charge.Experiment import Experiment
+from charge.servers import SMILES_utils
 import helper_funcs
 from typing import Optional, List
 from pydantic import BaseModel, field_validator
@@ -13,15 +14,11 @@ for binding affinity and synthetic accessibility.
 
 USER_PROMPT = """
 Given the lead molecule: {0}, generate 1 new SMILES strings for molecules similar to the lead molecule.
-For each molecule you suggest, verify the SMILES, check if it is already known, and
-calculate its density and synthetic accessibility. Only return molecules with higher density and
-the same or lower synthetic accessibility compared to the lead molecule.
-If a molecule is known or doesn't fit the criteria, move on and
-generate a different one and try again.
+For each molecule you suggest, verify the SMILES, check if it is already known, and calculate its density and synthetic accessibility. Do the checks in order.
+Only return molecules with higher density and the same or lower synthetic accessibility compared to the lead molecule.
+If a molecule is known or doesn't fit the criteria, move on and generate a different one and try again.
 Return a list of the unique molecules.
 
-For example, the output format should be:
-["CCO", "CCN", "CCC"]
 """
 
 
@@ -40,7 +37,7 @@ class MoleculeOutputSchema(BaseModel):
         for smiles in smiles_list:
             if not isinstance(smiles, str):
                 raise ValueError("Each SMILES must be a string.")
-            if not helper_funcs.verify_smiles(smiles):
+            if not SMILES_utils.verify_smiles(smiles):
                 raise ValueError(f"Invalid SMILES string: {smiles}")
         return smiles_list
 
@@ -82,50 +79,10 @@ class LMOExperiment(Experiment):
         self.user_prompt = user_prompt
         self.verification_prompt = verification_prompt
         self.refinement_prompt = refinement_prompt
-        self.max_synth_score = helper_funcs.get_synthesizability(lead_molecule)
+        self.max_synth_score = SMILES_utils.get_synthesizability(lead_molecule)
         self.min_density = helper_funcs.get_density(lead_molecule)
         self.set_structured_output_schema(MoleculeOutputSchema)
 
-    @charge.hypothesis
-    def canonicalize_smiles(self, smiles: str) -> str:
-        """
-        Canonicalize a SMILES string. Returns the canonical SMILES.
-        If the SMILES is invalid, returns "Invalid SMILES".
-
-        Args:
-            smiles (str): The input SMILES string.
-        Returns:
-            str: The canonicalized SMILES string.
-        """
-        return helper_funcs.canonicalize_smiles(smiles)
-
-    @charge.hypothesis
-    def verify_smiles(self, smiles: str) -> bool:
-        """
-        Verify if a SMILES string is valid. Returns True if valid, False otherwise.
-
-        Args:
-            smiles (str): The input SMILES string.
-        Returns:
-            bool: True if the SMILES is valid, False otherwise.
-        """
-        return helper_funcs.verify_smiles(smiles)
-
-    @charge.hypothesis
-    def get_synthesizability(self, smiles: str) -> float:
-        """
-        Calculate the synthesizability of a molecule given its SMILES string.
-        Values range from 1.0 (highly synthesizable) to 10.0 (not synthesizable).
-
-        Args:
-            smiles (str): The input SMILES string.
-        Returns:
-            float: The synthesizability score.
-        """
-
-        return helper_funcs.get_synthesizability(smiles)
-
-    @charge.hypothesis
     def check_proposal(self, smiles: str) -> bool:
         """
         Check if the proposed SMILES string is valid.
@@ -141,10 +98,10 @@ class LMOExperiment(Experiment):
         # NOTE: This is used both by the LLM and during verification in the final
         # step of the experiment. So it needs to be deterministic and not
         # rely on any LLM calls.
-        if not self.verify_smiles(smiles):
+        if not SMILES_utils.verify_smiles(smiles):
             raise ValueError(f"Invalid SMILES string: {smiles}")
 
-        synth_score = self.get_synthesizability(smiles)
+        synth_score = SMILES_utils.get_synthesizability(smiles)
         if synth_score > self.max_synth_score:
             raise ValueError(
                 f"Synthesizability score too high: {synth_score} > {self.max_synth_score}"

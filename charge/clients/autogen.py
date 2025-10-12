@@ -58,6 +58,7 @@ class AutoGenClient(Client):
         max_tool_calls: int = 30,
         check_response: bool = False,
         max_multi_turns: int = 100,
+        mcp_timeout: int = 60,
     ):
         """Initializes the AutoGenClient.
 
@@ -83,6 +84,7 @@ class AutoGenClient(Client):
             check_response (bool, optional): Whether to check the response using verifier methods.
                                              Defaults to False (Will be set to True in the future).
             max_multi_turns (int, optional): Maximum number of multi-turn interactions. Defaults to 100.
+            mcp_timeout (int, optional): Timeout in seconds for MCP server responses. Defaults to 60 s.
         Raises:
             ValueError: If neither `server_path` nor `server_url` is provided and MCP servers cannot be generated.
         """
@@ -95,6 +97,7 @@ class AutoGenClient(Client):
         self.max_tool_calls = max_tool_calls
         self.check_response = check_response
         self.max_multi_turns = max_multi_turns
+        self.mcp_timeout = mcp_timeout
 
         if model_client is not None:
             self.model_client = model_client
@@ -139,15 +142,27 @@ class AutoGenClient(Client):
                 if isinstance(server_path, str):
                     server_path = [server_path]
                 for sp in server_path:
-                    self.servers.append(StdioServerParams(command="python3", args=[sp]))
+                    self.servers.append(
+                        StdioServerParams(
+                            command="python3",
+                            args=[sp],
+                            read_timeout_seconds=self.mcp_timeout,
+                        )
+                    )
             if server_url is not None:
                 if isinstance(server_url, str):
                     server_url = [server_url]
                 for su in server_url:
                     self.servers.append(
-                        SseServerParams(url=su, **(server_kwargs or {}))
+                        SseServerParams(
+                            url=su,
+                            timeout=self.mcp_timeout,
+                            sse_read_timeout=self.mcp_timeout,
+                            **(server_kwargs or {}),
+                        )
                     )
 
+    @staticmethod
     def configure(
         model: Optional[str], backend: str
     ) -> (str, str, str, Dict[str, str]):
@@ -242,31 +257,29 @@ class AutoGenClient(Client):
             user_prompt is not None
         ), "User prompt must be provided for single-turn run."
 
-        assert (
-            len(self.servers) > 0
-        ), "No MCP servers available. Please provide server_path or server_url."
-
         workbenches = [McpWorkbench(server) for server in self.servers]
 
         # Start the servers
-        for workbench in workbenches:
-            await workbench.start()
 
-        #     # TODO: Convert this to use custom agent in the future
-        agent = AssistantAgent(
-            name="Assistant",
-            model_client=self.model_client,
-            system_message=system_prompt,
-            workbench=workbenches,
-            max_tool_iterations=self.max_tool_calls,
-            reflect_on_tool_use=True,
-            # output_content_type=structured_output_schema,
-        )
+        await asyncio.gather(*[workbench.start() for workbench in workbenches])
 
-        answer_invalid, result = await self.step(agent, user_prompt)
+        try:
+            # TODO: Convert this to use custom agent in the future
+            agent = AssistantAgent(
+                name="Assistant",
+                model_client=self.model_client,
+                system_message=system_prompt,
+                workbench=workbenches if len(workbenches) > 0 else None,
+                max_tool_iterations=self.max_tool_calls,
+                reflect_on_tool_use=True,
+                # output_content_type=structured_output_schema,
+            )
 
-        for workbench in workbenches:
-            await workbench.stop()
+            answer_invalid, result = await self.step(agent, user_prompt)
+
+        finally:
+
+            await asyncio.gather(*[workbench.stop() for workbench in workbenches])
 
         if answer_invalid:
             # Maybe convert this to a warning and let the user handle it
