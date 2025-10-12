@@ -1,11 +1,7 @@
 # Using Chemprop tools
-## Installation (tested only on Dane)
-After installing the ChARGe package, run the additional commands to use the Chemprop MPNN models.
+## Installation
+Installing the ChARGe package with the [chemprop] or [all] options to use the Chemprop MPNN models.
 
-1.) Install chemprop with pip.
-```
-pip install chemprop
-```
 
 2.) Set Chemprop model checkpoint path as environment variable
 ```
