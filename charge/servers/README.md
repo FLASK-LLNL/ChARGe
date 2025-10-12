@@ -1,7 +1,6 @@
 # Using Chemprop tools
 ## Installation
-Installing the ChARGe package with the [chemprop] or [all] options to use the Chemprop MPNN models.
-
+1.) Installing the ChARGe package with the [chemprop] or [all] options to use the Chemprop MPNN models.
 
 2.) Set Chemprop model checkpoint path as environment variable
 ```
