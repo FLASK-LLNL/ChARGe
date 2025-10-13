@@ -12,7 +12,7 @@ except ImportError:
 import json
 import os
 from loguru import logger
-from charge.Experiment import Experiment
+from charge.experiments.Experiment import Experiment
 from charge.servers.server_utils import add_server_arguments
 from mcp.server.fastmcp import FastMCP
 from charge.clients.autogen import AutoGenClient

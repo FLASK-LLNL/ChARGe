@@ -1,5 +1,5 @@
 import charge
-from charge.Experiment import Experiment
+from charge.experiments.Experiment import Experiment
 from charge.servers import SMILES_utils
 import helper_funcs
 from typing import Optional, List

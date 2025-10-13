@@ -2,32 +2,7 @@ from rdkit import Chem
 from rdkit.Chem import AllChem, Descriptors
 import json
 from charge.servers import SMILES_utils
-
-
-def get_density(smiles: str) -> float:
-    """
-    Calculate the density of a molecule given its SMILES string.
-    """
-    try:
-        mol = Chem.MolFromSmiles(smiles)
-        if mol is None:
-            return 0.0
-        mol = Chem.AddHs(mol)
-        AllChem.EmbedMolecule(mol, AllChem.ETKDG())
-        AllChem.UFFOptimizeMolecule(mol, maxIters=500)
-
-        if mol.GetNumConformers() == 0:
-            return 0.0
-        mw = Descriptors.MolWt(mol)
-        num_atoms = mol.GetNumAtoms()
-        if num_atoms == 0:
-            return 0.0
-
-        volume = AllChem.ComputeMolVolume(mol)
-        density = volume / mw
-        return density
-    except Exception as e:
-        return 0.0
+from charge.servers.molecular_property_utils import get_density
 
 
 def get_list_from_json_file(file_path: str) -> list:

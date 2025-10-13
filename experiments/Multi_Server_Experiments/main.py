@@ -1,6 +1,6 @@
 import argparse
 import asyncio
-from charge.Experiment import Experiment
+from charge.experiments.Experiment import Experiment
 from charge.clients.Client import Client
 from charge.clients.autogen import AutoGenClient
 
