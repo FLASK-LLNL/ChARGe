@@ -90,6 +90,7 @@ def generate_agent(
     callback: Optional[Callable] = None,
 ):
     if isinstance(model_client, AsyncOpenAI):
+        raise ValueError("ERROR: Incomplete Response API lacks tools.")
         agent = OpenAIAgent(
             name="Assistant",
             description="ChARGe OpenAIAgent",
