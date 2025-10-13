@@ -14,7 +14,7 @@ except ImportError:
     )
 from mcp.server.fastmcp import FastMCP
 from typing import List
-
+from charge.servers.server_utils import update_mcp_network
 
 from loguru import logger
 import logging
@@ -91,7 +91,9 @@ def predict_reaction_internal(data: List[str], retrosynthesis: bool) -> List[str
 @click.option("--model-dir-retro", envvar="FLASKV2_MODEL_RETRO", help="Path to flaskv2 model for retrosynthesis")
 @click.option("--adapter-weights-fwd", help="LoRA adapter weights, if used")
 @click.option("--adapter-weights-retro", help="LoRA adapter weights for retrosynthesis model, if used")
-def main(model_dir_fwd: str, adapter_weights_fwd: str, model_dir_retro: str, adapter_weights_retro: str):
+@click.option("--host", type=str, default="http://127.0.0.1", help="Host to run the server on")
+@click.option("--port", type=int, default=8000, help="Port to run the server on")
+def main(model_dir_fwd: str, adapter_weights_fwd: str, model_dir_retro: str, adapter_weights_retro: str, host: str, port: str):
     if not model_dir_fwd and not model_dir_retro:
         raise ValueError("At least one model has to be given to the MCP server")
     global fwd_model, retro_model, tokenizer, device, retrosynthesis
@@ -172,6 +174,7 @@ def main(model_dir_fwd: str, adapter_weights_fwd: str, model_dir_retro: str, ada
 
     logger.info(f"Available tools: {', '.join(available_tools)}")
 
+    update_mcp_network(mcp, host, port)
     # Run server
     mcp.run(
         transport="sse",
