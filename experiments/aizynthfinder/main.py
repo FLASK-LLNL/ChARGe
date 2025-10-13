@@ -4,10 +4,11 @@ from charge.Experiment import Experiment
 from charge.clients.Client import Client
 from charge.clients.autogen import AutoGenClient
 from charge.servers.AiZynthTools import find_synthesis_routes
+from charge.servers.log_progress import LOG_PROGRESS_SYSTEM_PROMPT
 
 class AiZynthFinderExperiment(Experiment):
     def __init__(self, lead_molecule: str):
-        system_prompt = "You are a world-class chemist. Your task is to perform retrosynthesis for a target molecule."
+        system_prompt = "You are a world-class chemist. Your task is to perform retrosynthesis for a target molecule." + LOG_PROGRESS_SYSTEM_PROMPT
 
         user_prompt = (
             f"Use available tools to find synthesis routes to make {lead_molecule}\n"

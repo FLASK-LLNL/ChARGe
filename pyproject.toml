@@ -26,7 +26,7 @@ rdkit = ["rdkit>=2025.3.6"]
 flask = ["transformers", "peft", "trl", "torch>=2.8.0"]
 # This is the manually identified set of necessary tools for AiZynthFinder 4.4.0 to work with a --no-deps install
 # pip3 install --no-deps aizynthfinder reaction-utils
-aizynthfinder = ["paretoset", "rdchiral", "wrapt_timeout_decorator", "swifter", "apted", "scipy", "onnxruntime", "dask[dataframe]>=2025.9.0"]
+aizynthfinder = ["paretoset", "rdchiral", "wrapt_timeout_decorator", "swifter", "apted", "scipy", "onnxruntime", "dask[dataframe]>=2025.9.0", "tables"]
 chemprop = ["chemprop>=2.2.0", "torch>=2.8.0", "lightning"]
 
 all = ["charge[ollama,gemini,autogen,rdkit,flask,aizynthfinder,chemprop]"]

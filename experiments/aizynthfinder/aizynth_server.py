@@ -6,10 +6,13 @@
 ################################################################################
 
 
-from charge.servers.server_utils import parser
+from charge.servers.server_utils import add_server_arguments
 from mcp.server.fastmcp import FastMCP
 from charge.servers.AiZynthTools import is_molecule_synthesizable
+import argparse
 
+parser = argparse.ArgumentParser()
+add_server_arguments(parser)
 parser.add_argument('--config', type=str, help='Config yaml file for initializing AiZynthFinder')
 args = parser.parse_args()
 
@@ -19,6 +22,10 @@ mcp = FastMCP('AiZynthFinder', website_url=args.host, port=args.port)
 mcp.tool()(is_molecule_synthesizable)
 
 def main():
+    from charge.servers.AiZynthTools import RetroPlanner
+
+    RetroPlanner.initialize(configfile=args.config)
+
     # Run MCP server
     mcp.run(transport=args.transport)
 
