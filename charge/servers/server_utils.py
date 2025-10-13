@@ -5,5 +5,9 @@ parser.add_argument("--port", type=int, default=8000, help="Port to run the serv
 parser.add_argument(
     "--host", type=str, default="http://127.0.0.1", help="Host to run the server on"
 )
-args = parser.parse_args()
+parser.add_argument(
+    '--transport', type=str,
+    help='MCP transport type',
+    choices=['stdio', 'streamable-http', 'sse'],
+    default='sse')
 

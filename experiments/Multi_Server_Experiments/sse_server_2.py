@@ -3,7 +3,8 @@ from rdkit import Chem
 
 from loguru import logger
 
-from charge.servers.server_utils import args
+from charge.servers.server_utils import parser
+args = parser.parse_args()
 
 mcp = FastMCP(
     "Database MCP Server that returns price of molecules",

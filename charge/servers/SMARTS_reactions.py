@@ -16,7 +16,8 @@ except ImportError:
 
 from loguru import logger
 
-from charge.servers.server_utils import args
+from charge.servers.server_utils import parser
+args = parser.parse_args()
 
 SMARTS_mcp = FastMCP(
     "[RDKit-SMARTS] Chemistry and reaction verification MCP Server",
