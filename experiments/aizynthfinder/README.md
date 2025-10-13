@@ -21,7 +21,7 @@ AiZynthFinder requires a config yaml file during
 initialization. Further, this config file contains paths to databases,
 reaction templates, and trained model files. This means you need to
 have access to these files. The
-[documentation](https://molecularai.github.io/aizynthfinder/index.html),
+[documentation](https://molecularai.github.io/aizynthfinder/index.html)
 shows how to download these files from running `download_public_data
 .` (once you have AiZynthFinder installed). You can also specify
 different parameters in the config file for more advanced usage. See
