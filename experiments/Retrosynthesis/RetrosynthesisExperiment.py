@@ -1,5 +1,5 @@
 from charge.Experiment import Experiment
-
+from charge.servers.log_progress import LOG_PROGRESS_SYSTEM_PROMPT
 
 TEMPLATE_SYSTEM_PROMPT = (
     "You are a retrosynthesis expert. Your task is to provide a retrosynthetic "
@@ -15,7 +15,9 @@ TEMPLATE_SYSTEM_PROMPT = (
     + " Use the diagnosis tools to fix any issues that arise."
     + " and return the reaction SMARTS, reactants, and products."
     + " Prefer reactions that are more likely to be performed in a lab "
-    + " setting. \n\n"
+    + " setting."
+    + LOG_PROGRESS_SYSTEM_PROMPT
+    + "\n\n"
 )
 
 
@@ -28,9 +30,13 @@ class RetrosynthesisExperiment(Experiment):
             system_prompt=TEMPLATE_SYSTEM_PROMPT,
             user_prompt=user_prompt,
         )
-        print("RetrosynthesisExperiment initialized with the provided prompts.")
         self.system_prompt = TEMPLATE_SYSTEM_PROMPT
         self.user_prompt = user_prompt
+        print(
+            "RetrosynthesisExperiment initialized with the provided prompts:"
+            + f"\n{self.system_prompt}"
+            + f"\n{self.user_prompt}"
+        )
 
 
 TEMPLATE_FREE_SYSTEM_PROMPT = (
@@ -39,6 +45,7 @@ TEMPLATE_FREE_SYSTEM_PROMPT = (
     + " be provided as a tuple of reactants as SMILES and the product as SMILES."
     + " Perform only single step retrosynthesis. Make sure the SMILES strings are"
     + " valid. Use tools to verify the SMILES strings and diagnose any issues that arise."
+    + LOG_PROGRESS_SYSTEM_PROMPT
     + " "
 )
 
@@ -52,8 +59,10 @@ class TemplateFreeRetrosynthesisExperiment(Experiment):
             system_prompt=TEMPLATE_FREE_SYSTEM_PROMPT,
             user_prompt=user_prompt,
         )
-        print(
-            "TemplateFreeRetrosynthesisExperiment initialized with the provided prompts."
-        )
         self.system_prompt = TEMPLATE_FREE_SYSTEM_PROMPT
         self.user_prompt = user_prompt
+        print(
+            "TemplateFreeRetrosynthesisExperiment initialized with the provided prompts:"
+            + f"\n{self.system_prompt}"
+            + f"\n{self.user_prompt}"
+        )
