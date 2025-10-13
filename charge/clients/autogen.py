@@ -126,19 +126,20 @@ class AutoGenClient(Client):
                     api_key is not None
                 ), "API key must be provided for OpenAI or Gemini backend"
 
-                if backend in ["openai", "livai", "livchat"]:
-                    self.model_client = AsyncOpenAI(
-                        **self.model_kwargs,
-                    )
-                else:
-                    from autogen_ext.models.openai import OpenAIChatCompletionClient
-
-                    self.model_client = OpenAIChatCompletionClient(
-                        model=model,
-                        api_key=api_key,
-                        model_info=model_info,
-                        **self.model_kwargs,
-                    )
+                # Disabled due to https://github.com/microsoft/autogen/issues/6937
+                # if backend in ["openai", "livai", "livchat"]:
+                #     self.model_client = AsyncOpenAI(
+                #         **self.model_kwargs,
+                #     )
+                # else:
+                from autogen_ext.models.openai import OpenAIChatCompletionClient
+                
+                self.model_client = OpenAIChatCompletionClient(
+                    model=model,
+                    api_key=api_key,
+                    model_info=model_info,
+                    **self.model_kwargs,
+                )
 
         if server_path is None and server_url is None:
             self.setup_mcp_servers()
@@ -179,9 +180,9 @@ class AutoGenClient(Client):
         if backend in ["openai", "gemini", "livai", "livchat"]:
             if backend == "openai":
                 API_KEY = os.getenv("OPENAI_API_KEY")
-                default_model = "gpt-4"
-                # kwargs["parallel_tool_calls"] = False
-                # kwargs["reasoning_effort"] = "high"
+                default_model = "gpt-5"
+                kwargs["parallel_tool_calls"] = False
+                kwargs["reasoning_effort"] = "high"
             elif backend == "livai" or backend == "livchat":
                 API_KEY = os.getenv("OPENAI_API_KEY")
                 BASE_URL = os.getenv("LIVAI_BASE_URL")
