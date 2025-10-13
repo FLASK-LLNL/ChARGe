@@ -8,7 +8,7 @@
 
 from charge.servers.server_utils import add_server_arguments, update_mcp_network
 from mcp.server.fastmcp import FastMCP
-from charge.servers.AiZynthTools import is_molecule_synthesizable
+from charge.servers.AiZynthTools import is_molecule_synthesizable, find_synthesis_routes
 import argparse
 
 parser = argparse.ArgumentParser()
@@ -20,6 +20,7 @@ args = parser.parse_args()
 mcp = FastMCP('AiZynthFinder')
 
 mcp.tool()(is_molecule_synthesizable)
+mcp.tool()(find_synthesis_routes)
 
 def main():
     from charge.servers.AiZynthTools import RetroPlanner
