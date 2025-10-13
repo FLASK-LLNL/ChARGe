@@ -1,10 +1,10 @@
 import argparse
 import asyncio
 import time
-from LMOExperiment import LMOExperiment as LeadMoleculeOptimization
+from charge.experiments.LMOExperiment import LMOExperiment as LeadMoleculeOptimization
 import os
 from charge.clients.Client import Client
-import helper_funcs
+import charge.utils.helper_funcs as helper_funcs
 from loguru import logger
 
 parser = argparse.ArgumentParser()

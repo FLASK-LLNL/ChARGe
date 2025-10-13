@@ -1,6 +1,6 @@
 import argparse
 import asyncio
-from RetrosynthesisExperiment import (
+from charge.experiments.RetrosynthesisExperiment import (
     RetrosynthesisExperiment,
     TemplateFreeRetrosynthesisExperiment,
 )
