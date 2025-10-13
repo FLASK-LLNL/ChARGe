@@ -7,10 +7,26 @@ This experiment demonstrates how to make a tool call to the aizynth MCP server, 
 
 ## Requirement
 
-You should have a separate python environment for running AiZynthFinder, because it has its own installation prerequisites that may not be compatible with the ChARGe environment.
+As noted in the README in `charge/servers/README.md` to install
+AiZynthFinder you will need to perform a `pip install
+charge[aizynthfinder]` or `pip install charge[all]` and follow it with
+```
+pip3 install --no-deps aizynthfinder reaction-utils
+```
+
+Alternatively, for an independent MCP server, You could have a separate python environment for running AiZynthFinder, because it has its own installation prerequisites that may not be compatible with the ChARGe environment.
 Follow [these steps](https://github.com/MolecularAI/aizynthfinder?tab=readme-ov-file#installation) for AiZynthFinder installation. 
 
-AiZynthFinder requires a config yaml file during initialization. Further, this config file contains paths to databases, reaction templates, and trained model files. This means you need to have access to these files. All these files are available at `/p/vast1/flask/team/tim/aizynth`. Alternatively, based on the [documentation](https://molecularai.github.io/aizynthfinder/index.html), you may be able to download these files from running `download_public_data .` (once you have AiZynthFinder installed). You can also specify different parameters in the config file for more advanced usage. See [here](https://molecularai.github.io/aizynthfinder/configuration.html) for more details regarding the config file.
+AiZynthFinder requires a config yaml file during
+initialization. Further, this config file contains paths to databases,
+reaction templates, and trained model files. This means you need to
+have access to these files. The
+[documentation](https://molecularai.github.io/aizynthfinder/index.html),
+shows how to download these files from running `download_public_data
+.` (once you have AiZynthFinder installed). You can also specify
+different parameters in the config file for more advanced usage. See
+[here](https://molecularai.github.io/aizynthfinder/configuration.html)
+for more details regarding the config file.
 
 
 ## How to use
@@ -19,13 +35,6 @@ First set up the aizynth server:
 
 ```bash
 python /path/to/aizynth_server.py --config /path/to/aizynth_config.yml --transport sse
-```
-
-Here is a specific example:
-
-```bash
-# cd to charge/servers
-python aizynth_server.py --config /p/vast1/flask/team/tim/aizynth/config.yml --transport sse
 ```
 
 This will start an SSE MCP server locally. The URL by default should be `http://127.0.0.1:8000/sse`.

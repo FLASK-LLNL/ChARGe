@@ -13,7 +13,7 @@ import json
 from dataclasses import dataclass, asdict
 from typing import Dict, List, Optional
 from loguru import logger
-
+from charge.servers.SMILES_utils import verify_smiles
 
 @dataclass
 class Node:
@@ -139,6 +139,9 @@ def is_molecule_synthesizable(smiles: str) -> bool:
     """
     logger.info(f"Checking if molecule {smiles} is synthesizable.")
 
+    if not verify_smiles(smiles):
+        raise ValueError(f"Invalid SMILES string: {smiles}")
+
     RetroPlanner.initialize()
     assert RetroPlanner.finder is not None
     RetroPlanner.finder.target_smiles = smiles
@@ -155,3 +158,26 @@ def is_molecule_synthesizable(smiles: str) -> bool:
         if all_purchasable:
             return True
     return False
+
+def find_synthesis_routes(smiles: str) -> list[dict]:
+    """
+    Find synthesis routes for synthesizing a target molecule.
+
+    Args:
+        smiles (str): the target molecule in SMILES representation.
+    Returns:
+        list[dict]: a list of synthesis routes, each of which is a reaction tree in json/dict format.
+    Raises:
+        ValueError:  If the molecule is not valid.
+    """
+    logger.info(f"Find a synthesis route for molecule {smiles}.")
+
+    if not verify_smiles(smiles):
+        raise ValueError(f"Invalid SMILES string: {smiles}")
+
+    RetroPlanner.initialize()
+    assert RetroPlanner.finder is not None
+    RetroPlanner.finder.target_smiles = smiles
+
+    _, _, routes = RetroPlanner.plan(smiles)
+    return routes

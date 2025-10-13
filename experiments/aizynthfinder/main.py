@@ -3,7 +3,7 @@ import asyncio
 from charge.Experiment import Experiment
 from charge.clients.Client import Client
 from charge.clients.autogen import AutoGenClient
-
+from charge.servers.AiZynthTools import find_synthesis_routes
 
 class AiZynthFinderExperiment(Experiment):
     def __init__(self, lead_molecule: str):
