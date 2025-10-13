@@ -61,9 +61,13 @@ def verify_smiles(smiles: str) -> bool:
         logger.info(
             f"Verifying SMILES: {smiles} used {SMILES_VERIFICATION_COUNTER} times"
         )
-        Chem.MolFromSmiles(smiles)
-        logger.info(f"SMILES is valid: {smiles}")
-        return True
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is not None:
+            logger.info(f"SMILES is valid: {smiles}")
+            return True
+        else:
+            logger.error(f"SMILES is invalid: {smiles}")
+            return False
     except Exception as e:
         logger.error(f"SMILES is invalid: {smiles}")
         return False

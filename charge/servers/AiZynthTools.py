@@ -142,7 +142,8 @@ def is_molecule_synthesizable(smiles: str) -> bool:
     if not verify_smiles(smiles):
         raise ValueError(f"Invalid SMILES string: {smiles}")
 
-    RetroPlanner.initialize()
+    if RetroPlanner.finder is None:
+        RetroPlanner.initialize()
     assert RetroPlanner.finder is not None
     RetroPlanner.finder.target_smiles = smiles
 
@@ -175,7 +176,8 @@ def find_synthesis_routes(smiles: str) -> list[dict]:
     if not verify_smiles(smiles):
         raise ValueError(f"Invalid SMILES string: {smiles}")
 
-    RetroPlanner.initialize()
+    if RetroPlanner.finder is None:
+        RetroPlanner.initialize()
     assert RetroPlanner.finder is not None
     RetroPlanner.finder.target_smiles = smiles
 
