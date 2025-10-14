@@ -6,6 +6,8 @@
 ################################################################################
 
 
+from loguru import logger
+
 LOG_PROGRESS_SYSTEM_PROMPT="At each step of your reasoning use the log_progress tool to report your current prograss, current thinking, and plan."
 
 
@@ -19,5 +21,5 @@ def log_progress(log_msg: str) -> None:
         None: returns None empty object.
     """
 
-    print(f"[ChARGe Orchestrator Inner Monologue] {log_msg}")
+    logger.info(f"[ChARGe Orchestrator Inner Monologue] {log_msg}")
     
