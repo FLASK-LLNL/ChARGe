@@ -17,9 +17,6 @@ from typing import List, Optional
 from charge.servers.server_utils import update_mcp_network, get_hostname
 
 from loguru import logger
-import logging
-
-logging.basicConfig(level=logging.INFO)
 
 
 def format_rxn_prompt(data: list[str], forward: bool) -> dict[str, list[dict[str, str]]]:

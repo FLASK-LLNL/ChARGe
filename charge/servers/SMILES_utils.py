@@ -15,11 +15,6 @@ except ImportError:
     raise ImportError("Please install the rdkit package to use this module.")
 
 from loguru import logger
-import logging
-
-# logging.basicConfig(level=logging.DEBUG)
-# Let's set this on the user side of the module
-
 
 def canonicalize_smiles(smiles: str) -> str:
     """

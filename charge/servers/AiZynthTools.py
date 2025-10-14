@@ -4,8 +4,14 @@
 ##
 ## SPDX-License-Identifier: Apache-2.0
 ################################################################################
+
+
+import logging
+
 try:
     from aizynthfinder.aizynthfinder import AiZynthFinder
+    from aizynthfinder.utils.logging import setup_logger
+    setup_logger(console_level=logging.INFO)
 except ImportError:
     raise ImportError("Please install the aizynthfinder package to use this module.")
 import json

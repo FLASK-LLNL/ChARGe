@@ -15,7 +15,6 @@ except ImportError:
     raise ImportError("Please install the rdkit package to use this module.")
 
 from loguru import logger
-import logging
 
 from charge.servers.server_utils import add_server_arguments
 import argparse
@@ -31,8 +30,6 @@ SMILES_mcp = FastMCP(
 )
 
 logger.info("[RDKit-SMILES] Starting Chem and BioInformatics MCP Server")
-
-logging.basicConfig(level=logging.DEBUG)
 
 import charge.servers.SMILES_utils as smiles
 
