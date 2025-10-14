@@ -25,3 +25,9 @@ def add_server_arguments(parser: argparse.ArgumentParser) -> None:
 def update_mcp_network(mcp: FastMCP, host: str, port: str):
     mcp.settings.host = host
     mcp.settings.port = port
+
+def get_hostname():
+    import socket
+    hostname = socket.gethostname()
+    host = socket.gethostbyname(hostname)
+    return hostname, host

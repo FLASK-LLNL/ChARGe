@@ -13,15 +13,13 @@ except ImportError:
         "Please install the [flask] optional packages to use this module."
     )
 from mcp.server.fastmcp import FastMCP
-from typing import List
-from charge.servers.server_utils import update_mcp_network
+from typing import List, Optional
+from charge.servers.server_utils import update_mcp_network, get_hostname
 
 from loguru import logger
 import logging
 
 logging.basicConfig(level=logging.INFO)
-
-mcp = FastMCP("FLASKv2 Reaction Predictor")
 
 
 def format_rxn_prompt(data: list[str], forward: bool) -> dict[str, list[dict[str, str]]]:
@@ -91,13 +89,22 @@ def predict_reaction_internal(data: List[str], retrosynthesis: bool) -> List[str
 @click.option("--model-dir-retro", envvar="FLASKV2_MODEL_RETRO", help="Path to flaskv2 model for retrosynthesis")
 @click.option("--adapter-weights-fwd", help="LoRA adapter weights, if used")
 @click.option("--adapter-weights-retro", help="LoRA adapter weights for retrosynthesis model, if used")
-@click.option("--host", type=str, default="http://127.0.0.1", help="Host to run the server on")
-@click.option("--port", type=int, default=8000, help="Port to run the server on")
-def main(model_dir_fwd: str, adapter_weights_fwd: str, model_dir_retro: str, adapter_weights_retro: str, host: str, port: str):
+@click.option("--port", type=int, default=8001, help="Port to run the server on")
+@click.option("--host", type=str, default=None, help="Host to run the server on")
+def main(model_dir_fwd: str, adapter_weights_fwd: str, model_dir_retro: str, adapter_weights_retro: str, port: str, host: Optional[str]):
     if not model_dir_fwd and not model_dir_retro:
         raise ValueError("At least one model has to be given to the MCP server")
     global fwd_model, retro_model, tokenizer, device, retrosynthesis
     device = torch.device("cuda")
+
+    # Detect the hostname and print it
+    if host is None:
+        _, host = get_hostname()
+
+    mcp = FastMCP("FLASKv2 Reaction Predictor",
+                  port=port,
+                  website_url=f"{host}",
+    )
 
     print("Loading tokenizer...", flush=True, end="")
     tokenizer = AutoTokenizer.from_pretrained(model_dir_fwd or model_dir_retro, padding_side="left")
