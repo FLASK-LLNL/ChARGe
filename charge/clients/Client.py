@@ -106,19 +106,9 @@ class Client:
                 "gemini",
                 "livai",
                 "livchat",
-                "huggingface",
-                "vllm",
             ],
             help="Backend to use for the orchestrator client",
         )
         parser.add_argument(
             "--server-urls", nargs="*", type=str, default="http://127.0.0.1:8000/sse"
         )
-        parser.add_argument(
-            "--reasoning-effort",
-            type=str,
-            choices=["low", "medium", "high"],
-            default="medium",
-            help="Effort level for reasoning models",
-        )
-

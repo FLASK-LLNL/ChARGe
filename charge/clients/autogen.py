@@ -1,6 +1,6 @@
 try:
     from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
-    from autogen_core.models import ModelFamily, ChatCompletionClient, CreateResult
+    from autogen_core.models import ModelFamily, ChatCompletionClient
     from autogen_ext.tools.mcp import StdioServerParams, McpWorkbench, SseServerParams
     from autogen_agentchat.messages import TextMessage
     from autogen_agentchat.conditions import HandoffTermination, TextMentionTermination
@@ -15,163 +15,9 @@ except ImportError:
 from functools import partial
 import os
 from charge.clients.Client import Client
-from typing import Type, Optional, Dict, Union, List, Any
+from typing import Type, Optional, Dict, Union
 from charge.Experiment import Experiment
-from charge.clients.hf import HuggingFaceLocalClient
 
-class VLLMClient(ChatCompletionClient):
-    """Client for vLLM served models via OpenAI-compatible API"""
-    
-    def __init__(
-        self,
-        base_url: str = "http://localhost:8000/v1",
-        model_name: str = "gpt-oss",
-        api_key: str = "EMPTY",
-        reasoning_effort: str = "medium",
-        model_info: Optional[Dict[str, Any]] = None,
-        **kwargs
-    ):
-        """
-        Initialize vLLM client.
-        
-        Args:
-            base_url: vLLM server URL (default: http://localhost:8000/v1)
-            model_name: Model name as registered in vLLM
-            api_key: API key (usually "EMPTY" for local vLLM)
-            model_info: Model information dict
-            reasoning_effort: Reasoning level for GPT-OSS (low, medium, high)
-            **kwargs: Additional arguments
-        """
-        try:
-            from openai import AsyncOpenAI
-        except ImportError:
-            raise ImportError(
-                "Please install openai: pip install openai"
-            )
-        
-        self._base_url = base_url
-        self._model_name = model_name
-        self._client = AsyncOpenAI(
-            base_url=base_url,
-            api_key=api_key,
-        )
-        self._reasoning_effort = reasoning_effort
-        self._model_info = model_info or {
-            "vision": False,
-            "function_calling": True,
-            "json_output": True,
-            "family": ModelFamily.UNKNOWN,
-            "structured_output": True,
-        }
-
-    async def create(
-        self,
-        messages: List[Any],
-        **kwargs
-    ) -> CreateResult:
-        """
-        Create a completion from messages using vLLM.
-        
-        Args:
-            messages: List of message objects or dicts
-            **kwargs: Additional generation parameters
-        """
-        # Convert AutoGen message objects to OpenAI format
-        formatted_messages = []
-        for msg in messages:
-            if hasattr(msg, 'content') and hasattr(msg, 'source'):
-                # AutoGen message object
-                role = 'system' if msg.source == 'system' else 'user' if msg.source == 'user' else 'assistant'
-                formatted_messages.append({
-                    'role': role,
-                    'content': msg.content
-                })
-            elif isinstance(msg, dict):
-                formatted_messages.append(msg)
-            else:
-                content = getattr(msg, 'content', str(msg))
-                formatted_messages.append({
-                    'role': 'user',
-                    'content': content
-                })
-        
-        # Call vLLM API
-        try:
-            response = await self._client.chat.completions.create(
-                model=self._model_name,
-                messages=formatted_messages,
-                max_tokens=kwargs.get("max_tokens", 8192),
-                temperature=kwargs.get("temperature", 0.7),
-                top_p=kwargs.get("top_p", 0.9),
-                stream=False,
-                extra_body={"reasoning_effort": self._reasoning_effort},
-            )
-            
-            # Extract response content
-            message = response.choices[0].message
-            final_content = message.content
-            
-            # Get reasoning from reasoning_content field if available
-            analysis_content = getattr(message, 'reasoning_content', None)
-
-            ## Debug: Check reasoning and final content
-            #print(f"\n=== DEBUG VLLMClient ===")
-            #print(f"Analysis captured: {analysis_content is not None}")
-            #if analysis_content:
-            #    print(f"Analysis length: {len(analysis_content)}")
-            #    print(f"Analysis preview: {analysis_content[:300]}...")
-            #print(f"Final content length: {len(final_content)}")
-            #print(f"======================\n")
-            
-            # Return in AutoGen format (with reasoning in thought field)
-            return CreateResult(
-                content=final_content,
-                usage={
-                    "prompt_tokens": response.usage.prompt_tokens,
-                    "completion_tokens": response.usage.completion_tokens,
-                },
-                finish_reason=response.choices[0].finish_reason,
-                cached=False,
-                thought=analysis_content,
-            )
-        except Exception as e:
-            raise RuntimeError(f"Error calling vLLM: {e}")
-    
-    @property
-    def model_info(self) -> Dict[str, Any]:
-        """Return model information"""
-        return self._model_info
-    
-    def capabilities(self) -> dict:
-        """Return model capabilities"""
-        return self._model_info
-    
-    def count_tokens(self, messages: List[Any], **kwargs) -> int:
-        """Estimate token count (rough approximation)"""
-        # Rough estimate: 4 chars per token
-        total_chars = sum(len(str(m.get('content', '') if isinstance(m, dict) else getattr(m, 'content', ''))) for m in messages)
-        return total_chars // 4
-    
-    def remaining_tokens(self, messages: List[Any], **kwargs) -> int:
-        """Return remaining tokens available"""
-        used = self.count_tokens(messages, **kwargs)
-        return max(0, 8192 - used)  # Assume 8K context
-    
-    def total_usage(self) -> dict:
-        """Return total token usage"""
-        return {"prompt_tokens": 0, "completion_tokens": 0}
-    
-    def actual_usage(self) -> dict:
-        """Return actual token usage for last request"""
-        return {"prompt_tokens": 0, "completion_tokens": 0}
-    
-    async def create_stream(self, messages: List[Any], **kwargs):
-        """Stream completion - not yet implemented"""
-        raise NotImplementedError("Streaming not yet implemented for vLLM client")
-    
-    async def close(self):
-        """Clean up resources"""
-        await self._client.close()
 
 class AutoGenClient(Client):
     def __init__(
@@ -191,11 +37,6 @@ class AutoGenClient(Client):
         max_tool_calls: int = 15,
         check_response: bool = False,
         max_multi_turns: int = 100,
-        # New parameters for local HuggingFace models
-        local_model_path: Optional[str] = "/p/vast1/flask/models/gpt-oss-120b",
-        device: str = "auto",
-        torch_dtype: str = "auto",
-        quantization: Optional[str] = "4bit",
     ):
         """Initializes the AutoGenClient.
 
@@ -203,7 +44,7 @@ class AutoGenClient(Client):
             experiment_type (Type[Experiment]): The experiment class to use.
             path (str, optional): Path to save generated MCP server files. Defaults to ".".
             max_retries (int, optional): Maximum number of retries for failed tasks. Defaults to 3.
-            backend (str, optional): Backend to use: "openai", "gemini", "ollama", "huggingface", "livai" or "livchat". Defaults to "openai".
+            backend (str, optional): Backend to use: "openai", "gemini", "ollama", "liveai" or "livchat". Defaults to "openai".
             model (str, optional): Model name to use. Defaults to "gpt-4".
             model_client (Optional[ChatCompletionClient], optional): Pre-initialized model client. If provided, `backend`, `model`, and `api_key` are ignored. Defaults to None.
             api_key (Optional[str], optional): API key for the model. Defaults to None.
@@ -221,12 +62,6 @@ class AutoGenClient(Client):
             check_response (bool, optional): Whether to check the response using verifier methods.
                                              Defaults to False (Will be set to True in the future).
             max_multi_turns (int, optional): Maximum number of multi-turn interactions. Defaults to 100.
-            local_model_path (Optional[str], optional): Path to local HuggingFace model directory. 
-                                                       Required when backend="huggingface". Defaults to local FLASK gpt-oss-120b.
-            device (str, optional): Device to load model on ("auto", "cuda", "cpu"). Defaults to "auto".
-            torch_dtype (str, optional): Torch dtype for model ("auto", "float16", "bfloat16"). Defaults to "auto".
-            quantization (Optional[str], optional): Quantization method ("4bit", "8bit", None). Defaults to "4bit".
-        
         Raises:
             ValueError: If neither `server_path` nor `server_url` is provided and MCP servers cannot be generated.
         """
@@ -239,10 +74,6 @@ class AutoGenClient(Client):
         self.max_tool_calls = max_tool_calls
         self.check_response = check_response
         self.max_multi_turns = max_multi_turns
-        
-        # Initialize servers list if not already done by parent
-        if not hasattr(self, 'servers'):
-            self.servers = []
 
         if model_client is not None:
             self.model_client = model_client
@@ -254,47 +85,7 @@ class AutoGenClient(Client):
                 "family": ModelFamily.UNKNOWN,
                 "structured_output": True,
             }
-            
-            if backend == "huggingface":
-                # Use local HuggingFace model
-                if local_model_path is None:
-                    raise ValueError(
-                        "local_model_path must be provided when backend='huggingface'"
-                    )
-                
-                self.model_client = HuggingFaceLocalClient(
-                    model_path=local_model_path,
-                    model_info=model_info,
-                    device=device,
-                    torch_dtype=torch_dtype,
-                    quantization=quantization,
-                    **self.model_kwargs,
-                )
-            elif backend == "vllm":
-                # Use vLLM server
-                vllm_url = self.model_kwargs.get(
-                    "vllm_url", 
-                    os.getenv("VLLM_URL", "http://localhost:8000/v1")
-                )
-                vllm_model = self.model_kwargs.get(
-                    "vllm_model", 
-                    os.getenv("VLLM_MODEL", model or "/p/vast1/flask/models/gpt-oss-120b")
-                )
-                reasoning_effort = self.model_kwargs.get(
-                    "reasoning_effort", 
-                    "medium"
-                )
-                print(f"\n  ==> vllm backend vllm_url: {vllm_url}")
-                print(f"\n  ==> vllm backend vllm_model: {vllm_model}")
-                print(f"\n  ==> oss reasoning: {reasoning_effort}")
-
-                self.model_client = VLLMClient(
-                    base_url=vllm_url,
-                    model_name=vllm_model,
-                    model_info=model_info,
-                    reasoning_effort=reasoning_effort,
-                )
-            elif backend == "ollama":
+            if backend == "ollama":
                 from autogen_ext.models.ollama import OllamaChatCompletionClient
 
                 self.model_client = OllamaChatCompletionClient(
@@ -336,8 +127,7 @@ class AutoGenClient(Client):
                     )
         self.messages = []
 
-    @staticmethod
-    def configure(model: Optional[str], backend: str) -> tuple[str, str, Optional[str], Dict[str, str]]:
+    def configure(model: Optional[str], backend: str) -> (str, str, str, Dict[str, str]):
         import httpx
 
         kwargs = {}
@@ -365,11 +155,6 @@ class AutoGenClient(Client):
                 kwargs["reasoning_effort"] = "high"
         elif backend in ["ollama"]:
             default_model = "gpt-oss:latest"
-        elif backend in ["huggingface"]:
-            default_model = None  # Must be provided via local_model_path
-        elif backend in ["vllm"]:
-            kwargs["reasoning_effort"] = "medium"
-            default_model = "gpt-oss"  # Default vLLM model name
 
         if not model:
             model = default_model
@@ -480,7 +265,7 @@ class AutoGenClient(Client):
             name="Assistant",
             model_client=self.model_client,
             system_message=system_prompt,
-            workbench=wokbenches,
+            workbench=workbench,
             max_tool_iterations=self.max_tool_calls,
             reflect_on_tool_use=True,
         )
