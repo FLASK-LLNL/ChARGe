@@ -181,7 +181,7 @@ class AutoGenClient(Client):
             if backend == "openai":
                 API_KEY = os.getenv("OPENAI_API_KEY")
                 default_model = "gpt-5"
-                kwargs["parallel_tool_calls"] = False
+                # kwargs["parallel_tool_calls"] = False
                 kwargs["reasoning_effort"] = "high"
             elif backend == "livai" or backend == "livchat":
                 API_KEY = os.getenv("OPENAI_API_KEY")
