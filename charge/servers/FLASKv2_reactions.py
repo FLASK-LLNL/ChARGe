@@ -94,7 +94,6 @@ def main(model_dir_fwd: str, adapter_weights_fwd: str, model_dir_retro: str, ada
     global fwd_model, retro_model, tokenizer, device, retrosynthesis
     device = torch.device("cuda")
 
-    # Detect the hostname and print it
     if host is None:
         _, host = get_hostname()
 

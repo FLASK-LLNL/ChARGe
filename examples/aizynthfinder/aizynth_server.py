@@ -6,7 +6,7 @@
 ################################################################################
 
 
-from charge.servers.server_utils import add_server_arguments, update_mcp_network
+from charge.servers.server_utils import add_server_arguments, update_mcp_network, get_hostname
 from mcp.server.fastmcp import FastMCP
 from charge.servers.AiZynthTools import is_molecule_synthesizable, find_synthesis_routes
 import argparse
@@ -27,7 +27,11 @@ def main():
 
     RetroPlanner.initialize(configfile=args.config)
 
-    update_mcp_network(mcp, host=args.host, port=args.port)
+    host = args.host
+    if host is None:
+        _, host = get_hostname()
+
+    update_mcp_network(mcp, host=host, port=args.port)
     # Run MCP server
     mcp.run(transport=args.transport)
 

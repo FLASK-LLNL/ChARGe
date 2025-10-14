@@ -11,8 +11,10 @@ def add_server_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--port", type=int, default=8000, help="Port to run the server on"
     )
+    # It seems that for FastMCP if the host is not set or set to None, it defaults to
+    # localhost
     parser.add_argument(
-        "--host", type=str, default="http://127.0.0.1", help="Host to run the server on"
+        "--host", type=str, default=None, help="Host to run the server on"
     )
     parser.add_argument(
         '--transport', type=str,
