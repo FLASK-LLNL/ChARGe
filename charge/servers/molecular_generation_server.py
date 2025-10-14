@@ -19,7 +19,7 @@ from charge.clients.autogen import AutoGenClient
 from charge.clients.Client import Client
 import asyncio
 from charge.servers import SMILES_utils
-import helper_funcs as hf
+import charge.utils.helper_funcs as hf
 import argparse
 
 parser = argparse.ArgumentParser()

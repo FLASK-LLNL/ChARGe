@@ -1,3 +1,17 @@
+# Exemplar ChARGe servers
+Here is a collection of commonly used MCP servers in the ChARGe
+framework.
+
+- molecular_generation_server.py
+- retrosynthesis_reaction_server.py
+- SMILES.py
+- SMARTS_reactions.py
+- FLASKv2_reactions.py
+
+- get_chemprop2_pred.py
+- molecular_pricer.py
+- AiZinthTools (??)
+
 # Using AiZynthFinder tools
 ## Installation
 After installing the ChARGe package with options [aizynthfinder], or

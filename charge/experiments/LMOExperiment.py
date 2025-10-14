@@ -1,7 +1,8 @@
 import charge
 from charge.experiments.Experiment import Experiment
 from charge.servers import SMILES_utils
-import helper_funcs
+from charge.servers.molecular_property_utils import get_density
+import charge.utils.helper_funcs
 from typing import Optional, List
 from pydantic import BaseModel, field_validator
 
@@ -87,7 +88,7 @@ class LMOExperiment(Experiment):
         self.verification_prompt = verification_prompt
         self.refinement_prompt = refinement_prompt
         self.max_synth_score = SMILES_utils.get_synthesizability(lead_molecule)
-        self.min_density = helper_funcs.get_density(lead_molecule)
+        self.min_density = get_density(lead_molecule)
         self.set_structured_output_schema(MoleculeOutputSchema)
 
     def check_proposal(self, smiles: str) -> bool:
@@ -114,7 +115,7 @@ class LMOExperiment(Experiment):
                 f"Synthesizability score too high: {synth_score} > {self.max_synth_score}"
             )
 
-        density = helper_funcs.get_density(smiles)
+        density = get_density(smiles)
         if density < self.min_density:
             raise ValueError(f"Density too low: {density} < {self.min_density}")
         return True
