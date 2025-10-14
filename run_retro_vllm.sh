@@ -9,14 +9,14 @@ PRODUCT_SMILES="c1cc(ccc1N)O"  # Default from main.py
 
 # Aniruddha hosting model with vLLM
 ## GPT-OSS-20b
-#export VLLM_URL="http://192.168.128.31:8000/v1"
-#export VLLM_MODEL="/p/vast1/flask/models/gpt-oss-20b"
+export VLLM_URL="http://192.168.128.31:8000/v1"
+export VLLM_MODEL="/p/vast1/flask/models/gpt-oss-20b"
 ## GPT-OSS-120b
-export VLLM_URL="http://192.168.128.32:8000/v1"
-export VLLM_MODEL="/p/vast1/flask/models/gpt-oss-120b"
+#export VLLM_URL="http://192.168.128.32:8000/v1"
+#export VLLM_MODEL="/p/vast1/flask/models/gpt-oss-120b"
 
 # Reasoning level for GPT-OSS
-OSS_REASONING="low" # Options: ["low", "medium", "high"]
+OSS_REASONING="medium" # Options: ["low", "medium", "high"]
 
 
 cd experiments/Retrosynthesis
