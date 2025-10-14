@@ -7,10 +7,8 @@ framework.
 - SMILES.py
 - SMARTS_reactions.py
 - FLASKv2_reactions.py
-
 - get_chemprop2_pred.py
-- molecular_pricer.py
-- AiZinthTools (??)
+- molecule_pricer.py
 
 # Using AiZynthFinder tools
 ## Installation
