@@ -1,6 +1,6 @@
 from typing import Type, Dict, Optional
 from abc import ABC, abstractmethod
-from charge.Experiment import Experiment
+from charge.experiments.Experiment import Experiment
 from charge._tags import is_verifier, is_hypothesis
 from charge.inspector import inspect_class
 import inspect

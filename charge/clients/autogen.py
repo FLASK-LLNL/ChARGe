@@ -33,7 +33,7 @@ import os
 from charge.clients.Client import Client
 from charge.clients.autogen_utils import generate_agent
 from typing import Type, Optional, Dict, Union, List, Callable
-from charge.Experiment import Experiment
+from charge.experiments.Experiment import Experiment
 
 
 class AutoGenClient(Client):
