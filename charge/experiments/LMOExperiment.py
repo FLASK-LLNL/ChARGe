@@ -5,22 +5,33 @@ from charge.servers.molecular_property_utils import get_density
 import charge.utils.helper_funcs
 from typing import Optional, List
 from pydantic import BaseModel, field_validator
+from charge.servers.log_progress import LOG_PROGRESS_SYSTEM_PROMPT
 
-SYSTEM_PROMPT = """
-You are a world-class medicinal chemist with expertise in drug discovery and molecular design. Your task is to propose novel small molecules that are likely to exhibit high binding affinity to a specified biological target, while also being synthetically accessible. 
-You will be provided with a lead molecule as a starting point for your designs.
-You can generate new molecules in a SMILES format and optimize
-for binding affinity and synthetic accessibility.
-"""
+SYSTEM_PROMPT = (
+    "You are a world-class medicinal chemist with expertise in drug"
+    + " discovery and molecular design. Your task is to propose novel small"
+    + " molecules that are likely to exhibit high binding affinity to a"
+    + " specified biological target, while also being synthetically"
+    + " accessible.  You will be provided with a lead molecule as a starting"
+    + " point for your designs.  You can generate new molecules in a SMILES"
+    + " format and optimize for binding affinity and synthetic accessibility."
+    + LOG_PROGRESS_SYSTEM_PROMPT
+    + "\n\n"
+)
 
-USER_PROMPT = """
-Given the lead molecule: {0}, generate 1 new SMILES strings for molecules similar to the lead molecule.
-For each molecule you suggest, verify the SMILES, check if it is already known, and calculate its density and synthetic accessibility. Do the checks in order.
-Only return molecules with higher density and the same or lower synthetic accessibility compared to the lead molecule.
-If a molecule is known or doesn't fit the criteria, move on and generate a different one and try again.
-Return a list of the unique molecules.
 
-"""
+USER_PROMPT = (
+    "Given the lead molecule: {0}, generate 1 new SMILES strings for"
+    + " molecules similar to the lead molecule.  For each molecule you"
+    + " suggest, verify the SMILES, check if it is already known, and"
+    + " calculate its density and synthetic accessibility. Do the checks in"
+    + " order.  Only return molecules with higher density and the same or"
+    + " lower synthetic accessibility compared to the lead molecule.  If a"
+    + " molecule is known or doesn't fit the criteria, move on and generate a"
+    + " different one and try again.  Return a list of the unique molecules."
+    + LOG_PROGRESS_SYSTEM_PROMPT
+    + "\n\n"
+)
 
 
 class MoleculeOutputSchema(BaseModel):
