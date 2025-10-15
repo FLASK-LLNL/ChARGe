@@ -11,15 +11,17 @@ import logging
 try:
     from aizynthfinder.aizynthfinder import AiZynthFinder
     from aizynthfinder.utils.logging import setup_logger
+
     setup_logger(console_level=logging.INFO)
 except ImportError:
     raise ImportError("Please install the aizynthfinder package to use this module.")
 import json
 
 from dataclasses import dataclass, asdict
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from loguru import logger
 from charge.servers.SMILES_utils import verify_smiles
+
 
 @dataclass
 class Node:
@@ -51,15 +53,11 @@ class ReactionPath:
         self.nodes: Dict[int, Node] = {}
         self.num_nodes = 0
         self._build_path()
-        self.leaf_nodes = [
-            node_id for node_id, node in self.nodes.items() if node.is_leaf
-        ]
+        self.leaf_nodes = [node_id for node_id, node in self.nodes.items() if node.is_leaf]
 
     def _build_path(self):
 
-        self.root = Node(
-            node_id=0, smiles=self.route["smiles"], children=[], is_root=True
-        )
+        self.root = Node(node_id=0, smiles=self.route["smiles"], children=[], is_root=True)
         self.nodes[0] = self.root
         self.num_nodes += 1
         reaction_node = self.route["children"][0]
@@ -84,9 +82,7 @@ class ReactionPath:
                 self.num_nodes += 1
                 if "children" in child:
                     reaction_node = child["children"][0]
-                    self._add_children(
-                        child_node, reaction_node, reaction_node["children"]
-                    )
+                    self._add_children(child_node, reaction_node, reaction_node["children"])
                 else:
                     child_node.is_leaf = True
 
@@ -105,21 +101,19 @@ class RetroPlanner:
     finder = None
 
     def __init__(self, configfile="config.yml", stock_name="zinc", policy_name="uspto"):
+        if RetroPlanner.finder is None:
+            RetroPlanner.initialize(configfile, stock_name, policy_name)
+        self.routes: list[dict[str, Any]] = []
+        self.last_route_used: int = -1
+
+    @staticmethod
+    def initialize(configfile="config.yml", stock_name="zinc", policy_name="uspto"):
         RetroPlanner.finder = AiZynthFinder(configfile=configfile)
         RetroPlanner.finder.stock.select(stock_name)
         RetroPlanner.finder.expansion_policy.select(policy_name)
         RetroPlanner.finder.filter_policy.select(policy_name)
 
-    @staticmethod
-    def initialize(configfile="config.yml", stock_name="zinc", policy_name="uspto"):
-        if RetroPlanner.finder is None:
-            RetroPlanner.finder = AiZynthFinder(configfile=configfile)
-            RetroPlanner.finder.stock.select(stock_name)
-            RetroPlanner.finder.expansion_policy.select(policy_name)
-            RetroPlanner.finder.filter_policy.select(policy_name)
-
-    @staticmethod
-    def plan(smiles):
+    def plan(self, smiles: str):
         if RetroPlanner.finder is None:
             raise ValueError("RetroPlanner not initialized. Call initialize() first.")
         RetroPlanner.finder.target_smiles = smiles
@@ -127,7 +121,8 @@ class RetroPlanner:
         RetroPlanner.finder.build_routes()
         stats = RetroPlanner.finder.extract_statistics()
         route_dicts = RetroPlanner.finder.routes.make_dicts()
-        return RetroPlanner.finder.tree, stats, route_dicts
+        self.routes = list(route_dicts)
+        return RetroPlanner.finder.tree, stats, self.routes
 
 
 def is_molecule_synthesizable(smiles: str) -> bool:
@@ -159,12 +154,11 @@ def is_molecule_synthesizable(smiles: str) -> bool:
     for route in routes:
         path = ReactionPath(route=route)
         # check if all leaf nodes are purchasable
-        all_purchasable = all(
-            path.nodes[node_id].purchasable is True for node_id in path.leaf_nodes
-        )
+        all_purchasable = all(path.nodes[node_id].purchasable is True for node_id in path.leaf_nodes)
         if all_purchasable:
             return True
     return False
+
 
 def find_synthesis_routes(smiles: str) -> list[dict]:
     """
