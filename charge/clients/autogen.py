@@ -34,6 +34,7 @@ from charge.clients.Client import Client
 from charge.clients.autogen_utils import generate_agent
 from typing import Type, Optional, Dict, Union, List, Callable
 from charge.experiments.Experiment import Experiment
+from loguru import logger
 
 
 class AutoGenClient(Client):
@@ -264,6 +265,20 @@ class AutoGenClient(Client):
         ), "User prompt must be provided for single-turn run."
 
         workbenches = [McpWorkbench(server) for server in self.servers]
+
+        # Report on which tools are available
+        for wb in workbenches:
+            tools = await wb.list_tools()
+            server_params = wb._server_params
+            if isinstance(server_params, SseServerParams):
+                msg = server_params.url
+            elif isinstance(server_params, StdioServerParams):
+                msg = ' '.join(server_params.args)
+            else:
+                msg = "Unknown server params"
+            logger.info(f"Workbench: {msg}")
+            for tool in tools:
+                logger.info(f"\tTool: {tool['name']}")
 
         # Start the servers
 
