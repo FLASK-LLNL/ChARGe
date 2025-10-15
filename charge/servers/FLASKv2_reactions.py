@@ -1,9 +1,8 @@
-"""
-Persistent server that serves one or two FLASKv2 LLMs for forward reaction prediction and retrosynthesis
-"""
-
 import click
 from loguru import logger
+import json
+from mcp.server.fastmcp import FastMCP
+from typing import Optional
 
 try:
     from transformers import AutoTokenizer, AutoModelForCausalLM, LlamaForCausalLM, PreTrainedTokenizer
@@ -17,75 +16,48 @@ except (ImportError, ModuleNotFoundError) as e:
         "Please install the flask support packages to use this module."
         "Install it with: pip install charge[flask]",
     )
-from mcp.server.fastmcp import FastMCP
-from typing import List, Optional
-from charge.servers.server_utils import update_mcp_network, get_hostname
 
 
-def format_rxn_prompt(data: list[str], forward: bool) -> dict[str, list[dict[str, str]]]:
+def format_rxn_prompt(data: dict, forward: bool) -> dict:
+    required_keys = ['reactants', 'products', 'agents', 'solvents', 'catalysts', 'atmospheres']
+    non_product_keys = [k for k in required_keys if k != 'products']
     if forward:
-        reactants = [f"`{smi}`" for smi in data]
-        user_prompt = (
-            "Predict the chemical reaction product that would be synthesized based on the following reactant molecule(s) in SMILES representation. "
-            "Your response must start with the string 'Product: ' followed by the SMILES of the product molecule. "
-            "Each SMILES string must be surrounded with the '`' symbol. "
-            "Do not output anything else.\n"
-        )
-        user_prompt += "\n".join(reactants)
+        d = {k: data[k] for k in non_product_keys if data.get(k, None)}
+        prompt = json.dumps(d)
     else:
-        products = [f"`{smi}`" for smi in data]
-        user_prompt = (
-            "Predict the chemical reactants needed for synthesizing the following product molecule(s) in SMILES representation. "
-            "Your response must be one or multiple lines of text, each starting with the string 'Reactant: ' followed by the SMILES of a reactant molecule. "
-            "Each SMILES string must be surrounded with the '`' symbol. "
-            "Do not output anything else.\n"
-        )
-        user_prompt += "\n".join(products)
-
-    data: dict[str, list[dict[str, str]]] = {}
-    data["prompt"] = [{"role": "user", "content": user_prompt}]
+        d = {'products': data['products']}
+        prompt = json.dumps(d)
+    data['prompt'] = [{'role': 'user', 'content': prompt}]
     return data
 
 
-# Keep global state
-fwd_model: LlamaForCausalLM = None
-retro_model: LlamaForCausalLM = None
-tokenizer: PreTrainedTokenizer = None
-device = None
-
-
-def predict_reaction_internal(data: List[str], retrosynthesis: bool) -> List[str]:
+def predict_reaction_internal(molecules: list[str], retrosynthesis: bool) -> list[str]:
     if not HAS_FLASKV2:
         raise ImportError(
             "Please install the [flask] optional packages to use this module."
         )
-    SEQS = 3
-    model = fwd_model if not retrosynthesis else retro_model
+    model = retro_model if retrosynthesis else fwd_model
+    data = {'products': molecules} if retrosynthesis else {'reactants': molecules}
     with torch.inference_mode():
-        prompt = format_rxn_prompt(data, forward=not retrosynthesis)
+        prompt = format_rxn_prompt(data, forward=(not retrosynthesis))
         prompt = apply_chat_template(prompt, tokenizer=tokenizer)
-        inputs = tokenizer(prompt["prompt"], return_tensors="pt", padding="longest").to(device)
+        inputs = tokenizer(prompt["prompt"], return_tensors="pt", padding="longest").to('cuda')
         prompt_length = inputs["input_ids"].size(1)
-
         outputs = model.generate(
             **inputs,
             max_new_tokens=2048,
-            num_return_sequences=SEQS,
-            do_sample=False,
-            num_beams=SEQS,
+            num_return_sequences=3,
+            # do_sample=True,
+            num_beams=3,
             pad_token_id=tokenizer.pad_token_id,
             eos_token_id=tokenizer.eos_token_id,
             use_cache=True,  # enable KV cache
         )
         processed_outputs = [tokenizer.decode(out[prompt_length:], skip_special_tokens=True) for out in outputs]
-
-    result: list[str] = []
-    for line in processed_outputs[0].splitlines():
-        result.append(line.strip().removeprefix("Reactant: `" if retrosynthesis else "Product: `").removesuffix("`"))
-
-    logger.info(f'{"RETRO" if retrosynthesis else "FORWARD"}: Got {data}, returned {result}')
-
-    return result
+    logger.debug(f'Model input: {prompt["prompt"]}')
+    processed_outs = "\n".join(processed_outputs)
+    logger.debug(f'Model output: {processed_outs}')
+    return processed_outputs
 
 
 @click.command()
@@ -93,52 +65,47 @@ def predict_reaction_internal(data: List[str], retrosynthesis: bool) -> List[str
 @click.option("--model-dir-retro", envvar="FLASKV2_MODEL_RETRO", help="Path to flaskv2 model for retrosynthesis")
 @click.option("--adapter-weights-fwd", help="LoRA adapter weights, if used")
 @click.option("--adapter-weights-retro", help="LoRA adapter weights for retrosynthesis model, if used")
+@click.option("--transport", type=click.Choice(['stdio', 'streamable-http', 'sse']), help="MCP transport type", default="sse")
 @click.option("--port", type=int, default=8125, help="Port to run the server on")
 @click.option("--host", type=str, default=None, help="Host to run the server on")
-def main(model_dir_fwd: str, adapter_weights_fwd: str, model_dir_retro: str, adapter_weights_retro: str, port: str, host: Optional[str]):
+@click.option("--transport", type=click.Choice(['stdio', 'streamable-http', 'sse']), help="MCP transport type", default="sse")
+def main(model_dir_fwd: str, adapter_weights_fwd: str, model_dir_retro: str, adapter_weights_retro: str, transport: str, port: str, host: Optional[str]):
     if not HAS_FLASKV2:
         raise ImportError(
             "Please install the [flask] optional packages to use this module."
         )
     if not model_dir_fwd and not model_dir_retro:
         raise ValueError("At least one model has to be given to the MCP server")
-    global fwd_model, retro_model, tokenizer, device, retrosynthesis
-    device = torch.device("cuda")
+    
+    # Init MCP server
+    mcp = FastMCP("FLASKv2 Reaction Predictor", host=host, port=port)
+    
+    # Make HF models and tokenizer global objects
+    global fwd_model, retro_model, tokenizer
+    fwd_model = None
+    retro_model = None
 
-    if host is None:
-        _, host = get_hostname()
-
-    mcp = FastMCP("FLASKv2 Reaction Predictor",
-                  port=port,
-                  website_url=f"{host}",
-    )
-
-    print("Loading tokenizer...", flush=True, end="")
+    # Load tokenizer and models
     tokenizer = AutoTokenizer.from_pretrained(model_dir_fwd or model_dir_retro, padding_side="left")
     tokenizer.add_special_tokens({"pad_token": "<|finetune_right_pad_id|>"})
-    print("Done", flush=True)
-
-    print("Loading models...", flush=True)
     if model_dir_fwd:
         fwd_model = AutoModelForCausalLM.from_pretrained(
             model_dir_fwd,
-            device_map=device,
+            device_map='cuda',
             torch_dtype=torch.bfloat16,
         )
         if adapter_weights_fwd is not None:
             fwd_model = PeftModel.from_pretrained(fwd_model, adapter_weights_fwd)
             fwd_model = fwd_model.merge_and_unload()
-
     if model_dir_retro:
         retro_model = AutoModelForCausalLM.from_pretrained(
             model_dir_retro,
-            device_map=device,
+            device_map='cuda',
             torch_dtype=torch.bfloat16,
         )
         if adapter_weights_retro is not None:
             retro_model = PeftModel.from_pretrained(retro_model, adapter_weights_retro)
             retro_model = retro_model.merge_and_unload()
-    print("Models loaded")
 
     # Enable model optimizations
     if fwd_model is not None:
@@ -156,43 +123,39 @@ def main(model_dir_fwd: str, adapter_weights_fwd: str, model_dir_retro: str, ada
         available_tools.append("Forward Prediction")
 
         @mcp.tool()
-        def predict_reaction_products(reactants: List[str]) -> List[str]:
+        def predict_reaction_products(reactants: list[str]) -> list[str]:
             """
-            Analyzes a set of molecules to compute what likely product molecules of a
-            chemical reaction would be. The reactants and products are both given as
-            SMILES strings.
+            Given a set of reactant molecules, predict the likely product molecule(s).
 
             Args:
-                reactants (List[str]): A list of reactant molecules given as SMILES strings.
+                reactants (list[str]): a list of reactant molecules in SMILES representation.
             Returns:
-                List[str]: A list of product molecules, given as SMILES strings.
+                list[str]: a list of predictions, each of which is a json string listing the predicted product molecule(s) in SMILES.
             """
+            logger.debug('Calling `predict_reaction_products`')
             return predict_reaction_internal(reactants, False)
 
     if retro_model is not None:
         available_tools.append("Single-Step Retrosynthesis")
 
         @mcp.tool()
-        def predict_reaction_reactants(products: List[str]) -> List[str]:
+        def predict_reaction_reactants(products: list[str]) -> list[str]:
             """
-            Performs a retrosynthetic analysis to compute, for a given set of products
-            in a chemical reaction, a set of potential reactants. The products and
-            reactants are both given as SMILES strings.
+            Given a product molecule, predict the likely reactants and other chemical species (e.g., agents, solvents).
 
             Args:
-                products (List[str]): A list of product molecules given as SMILES strings.
+                products (list[str]): a list of product molecules in SMILES representation.
             Returns:
-                List[str]: A list of reactant molecules, given as SMILES strings.
+                list[str]: a list of predictions, each of which is a json string listing the predicted reactant molecule(s) in SMILES, 
+                    as well as potential (re)agents and solvents used in the reaction.
             """
+            logger.debug('Calling `predict_reaction_reactants`')
             return predict_reaction_internal(products, True)
 
     logger.info(f"Available tools: {', '.join(available_tools)}")
 
-    update_mcp_network(mcp, host, port)
-    # Run server
-    mcp.run(
-        transport="sse",
-    )
+    # Run MCP server
+    mcp.run(transport=transport)
 
 
 if __name__ == "__main__":
