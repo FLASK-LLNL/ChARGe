@@ -29,7 +29,6 @@ USER_PROMPT = (
     + " lower synthetic accessibility compared to the lead molecule.  If a"
     + " molecule is known or doesn't fit the criteria, move on and generate a"
     + " different one and try again.  Return a list of the unique molecules."
-    + LOG_PROGRESS_SYSTEM_PROMPT
     + "\n\n"
 )
 
