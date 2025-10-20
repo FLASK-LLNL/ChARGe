@@ -31,7 +31,10 @@ def update_mcp_network(mcp: FastMCP, host: str, port: str):
 def get_hostname():
     import socket
     hostname = socket.gethostname()
-    host = socket.gethostbyname(hostname)
+    try:
+        host = socket.gethostbyname(hostname)
+    except socket.gaierror as e:
+        host = "127.0.0.1"
     return hostname, host
 
 def try_get_public_hostname():
@@ -42,6 +45,9 @@ def try_get_public_hostname():
         host = socket.gethostbyname(public_hostname)
         hostname = public_hostname
     except socket.gaierror as e:
-        host = socket.gethostbyname(hostname)
+        try:
+            host = socket.gethostbyname(hostname)
+        except socket.gaierror as e:
+            host = "127.0.0.1"
 
     return hostname, host
