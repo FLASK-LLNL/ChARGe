@@ -9,11 +9,20 @@ PACKAGE_GROUPS = {
         "packages": ["chemprice"],
         "description": "Chemical pricing analysis tools"
     },
-    "synthesis": {
+    "aizynthfinder": {
         "packages": ["aizynthfinder", "reaction-utils"],
-        "description": "AI synthesis planning and reaction utilities"
+        "description": "AiZynthfinder planning and reaction utilities"
     },
 }
+
+def install_packages_from_group(group: str):
+    commands = []
+    for pkg in PACKAGE_GROUPS[group]["packages"]:
+        commands.append({
+            "cmd": [sys.executable, '-m', 'pip', 'install', '--no-deps', pkg],
+            "desc": f"Installing {pkg} (--no-deps)"
+        })
+    return commands
 
 
 def run_pip_command(cmd, description):
@@ -32,21 +41,6 @@ def run_pip_command(cmd, description):
 
 @click.command()
 @click.option(
-    '--skip-chemprice',
-    is_flag=True,
-    help='Skip installation of chemprice package'
-)
-@click.option(
-    '--skip-synthesis',
-    is_flag=True,
-    help='Skip installation of synthesis packages (aizynthfinder, reaction-utils)'
-)
-@click.option(
-    '--only',
-    type=click.Choice(['chemprice', 'synthesis'], case_sensitive=False),
-    help='Only install specified package group'
-)
-@click.option(
     '--no-main',
     is_flag=True,
     help='Skip installation of main package (only install optional packages)'
@@ -58,7 +52,9 @@ def run_pip_command(cmd, description):
 )
 @click.option(
     '--extras',
+    type=click.Choice(['all', 'autogen', 'aizynthfinder', 'ollama', 'gemini', 'rdkit', 'flask', 'chemprop','chemprice'], case_sensitive=False),
     default='all',
+    multiple=True,
     help='Extras to install for main package (default: all)'
 )
 @click.option(
@@ -66,7 +62,7 @@ def run_pip_command(cmd, description):
     is_flag=True,
     help='Show what would be installed without actually installing'
 )
-def main(skip_chemprice, skip_synthesis, only, no_main, editable, extras, dry_run):
+def main(no_main, editable, extras, dry_run):
     """
     Install ChARGe and its key package dependencies without sub-dependencies.
     
@@ -78,11 +74,11 @@ def main(skip_chemprice, skip_synthesis, only, no_main, editable, extras, dry_ru
         # Full installation (default)
         $ charge-install
         
-        # Skip chemprice
-        $ charge-install --skip-chemprice
+        # Only install chemprice
+        $ charge-install --extras chemprice
         
-        # Only install synthesis tools
-        $ charge-install --only synthesis
+        # Only install aizynthfinder tools
+        $ charge-install --extras aizynthfinder
         
         # Install only optional packages (assumes main package already installed)
         $ charge-install --no-main
@@ -101,19 +97,14 @@ def main(skip_chemprice, skip_synthesis, only, no_main, editable, extras, dry_ru
     failed = []
     
     # Determine which packages to install
-    if only:
-        skip_chemprice = (only != 'chemprice')
-        skip_synthesis = (only != 'synthesis')
-        click.echo(f"\n→ Installing only: {only}")
-    
     # Main package installation
     if not no_main:
         install_cmd = [sys.executable, '-m', 'pip', 'install']
         if editable:
             install_cmd.append('-e')
-        
+
         if extras:
-            install_cmd.append(f'.[{extras}]')
+            install_cmd.append(f'.[{",".join(extras)}]')
         else:
             install_cmd.append('.')
         
@@ -122,26 +113,18 @@ def main(skip_chemprice, skip_synthesis, only, no_main, editable, extras, dry_ru
             "desc": f"Installing main package{' (editable)' if editable else ''}" + 
                    (f" with [{extras}] extras" if extras else "")
         })
-    
+
     # Optional package groups
-    if not skip_chemprice:
-        for pkg in PACKAGE_GROUPS["chemprice"]["packages"]:
-            commands.append({
-                "cmd": [sys.executable, '-m', 'pip', 'install', '--no-deps', pkg],
-                "desc": f"Installing {pkg} (--no-deps)"
-            })
+    if 'chemprice' in extras  or 'all' in extras:
+        commands.extend(install_packages_from_group("chemprice"))
     else:
         click.echo(f"\n⊘ Skipping chemprice")
-    
-    if not skip_synthesis:
-        packages = PACKAGE_GROUPS["synthesis"]["packages"]
-        commands.append({
-            "cmd": [sys.executable, '-m', 'pip', 'install', '--no-deps'] + packages,
-            "desc": f"Installing synthesis packages: {', '.join(packages)} (--no-deps)"
-        })
+
+    if 'aizynthfinder' in extras or 'all' in extras:
+        commands.extend(install_packages_from_group("aizynthfinder"))
     else:
-        click.echo(f"\n⊘ Skipping synthesis packages")
-    
+        click.echo(f"\n⊘ Skipping aizynthfinder packages")
+
     # Show plan
     if commands:
         click.echo(f"\n{len(commands)} installation step(s) planned:")
@@ -150,7 +133,7 @@ def main(skip_chemprice, skip_synthesis, only, no_main, editable, extras, dry_ru
     else:
         click.secho("\n⚠ No packages selected for installation", fg="yellow")
         return
-    
+
     if dry_run:
         click.secho("\n[Dry run complete - no changes made]", fg="yellow")
         return
