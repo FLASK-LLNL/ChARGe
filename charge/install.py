@@ -53,7 +53,7 @@ def run_pip_command(cmd, description):
 @click.option(
     '--extras',
     type=click.Choice(['all', 'autogen', 'aizynthfinder', 'ollama', 'gemini', 'rdkit', 'flask', 'chemprop','chemprice'], case_sensitive=False),
-    default='all',
+    default=['all'],
     multiple=True,
     help='Extras to install for main package (default: all)'
 )
