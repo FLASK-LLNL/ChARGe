@@ -46,6 +46,11 @@ def run_pip_command(cmd, description):
     help='Skip installation of main package (only install optional packages)'
 )
 @click.option(
+    '--no-extras',
+    is_flag=True,
+    help='Installation of main package only (no optional packages)'
+)
+@click.option(
     '--editable/--no-editable',
     default=True,
     help='Install main package in editable mode (default: editable)'
@@ -62,7 +67,7 @@ def run_pip_command(cmd, description):
     is_flag=True,
     help='Show what would be installed without actually installing'
 )
-def main(no_main, editable, extras, dry_run):
+def main(no_extras, no_main, editable, extras, dry_run):
     """
     Install ChARGe and its key package dependencies without sub-dependencies.
     
@@ -73,6 +78,9 @@ def main(no_main, editable, extras, dry_run):
     
         # Full installation (default)
         $ charge-install
+
+        # Minimal installation
+        $ charge-install --no-extras
         
         # Only install chemprice
         $ charge-install --extras chemprice
@@ -95,7 +103,11 @@ def main(no_main, editable, extras, dry_run):
     
     commands = []
     failed = []
-    
+
+    if no_extras:
+        click.secho(f"\n[WARNING - No optional packages will be installed flag --no-extras overriding --extras={extras}]\n", fg="yellow", bold=True)
+        extras = []
+
     # Determine which packages to install
     # Main package installation
     if not no_main:

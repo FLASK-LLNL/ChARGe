@@ -6,13 +6,13 @@
 To install the package, clone the repository and run:
 ```bash
 pip install -e .
-charge-install
+charge-install --extras all
 ```
 
 Or install directly from GitHub:
 ```bash
 pip install git+https://github.com/FLASK-LLNL/ChARGe.git
-charge-install
+charge-install --extras all
 ```
 
 
