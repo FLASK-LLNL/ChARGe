@@ -31,7 +31,7 @@ import asyncio
 from functools import partial
 import os
 from charge.clients.Client import Client
-from charge.clients.autogen_utils import generate_agent
+from charge.clients.autogen_utils import generate_agent, list_client_tools
 from typing import Type, Optional, Dict, Union, List, Callable
 from charge.experiments.Experiment import Experiment
 from loguru import logger
@@ -134,7 +134,7 @@ class AutoGenClient(Client):
                 #     )
                 # else:
                 from autogen_ext.models.openai import OpenAIChatCompletionClient
-                
+
                 self.model_client = OpenAIChatCompletionClient(
                     model=model,
                     api_key=api_key,
@@ -267,18 +267,7 @@ class AutoGenClient(Client):
         workbenches = [McpWorkbench(server) for server in self.servers]
 
         # Report on which tools are available
-        for wb in workbenches:
-            tools = await wb.list_tools()
-            server_params = wb._server_params
-            if isinstance(server_params, SseServerParams):
-                msg = server_params.url
-            elif isinstance(server_params, StdioServerParams):
-                msg = ' '.join(server_params.args)
-            else:
-                msg = "Unknown server params"
-            logger.info(f"Workbench: {msg}")
-            for tool in tools:
-                logger.info(f"\tTool: {tool['name']}")
+        list_client_tools(self)
 
         # Start the servers
 
@@ -293,6 +282,7 @@ class AutoGenClient(Client):
                 self.max_tool_calls,
                 self.thoughts_callback,
             )
+#            await list_client_tools(self.model_client)
             answer_invalid, result = await self.step(agent, user_prompt)
 
         finally:

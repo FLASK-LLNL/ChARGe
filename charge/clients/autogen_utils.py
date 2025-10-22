@@ -14,12 +14,14 @@ try:
     )
     from openai import AsyncOpenAI
     from autogen_ext.agents.openai import OpenAIAgent
-    from autogen_ext.tools.mcp import McpWorkbench
+    from autogen_ext.tools.mcp import McpWorkbench, StdioServerParams, SseServerParams
 except ImportError:
     raise ImportError(
         "Please install the autogen-agentchat package to use this module."
     )
+from charge.clients.Client import Client
 from typing import Type, Optional, Dict, Union, List, Callable
+from loguru import logger
 
 
 class ReasoningModelContext(UnboundedChatCompletionContext):
@@ -116,3 +118,30 @@ def generate_agent(
         raise ValueError("ERROR: Unknown model client type.")
 
     return agent
+
+# Report on which tools are available
+async def list_client_tools(
+        client: Client,
+):
+    workbenches: List[McpWorkbench] = [McpWorkbench(server) for server in client.servers]
+
+    if not workbenches:
+        raise ValueError(f"ERROR: client has no tools.")
+
+    tool_list = []
+    for wb in workbenches:
+        tools = await wb.list_tools()
+        server_params = wb._server_params
+        if isinstance(server_params, SseServerParams):
+            msg = server_params.url
+        elif isinstance(server_params, StdioServerParams):
+            msg = ' '.join(server_params.args)
+        else:
+            msg = "Unknown server params"
+        logger.info(f"Workbench: {msg}")
+        for tool in tools:
+            name = tool['name']
+            logger.info(f"\tTool: {name}")
+            tool_list.append((name, msg))
+
+    return tool_list
