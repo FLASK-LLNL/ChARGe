@@ -282,7 +282,6 @@ class AutoGenClient(Client):
                 self.max_tool_calls,
                 self.thoughts_callback,
             )
-#            await list_client_tools(self.model_client)
             answer_invalid, result = await self.step(agent, user_prompt)
 
         finally:
