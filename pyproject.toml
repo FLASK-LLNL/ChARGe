@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "charge"
 version = "0.1.0"
@@ -17,6 +21,10 @@ dependencies = [
 
 [tool.setuptools]
 packages = ["charge"]
+
+# This creates the console script
+[project.scripts]
+charge-install = "charge.install:main"
 
 [project.optional-dependencies]
 ollama = ["ollama>=0.5.0"]
