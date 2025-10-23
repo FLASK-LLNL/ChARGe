@@ -148,7 +148,9 @@ def is_molecule_synthesizable(smiles: str) -> bool:
     assert RetroPlanner.finder is not None
     RetroPlanner.finder.target_smiles = smiles
 
-    tree, stats, routes = RetroPlanner.plan(smiles)
+    # Grab a local instance of the planner
+    planner = RetroPlanner()
+    tree, stats, routes = planner.plan(smiles)
     if len(routes) == 0:
         return False
     for route in routes:
@@ -181,5 +183,7 @@ def find_synthesis_routes(smiles: str) -> list[dict]:
     assert RetroPlanner.finder is not None
     RetroPlanner.finder.target_smiles = smiles
 
-    _, _, routes = RetroPlanner.plan(smiles)
+    # Grab a local instance of the planner
+    planner = RetroPlanner()
+    _, _, routes = planner.plan(smiles)
     return routes

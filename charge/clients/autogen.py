@@ -267,7 +267,7 @@ class AutoGenClient(Client):
         workbenches = [McpWorkbench(server) for server in self.servers]
 
         # Report on which tools are available
-        list_client_tools(self)
+        await list_client_tools(self)
 
         # Start the servers
 
