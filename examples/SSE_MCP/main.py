@@ -71,7 +71,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     lead_molecule = args.lead_molecule
-    server_url = args.server_url[0]
+    server_url = args.server_urls[0]
     assert server_url is not None, "Server URL must be provided"
     assert server_url.endswith("/sse"), "Server URL must end with /sse"
 
