@@ -89,6 +89,7 @@ def generate_agent(
     system_prompt: str,
     workbenches: List[McpWorkbench],
     max_tool_calls: int,
+    relect_on_tools_use=True,
     callback: Optional[Callable] = None,
 ):
     if isinstance(model_client, AsyncOpenAI):
