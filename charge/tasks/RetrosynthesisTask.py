@@ -1,4 +1,4 @@
-from charge.experiments.Experiment import Experiment
+from charge.tasks.Task import Task
 from charge.servers.log_progress import LOG_PROGRESS_SYSTEM_PROMPT
 from typing import List, Optional
 from pydantic import BaseModel, field_validator
@@ -119,7 +119,7 @@ def _check_smiles_list(smiles_list: List[str]) -> None:
             raise ValueError(f"Invalid SMILES string: {smiles}")
 
 
-class RetrosynthesisExperiment(Experiment):
+class RetrosynthesisTask(Task):
     def __init__(
         self,
         user_prompt,
@@ -137,7 +137,7 @@ class RetrosynthesisExperiment(Experiment):
         self.user_prompt = user_prompt + TEMPLATE_REACTION_SCHEMA_PROMPT
         self.set_structured_output_schema(ReactionOutputSchema)
         print(
-            "RetrosynthesisExperiment initialized with the provided prompts:"
+            "RetrosynthesisTask initialized with the provided prompts:"
             + f"\n{self.system_prompt}"
             + f"\n{self.user_prompt}"
             + f"\n{TEMPLATE_SYSTEM_PROMPT}"
@@ -156,7 +156,7 @@ TEMPLATE_FREE_SYSTEM_PROMPT = (
 )
 
 
-class TemplateFreeRetrosynthesisExperiment(Experiment):
+class TemplateFreeRetrosynthesisTask(Task):
     def __init__(
         self,
         user_prompt,
@@ -174,7 +174,7 @@ class TemplateFreeRetrosynthesisExperiment(Experiment):
         self.user_prompt = user_prompt + TEMPLATE_FREE_REACTION_SCHEMA_PROMPT
         self.set_structured_output_schema(TemplateFreeReactionOutputSchema)
         print(
-            "TemplateFreeRetrosynthesisExperiment initialized with the provided prompts:"
+            "TemplateFreeRetrosynthesisTask initialized with the provided prompts:"
             + f"\n{self.system_prompt}"
             + f"\n{self.user_prompt}"
             + f"\n{TEMPLATE_FREE_SYSTEM_PROMPT}"

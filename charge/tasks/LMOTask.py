@@ -1,5 +1,5 @@
 import charge
-from charge.experiments.Experiment import Experiment
+from charge.tasks.Task import Task
 from charge.servers import SMILES_utils
 from charge.servers.molecular_property_utils import get_density
 import charge.utils.helper_funcs
@@ -69,7 +69,7 @@ Return your answer as a JSON object matching this schema:
 """
 
 
-class LMOExperiment(Experiment):
+class LMOTask(Task):
     def __init__(
         self,
         lead_molecule: str,
@@ -91,7 +91,7 @@ class LMOExperiment(Experiment):
             refinement_prompt=refinement_prompt,
         )
 
-        print("LMOExperiment initialized with the provided prompts.")
+        print("LMOTask initialized with the provided prompts.")
         self.lead_molecule = lead_molecule
         self.system_prompt = system_prompt
         self.user_prompt = user_prompt
@@ -114,7 +114,7 @@ class LMOExperiment(Experiment):
             ValueError: If the SMILES string is invalid or does not meet the criteria.
         """
         # NOTE: This is used both by the LLM and during verification in the final
-        # step of the experiment. So it needs to be deterministic and not
+        # step of the task. So it needs to be deterministic and not
         # rely on any LLM calls.
         if not SMILES_utils.verify_smiles(smiles):
             raise ValueError(f"Invalid SMILES string: {smiles}")
@@ -150,7 +150,7 @@ class LMOExperiment(Experiment):
         """
 
         # NOTE: This is used both by the LLM and during verification in the final
-        # step of the experiment. So it needs to be deterministic and not
+        # step of the task. So it needs to be deterministic and not
         # rely on any LLM calls.
         try:
             smiles_list = eval(smiles_list_as_string)

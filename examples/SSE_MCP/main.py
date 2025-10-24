@@ -1,6 +1,6 @@
 import argparse
 import asyncio
-from charge.experiments.Experiment import Experiment
+from charge.tasks.Task import Task
 import httpx
 from charge.clients.Client import Client
 from charge.clients.autogen import AutoGenClient
@@ -36,14 +36,14 @@ DEFAULT_SYSTEM_PROMPT = (
     "Provide the final answer in a clear and concise manner."
 )
 
-# Note that this is a template and `lead_molecule` is replaced in experiment
+# Note that this is a template and `lead_molecule` is replaced in task
 DEFAULT_USER_PROMPT_TEMPLATE = (
     "Generate 3 unique molecules based on the lead molecule {lead_molecule}. "
     "Use tools to verify the molecule is valid. "
     "Return only the SMILES strings in a Python list format."
 )
 
-class UniqueMoleculeExperiment(Experiment):
+class UniqueMoleculeTask(Task):
     def __init__(
         self,
         lead_molecule: str,
@@ -61,7 +61,7 @@ class UniqueMoleculeExperiment(Experiment):
         user_prompt = user_prompt_template.format(lead_molecule=lead_molecule)
 
         super().__init__(system_prompt=system_prompt, user_prompt=user_prompt)
-        print("UniqueMoleculeExperiment initialized with the provided prompts.")
+        print("UniqueMoleculeTask initialized with the provided prompts.")
         self.lead_molecule = lead_molecule
         self.system_prompt = system_prompt
         self.user_prompt = user_prompt
@@ -75,7 +75,7 @@ if __name__ == "__main__":
     assert server_url is not None, "Server URL must be provided"
     assert server_url.endswith("/sse"), "Server URL must end with /sse"
 
-    myexperiment = UniqueMoleculeExperiment(
+    mytask = UniqueMoleculeTask(
         lead_molecule=lead_molecule,
         system_prompt=args.system_prompt,
         user_prompt_template=args.user_prompt,
@@ -84,7 +84,7 @@ if __name__ == "__main__":
     (model, backend, API_KEY, kwargs) = AutoGenClient.configure(args.model, args.backend)
 
     runner = AutoGenClient(
-        experiment_type=myexperiment,
+        task_type=mytask,
         backend=backend,
         model=model,
         api_key=API_KEY,
@@ -94,4 +94,4 @@ if __name__ == "__main__":
 
     results = asyncio.run(runner.run())
 
-    print(f"[{model} orchestrated] Experiment completed. Results: {results}")
+    print(f"[{model} orchestrated] Task completed. Results: {results}")

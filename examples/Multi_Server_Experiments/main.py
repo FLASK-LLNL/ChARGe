@@ -1,7 +1,7 @@
 import argparse
 import asyncio
 from typing import Optional
-from charge.experiments.Experiment import Experiment
+from charge.tasks.Task import Task
 from charge.clients.Client import Client
 from charge.clients.autogen import AutoGenClient
 
@@ -42,7 +42,7 @@ DEFAULT_USER_PROMPT = (
     "using the molecule pricing tool, and get a cheap molecule. "
 )
 
-class ChargeMultiServerExperiment(Experiment):
+class ChargeMultiServerTask(Task):
     def __init__(
         self,
         system_prompt: Optional[str] = None,
@@ -55,7 +55,7 @@ class ChargeMultiServerExperiment(Experiment):
             user_prompt = DEFAULT_USER_PROMPT
 
         super().__init__(system_prompt=system_prompt, user_prompt=user_prompt)
-        print("ChargeMultiServerExperiment initialized with the provided prompts.")
+        print("ChargeMultiServerTask initialized with the provided prompts.")
 
         self.system_prompt = system_prompt
         self.user_prompt = user_prompt
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     for url in server_urls:
         assert url.endswith("/sse"), f"Server URL {url} must end with /sse"
 
-    myexperiment = ChargeMultiServerExperiment(
+    mytask = ChargeMultiServerTask(
         system_prompt=args.system_prompt,
         user_prompt=args.user_prompt,
     )
@@ -83,7 +83,7 @@ if __name__ == "__main__":
     server_path_2 = "stdio_server_2.py"
 
     runner = AutoGenClient(
-        experiment_type=myexperiment,
+        task_type=mytask,
         backend=backend,
         model=model,
         api_key=API_KEY,
@@ -94,4 +94,4 @@ if __name__ == "__main__":
 
     results = asyncio.run(runner.run())
 
-    print(f"Experiment completed. Results: {results}")
+    print(f"Task completed. Results: {results}")

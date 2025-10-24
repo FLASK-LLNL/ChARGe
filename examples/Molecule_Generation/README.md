@@ -1,15 +1,15 @@
 # Lead Molecule Generation
 
-This directory contains an experiment setup for lead molecule generation using ChARGe.
+This directory contains an task setup for lead molecule generation using ChARGe.
 
-There are two ways we can define the tools used for the experiment. Either directly in the `LMOExperiment` class or in a separate file like the `molecular_generation_server.py` file. 
+There are two ways we can define the tools used for the task. Either directly in the `LMOTask` class or in a separate file like the `molecular_generation_server.py` file. 
 
-The `LMOExperiment` also handles the boilerplate prompts that will be used in the experiment.
+The `LMOTask` also handles the boilerplate prompts that will be used in the task.
 
 `molecular_generation_server.py` is an example MCP server that exposes RDKit functionalities as tools.
 
-## Running the Experiment
-To run the experiment, first setup the server:
+## Running the Task
+To run the task, first setup the server:
 
 ```bash
 python3 ../../charge/servers/molecular_generation_server.py
@@ -33,4 +33,4 @@ The `--lead-molecule` argument is used to specify the lead molecule in SMILES fo
 - Ensure you have the required dependencies installed, including ChARGe and RDKit.
 - Modify the prompts and tools as necessary to fit your specific use case.
 - The `molecular_generation_server.py` file can be copied and customized to include additional RDKit functionalities as needed.
-- When the `server_path` is not provided, the experiment class methods (if properly annotated) will be converted to tools automatically. This is disabled for this example.
+- When the `server_path` is not provided, the task class methods (if properly annotated) will be converted to tools automatically. This is disabled for this example.

@@ -1,12 +1,12 @@
-from charge.experiments.Experiment import Experiment
+from charge.tasks.Task import Task
 from typing import Type
 import inspect
 import textwrap
 
 
-def experiment_to_mcp(class_info, methods_list) -> str:
+def task_to_mcp(class_info, methods_list) -> str:
     """
-    Convert an Experiment class to an MCP server definition string.
+    Convert an Task class to an MCP server definition string.
     """
     return_str = ""
     return_str += "from mcp.server.fastmcp import FastMCP\n"

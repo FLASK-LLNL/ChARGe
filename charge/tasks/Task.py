@@ -39,7 +39,7 @@ def _prompt_from_txt_file(file_path: str) -> str:
     return prompt
 
 
-class Experiment(ABC):
+class Task(ABC):
 
     def __init__(
         self,
@@ -50,11 +50,12 @@ class Experiment(ABC):
         **kwargs,
     ):
         """
-        Base class for defining an experiment. Users should inherit from this class.
-        The Experiment class interfaces with the Client class to run experiments.
+        Base class for defining an task, which is composed of a set of steps:
+        e.g. prompts and tools. Users should inherit from this class.
+        The Task class interfaces with the Client class to run tasks.
         At the very least, users should provide a system prompt and a user prompt.
-        The system prompt is a high-level description of the experiment and provided
-        to the reasoning engine at the start of the experiment. The user prompt
+        The system prompt is a high-level description of the task and provided
+        to the reasoning engine at the start of the task. The user prompt
         is the specific task to be accomplished.
 
         Optionally, users can provide a verification prompt and a refinement prompt.
@@ -63,17 +64,17 @@ class Experiment(ABC):
         reasoning engine for self verification. The refinement prompt is used to
         guide the reasoning engine to refine its response if the verification fails.
 
-        **Note**: Automatic verification is an experimental feature and may not work as
+        **Note**: Automatic verification is an taskal feature and may not work as
         expected.
 
-        The experiment class can also be extended to include hypothesis methods
+        The task class can also be extended to include hypothesis methods
         (decorated with @hypothesis) and verifier methods (decorated with @verifier).
         Appropriate MCPs are automatically generated for these methods and used by the
         Client class to call these methods in the HVR process. Prewritten functions
-        (with type annotations and docstrings) can also be added to the Experiment
+        (with type annotations and docstrings) can also be added to the Task
         via the register_<hypothesis/verifier>_tool functions.
 
-        **Note**: Automatic MCP generation is an experimental feature and may not work as
+        **Note**: Automatic MCP generation is an taskal feature and may not work as
         expected. All decorated methods must have proper type annotations and be static.
         The docstring of the methods is used as the docstring in the MCP server.
         Long running MCPs with high starting costs should be provided separately to the
@@ -81,11 +82,11 @@ class Experiment(ABC):
 
 
         Args:
-            system_prompt (str, optional): The system prompt for the experiment.
-            user_prompt (str, optional): The user prompt for the experiment.
-            verification_prompt (str, optional): The verification prompt for the experiment.
-            refinement_prompt (str, optional): The refinement prompt for the experiment.
-            **kwargs: Additional keyword arguments to be stored in the experiment.
+            system_prompt (str, optional): The system prompt for the task.
+            user_prompt (str, optional): The user prompt for the task.
+            verification_prompt (str, optional): The verification prompt for the task.
+            refinement_prompt (str, optional): The refinement prompt for the task.
+            **kwargs: Additional keyword arguments to be stored in the task.
 
         """
         self.system_prompt = system_prompt
@@ -94,7 +95,7 @@ class Experiment(ABC):
         self.refinement_prompt = refinement_prompt
         for key, value in kwargs.items():
             if hasattr(self, key):
-                raise ValueError(f"Attribute {key} already exists in Experiment class.")
+                raise ValueError(f"Attribute {key} already exists in Task class.")
             setattr(self, key, value)
         self.constructor_args = {}
 

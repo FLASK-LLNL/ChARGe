@@ -1,8 +1,8 @@
-# AiZynthFinder experiment
+# AiZynthFinder task
 
 AiZynthFinder is a retrosynthesis tool based on Monte Carlo tree search that breaks down a target molecule recursively into purchasable precursors.
 
-This experiment demonstrates how to make a tool call to the aizynth MCP server, and have the AI orchestrator summarize the tool call output.
+This task demonstrates how to make a tool call to the aizynth MCP server, and have the AI orchestrator summarize the tool call output.
 
 
 ## Requirement
@@ -177,7 +177,7 @@ Each inner list corresponds to one complete route (here every route is a single-
 Here is one example for Ritonavir:
 
 ```
-[o3 orchestrated] Experiment completed. Results: Below is a concise description of three reasonable disconnections that arise from the tool search.  All of the required “building blocks’’ (in italics) are commercially listed or available in ≤ 2-step literature procedures.  Standard peptide / carbamate chemistry is used throughout, so only the key bond-forming steps are highlighted.
+[o3 orchestrated] Task completed. Results: Below is a concise description of three reasonable disconnections that arise from the tool search.  All of the required “building blocks’’ (in italics) are commercially listed or available in ≤ 2-step literature procedures.  Standard peptide / carbamate chemistry is used throughout, so only the key bond-forming steps are highlighted.
 
 ────────────────────────
 ROUTE A “Acid-chloride peptide coupling”

@@ -1,9 +1,9 @@
 # Single Step Retrosynthesis
 
-This experiment focuses on retrosynthesis, where the goal is to determine a synthetic route to a target molecule from simpler starting materials. 
+This task focuses on retrosynthesis, where the goal is to determine a synthetic route to a target molecule from simpler starting materials. 
 
-## Running the Experiment
-To run the experiment, first setup the server:
+## Running the Task
+To run the task, first setup the server:
 
 ```bash
 python3 ../../charge/servers/retrosynthesis_reaction_server.py

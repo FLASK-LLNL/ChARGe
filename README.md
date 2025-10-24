@@ -16,7 +16,7 @@ charge-install --extras all
 ```
 
 
-## Running an Experiment
+## Running an Task
 
 ```python
 
@@ -29,12 +29,12 @@ if __name__ == "__main__":
     parser.add_argument("--system-prompt", type=str, default="You are a helpful assistant.")
     args = parser.parse_args()
 
-    myexperiment = LeadMoleculeOptimization(
+    mytask = LeadMoleculeOptimization(
         system_prompt=args.system_prompt,
         hypothesis_prompt=args.user_prompt
     )
 
-    runner = GeminiClient(experiment_type=myexperiment)
+    runner = GeminiClient(task_type=mytask)
     results = runner.run()
     print(results)
 
@@ -45,13 +45,13 @@ if __name__ == "__main__":
 
 ```
 
-## Defining an Experiment
+## Defining an Task
 
 ```python
-from charge.experiments import Experiment
+from charge.tasks import Task
 
 
-class LeadMoleculeOptimization(Experiment):
+class LeadMoleculeOptimization(Task):
     def __init__(
         self,
         system_prompt,
@@ -62,7 +62,7 @@ class LeadMoleculeOptimization(Experiment):
         super().__init__(
             system_prompt, hypothesis_prompt, verification_prompt, refinement_prompt
         )
-        self._experiment_global_variable = "Put useful info like API endpoints here"
+        self._task_global_variable = "Put useful info like API endpoints here"
         self._min_density = 0.8
         self._max_sascore = 1.2
 

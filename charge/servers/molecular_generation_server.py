@@ -12,7 +12,7 @@ except ImportError:
 import json
 import os
 from loguru import logger
-from charge.experiments.Experiment import Experiment
+from charge.tasks.Task import Task
 from charge.servers.server_utils import add_server_arguments
 from mcp.server.fastmcp import FastMCP
 from charge.clients.autogen import AutoGenClient
@@ -39,7 +39,7 @@ KWARGS = {}
 JSON_FILE_PATH = f"{os.getcwd()}/known_molecules.json"
 
 
-class DiagnoseSMILESTask(Experiment):
+class DiagnoseSMILESTask(Task):
     def __init__(self):
         system_prompt = (
             "You are a world-class chemist. Your task is to diagnose and evaluate "
@@ -72,10 +72,10 @@ def diagnose_smiles(smiles: str) -> str:
         str: The diagnosis of the SMILES string.
     """
     logger.info(f"Diagnosing SMILES string: {smiles}")
-    experiment = DiagnoseSMILESTask()
-    experiment.update_user_prompt(smiles)
+    task = DiagnoseSMILESTask()
+    task.update_user_prompt(smiles)
     diagnose_agent = AutoGenClient(
-        experiment_type=experiment,
+        task_type=task,
         model=MODEL,
         backend=BACKEND,
         api_key=API_KEY,

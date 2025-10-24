@@ -52,4 +52,4 @@ if __name__ == "__main__":
             transport="sse",
         )
     else:
-        raise ValueError(f"Unknown experiment type: {exp_type}")
+        raise ValueError(f"Unknown task type: {exp_type}")

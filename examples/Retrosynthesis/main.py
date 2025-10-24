@@ -1,8 +1,8 @@
 import argparse
 import asyncio
-from charge.experiments.RetrosynthesisExperiment import (
-    RetrosynthesisExperiment,
-    TemplateFreeRetrosynthesisExperiment,
+from charge.tasks.RetrosynthesisTask import (
+    RetrosynthesisTask,
+    TemplateFreeRetrosynthesisTask,
 )
 import os
 from charge.clients.Client import Client
@@ -42,7 +42,7 @@ parser.add_argument(
     "--exp_type",
     default="template",
     choices=["template", "template-free"],
-    help="Type of retrosynthesis experiment to run",
+    help="Type of retrosynthesis task to run",
 )
 
 args = parser.parse_args()
@@ -60,24 +60,24 @@ if __name__ == "__main__":
 
     if args.exp_type == "template":
 
-        myexperiment = RetrosynthesisExperiment(
+        mytask = RetrosynthesisTask(
             user_prompt=user_prompt,
             system_prompt=args.system_prompt,
         )
     elif args.exp_type == "template-free":
-        myexperiment = TemplateFreeRetrosynthesisExperiment(
+        mytask = TemplateFreeRetrosynthesisTask(
             user_prompt=user_prompt,
             system_prompt=args.system_prompt,
         )
     else:
-        raise ValueError(f"Unknown experiment type: {args.exp_type}")
+        raise ValueError(f"Unknown task type: {args.exp_type}")
 
     if args.client == "gemini":
         from charge.clients.gemini import GeminiClient
 
         client_key = os.getenv("GOOGLE_API_KEY")
         assert client_key is not None, "GOOGLE_API_KEY must be set in environment"
-        runner = GeminiClient(experiment_type=myexperiment, api_key=client_key)
+        runner = GeminiClient(task_type=mytask, api_key=client_key)
     elif args.client == "autogen":
         from charge.clients.autogen import AutoGenClient
         from charge.clients.autogen_utils import thoughts_callback
@@ -87,7 +87,7 @@ if __name__ == "__main__":
         )
 
         runner = AutoGenClient(
-            experiment_type=myexperiment,
+            task_type=mytask,
             model=model,
             backend=backend,
             api_key=API_KEY,
@@ -99,4 +99,4 @@ if __name__ == "__main__":
 
         results = asyncio.run(runner.run())
 
-        print(f"Experiment completed. Results: {results}")
+        print(f"Task completed. Results: {results}")

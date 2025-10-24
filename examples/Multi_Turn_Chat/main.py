@@ -1,6 +1,6 @@
 import argparse
 import asyncio
-from charge.experiments.Experiment import Experiment
+from charge.tasks.Task import Task
 from typing import Optional
 from charge.clients.Client import Client
 from charge.clients.autogen import AutoGenClient
@@ -27,7 +27,7 @@ DEFAULT_SYSTEM_PROMPT = (
     "Provide the final answer in a clear and concise manner."
 )
 
-class ChargeChatExperiment(Experiment):
+class ChargeChatTask(Task):
     def __init__(
         self,
         system_prompt: Optional[str] = None,
@@ -37,7 +37,7 @@ class ChargeChatExperiment(Experiment):
             system_prompt = DEFAULT_SYSTEM_PROMPT
 
         super().__init__(system_prompt=system_prompt, user_prompt=None)
-        print("ChargeChatExperiment initialized with the provided prompts.")
+        print("ChargeChatTask initialized with the provided prompts.")
 
         self.system_prompt = system_prompt
         self.user_prompt = None
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     assert server_url is not None, "Server URL must be provided"
     assert server_url.endswith("/sse"), "Server URL must end with /sse"
 
-    myexperiment = ChargeChatExperiment(
+    mytask = ChargeChatTask(
         system_prompt=args.system_prompt,
     )
 
@@ -59,7 +59,7 @@ if __name__ == "__main__":
     )
 
     runner = AutoGenClient(
-        experiment_type=myexperiment,
+        task_type=mytask,
         backend=backend,
         model=model,
         api_key=API_KEY,
@@ -70,4 +70,4 @@ if __name__ == "__main__":
 
     results = asyncio.run(runner.chat())
 
-    print(f"Experiment completed. Results: {results}")
+    print(f"Task completed. Results: {results}")

@@ -33,14 +33,14 @@ import os
 from charge.clients.Client import Client
 from charge.clients.autogen_utils import generate_agent, list_client_tools
 from typing import Type, Optional, Dict, Union, List, Callable
-from charge.experiments.Experiment import Experiment
+from charge.tasks.Task import Task
 from loguru import logger
 
 
 class AutoGenClient(Client):
     def __init__(
         self,
-        experiment_type: Experiment,
+        task_type: Task,
         path: str = ".",
         max_retries: int = 3,
         backend: str = "openai",
@@ -61,7 +61,7 @@ class AutoGenClient(Client):
         """Initializes the AutoGenClient.
 
         Args:
-            experiment_type (Type[Experiment]): The experiment class to use.
+            task_type (Type[Task]): The task class to use.
             path (str, optional): Path to save generated MCP server files. Defaults to ".".
             max_retries (int, optional): Maximum number of retries for failed tasks. Defaults to 3.
             backend (str, optional): Backend to use: "openai", "gemini", "ollama", "liveai" or "livchat". Defaults to "openai".
@@ -88,7 +88,7 @@ class AutoGenClient(Client):
         Raises:
             ValueError: If neither `server_path` nor `server_url` is provided and MCP servers cannot be generated.
         """
-        super().__init__(experiment_type, path, max_retries)
+        super().__init__(task_type, path, max_retries)
         self.backend = backend
         self.model = model
         self.api_key = api_key
@@ -252,12 +252,12 @@ class AutoGenClient(Client):
         return answer_invalid, result
 
     async def run(self):
-        system_prompt = self.experiment_type.get_system_prompt()
-        user_prompt = self.experiment_type.get_user_prompt()
+        system_prompt = self.task_type.get_system_prompt()
+        user_prompt = self.task_type.get_user_prompt()
         structured_output_schema = None
-        if self.experiment_type.has_structured_output_schema():
+        if self.task_type.has_structured_output_schema():
             structured_output_schema = (
-                self.experiment_type.get_structured_output_schema()
+                self.task_type.get_structured_output_schema()
             )
 
         assert (
@@ -315,7 +315,7 @@ class AutoGenClient(Client):
             return result.messages[-1].content
 
     async def chat(self):
-        system_prompt = self.experiment_type.get_system_prompt()
+        system_prompt = self.task_type.get_system_prompt()
 
         handoff_termination = HandoffTermination(target="user")
         # Define a termination condition that checks for a specific text mention.
