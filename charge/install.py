@@ -56,6 +56,12 @@ def run_pip_command(cmd, description):
     help='Install main package in editable mode (default: editable)'
 )
 @click.option(
+    '--git-tag',
+    required=False,
+    default='main',
+    help='Install from github using the tag (default: main)'
+)
+@click.option(
     '--extras',
     type=click.Choice(['all', 'autogen', 'aizynthfinder', 'ollama', 'gemini', 'rdkit', 'flask', 'chemprop','chemprice'], case_sensitive=False),
     default=['all'],
@@ -67,7 +73,7 @@ def run_pip_command(cmd, description):
     is_flag=True,
     help='Show what would be installed without actually installing'
 )
-def main(no_extras, no_main, editable, extras, dry_run):
+def main(no_extras, no_main, editable, git_tag, extras, dry_run):
     """
     Install ChARGe and its key package dependencies without sub-dependencies.
     
@@ -108,6 +114,11 @@ def main(no_extras, no_main, editable, extras, dry_run):
         click.secho(f"\n[WARNING - No optional packages will be installed flag --no-extras overriding --extras={extras}]\n", fg="yellow", bold=True)
         extras = []
 
+    package_location = '.'
+    if git_tag:
+        package_location = f"git+https://github.com/FLASK-LLNL/ChARGe.git@{git_tag}"
+        editable = False
+
     # Determine which packages to install
     # Main package installation
     if not no_main:
@@ -116,13 +127,13 @@ def main(no_extras, no_main, editable, extras, dry_run):
             install_cmd.append('-e')
 
         if extras:
-            install_cmd.append(f'.[{",".join(extras)}]')
+            install_cmd.append(f'charge[{",".join(extras)}] @ {package_location}')
         else:
-            install_cmd.append('.')
+            install_cmd.append('charge @ {package_location}')
         
         commands.append({
             "cmd": install_cmd,
-            "desc": f"Installing main package{' (editable)' if editable else ''}" + 
+            "desc": f"Installing main package from {package_location}{' (editable)' if editable else ''}" +
                    (f" with [{extras}] extras" if extras else "")
         })
 

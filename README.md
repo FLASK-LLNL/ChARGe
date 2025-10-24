@@ -12,7 +12,7 @@ charge-install --extras all
 Or install directly from GitHub:
 ```bash
 pip install git+https://github.com/FLASK-LLNL/ChARGe.git
-charge-install --extras all
+charge-install --git-tag main --extras all
 ```
 
 
