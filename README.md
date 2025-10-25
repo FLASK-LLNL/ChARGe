@@ -34,7 +34,7 @@ if __name__ == "__main__":
         hypothesis_prompt=args.user_prompt
     )
 
-    runner = GeminiClient(task_type=mytask)
+    runner = GeminiClient(task=mytask)
     results = runner.run()
     print(results)
 
