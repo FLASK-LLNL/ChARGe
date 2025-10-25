@@ -58,7 +58,6 @@ def run_pip_command(cmd, description):
 @click.option(
     '--git-tag',
     required=False,
-    default='main',
     help='Install from github using the tag (default: main)'
 )
 @click.option(
