@@ -13,9 +13,9 @@ import readline
 
 class Client:
     def __init__(
-        self, task_type: Task, path: str = ".", max_retries: int = 3
+        self, task: Task, path: str = ".", max_retries: int = 3
     ):
-        self.task_type = task_type
+        self.task = task
         self.path = path
         self.max_retries = max_retries
         self.servers = []
@@ -47,10 +47,10 @@ class Client:
 
     def setup_mcp_servers(self):
 
-        class_info = inspect_class(self.task_type)
+        class_info = inspect_class(self.task)
         name = class_info["name"]
 
-        methods = inspect.getmembers(self.task_type, predicate=inspect.ismethod)
+        methods = inspect.getmembers(self.task, predicate=inspect.ismethod)
 
         verifier_methods = []
         hypothesis_methods = []

@@ -77,7 +77,7 @@ if __name__ == "__main__":
 
         client_key = os.getenv("GOOGLE_API_KEY")
         assert client_key is not None, "GOOGLE_API_KEY must be set in environment"
-        runner = GeminiClient(task_type=mytask, api_key=client_key)
+        runner = GeminiClient(task=mytask, api_key=client_key)
     elif args.client == "autogen":
         from charge.clients.autogen import AutoGenClient
         from charge.clients.autogen_utils import thoughts_callback

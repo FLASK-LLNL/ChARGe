@@ -64,7 +64,7 @@ class Task(ABC):
         reasoning engine for self verification. The refinement prompt is used to
         guide the reasoning engine to refine its response if the verification fails.
 
-        **Note**: Automatic verification is an taskal feature and may not work as
+        **Note**: Automatic verification is an experimental feature and may not work as
         expected.
 
         The task class can also be extended to include hypothesis methods
@@ -74,7 +74,7 @@ class Task(ABC):
         (with type annotations and docstrings) can also be added to the Task
         via the register_<hypothesis/verifier>_tool functions.
 
-        **Note**: Automatic MCP generation is an taskal feature and may not work as
+        **Note**: Automatic MCP generation is an experimental feature and may not work as
         expected. All decorated methods must have proper type annotations and be static.
         The docstring of the methods is used as the docstring in the MCP server.
         Long running MCPs with high starting costs should be provided separately to the

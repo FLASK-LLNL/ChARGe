@@ -75,7 +75,7 @@ def diagnose_smiles(smiles: str) -> str:
     task = DiagnoseSMILESTask()
     task.update_user_prompt(smiles)
     diagnose_agent = AutoGenClient(
-        task_type=task,
+        task=task,
         model=MODEL,
         backend=BACKEND,
         api_key=API_KEY,

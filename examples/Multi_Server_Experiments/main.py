@@ -83,7 +83,7 @@ if __name__ == "__main__":
     server_path_2 = "stdio_server_2.py"
 
     runner = AutoGenClient(
-        task_type=mytask,
+        task=mytask,
         backend=backend,
         model=model,
         api_key=API_KEY,

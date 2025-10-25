@@ -59,7 +59,7 @@ if __name__ == "__main__":
     )
 
     runner = AutoGenClient(
-        task_type=mytask,
+        task=mytask,
         backend=backend,
         model=model,
         api_key=API_KEY,

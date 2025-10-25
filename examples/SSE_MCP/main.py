@@ -84,7 +84,7 @@ if __name__ == "__main__":
     (model, backend, API_KEY, kwargs) = AutoGenClient.configure(args.model, args.backend)
 
     runner = AutoGenClient(
-        task_type=mytask,
+        task=mytask,
         backend=backend,
         model=model,
         api_key=API_KEY,

@@ -32,7 +32,7 @@ def main():
 
     (model, backend, API_KEY, kwargs) = AutoGenClient.configure(args.model, args.backend)
     runner = AutoGenClient(
-        task_type=AiZynthFinderTask(lead_molecule=args.lead_molecule),
+        task=AiZynthFinderTask(lead_molecule=args.lead_molecule),
         backend=backend,
         model=model,
         api_key=API_KEY,
