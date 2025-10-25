@@ -125,10 +125,16 @@ def main(no_extras, no_main, editable, git_tag, extras, dry_run):
         if editable:
             install_cmd.append('-e')
 
-        if extras:
-            install_cmd.append(f'charge[{",".join(extras)}] @ {package_location}')
+        if not git_tag:
+            if extras:
+                install_cmd.append(f'{package_location}[{",".join(extras)}]')
+            else:
+                install_cmd.append(f'{package_location}')
         else:
-            install_cmd.append('charge @ {package_location}')
+            if extras:
+                install_cmd.append(f'charge[{",".join(extras)}]@{package_location}')
+            else:
+                install_cmd.append(f'{package_location}')
         
         commands.append({
             "cmd": install_cmd,
