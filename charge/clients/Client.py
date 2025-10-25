@@ -28,8 +28,8 @@ class Client:
         self.reasoning_trace = []
 
     def _setup(self):
-        cls_info = inspect_class(self.task_type)
-        methods = inspect.getmembers(self.task_type, predicate=inspect.ismethod)
+        cls_info = inspect_class(self.task)
+        methods = inspect.getmembers(self.task, predicate=inspect.ismethod)
         name = cls_info["name"]
 
         verifier_methods = []
