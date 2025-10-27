@@ -119,15 +119,8 @@ def generate_agent(
 
     return agent
 
-# Report on which tools are available
-async def list_client_tools(
-        client: Client,
-):
-    workbenches: List[McpWorkbench] = [McpWorkbench(server) for server in client.servers]
 
-    if not workbenches:
-        raise ValueError(f"ERROR: client has no tools.")
-
+async def _list_wb_tools(workbenches: List[McpWorkbench]):
     tool_list = []
     for wb in workbenches:
         tools = await wb.list_tools()
@@ -135,13 +128,27 @@ async def list_client_tools(
         if isinstance(server_params, SseServerParams):
             msg = server_params.url
         elif isinstance(server_params, StdioServerParams):
-            msg = ' '.join(server_params.args)
+            msg = " ".join(server_params.args)
         else:
             msg = "Unknown server params"
         logger.info(f"Workbench: {msg}")
         for tool in tools:
-            name = tool['name']
+            name = tool["name"]
             logger.info(f"\tTool: {name}")
             tool_list.append((name, msg))
 
     return tool_list
+
+
+# Report on which tools are available
+async def list_client_tools(
+    client: Client,
+):
+    workbenches: List[McpWorkbench] = [
+        McpWorkbench(server) for server in client.servers
+    ]
+
+    if not workbenches:
+        raise ValueError(f"ERROR: client has no tools.")
+
+    return await _list_wb_tools(workbenches)

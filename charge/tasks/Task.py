@@ -1,12 +1,12 @@
 from abc import ABC, abstractmethod
+import os
 from pydantic import BaseModel
-from typing import Type
+from typing import Type, Union, Optional
 import os.path as osp
 import json
 import re
-import inspect
-import os
 import warnings
+import requests
 
 
 def normalize_string(s: str) -> str:
@@ -39,14 +39,85 @@ def _prompt_from_txt_file(file_path: str) -> str:
     return prompt
 
 
+def _check_file_exists(file_path: str) -> bool:
+    return osp.isfile(file_path)
+
+
+def check_url_exists(url: str) -> bool:
+    if not url.startswith("http://") and not url.startswith("https://"):
+        return False
+
+    if not url.endswith("/sse"):
+        return False
+
+    try:
+        with requests.get(url, stream=True, timeout=5) as response:
+            if response.status_code != 200:
+                return False
+    except requests.RequestException as e:
+        warnings.warn(f"Error reaching URL '{url}': {e}")
+        return False
+
+    return True
+
+
+def check_and_store_server_paths(server_paths: Optional[Union[str, list]]) -> list:
+    """
+    Gracefully handle errors in server paths provided by user.
+    Args:
+        server_paths (Optional[Union[str, list]]): The server paths to check.
+    Returns:
+        list: A list of valid server paths.
+    Raises:
+        FileNotFoundError: If any of the server paths do not exist and
+        CHARGE_ERROR_ON_MISSING_SERVER is set to 1.
+    """
+
+    if server_paths is None:
+        return []
+    if not isinstance(server_paths, list) and not isinstance(server_paths, str):
+        raise TypeError(
+            "server_paths and server_urls must be a string or a list of strings"
+        )
+
+    _paths = []
+    if isinstance(server_paths, str):
+        _paths = [server_paths]
+    else:
+        _paths = server_paths
+
+    valid_paths = []
+    for path in _paths:
+        if path.startswith("http://") or path.startswith("https://"):
+            if check_url_exists(path):
+                valid_paths.append(path)
+            else:
+                warnings.warn(f"Server URL '{path}' is not reachable.")
+        else:
+            if _check_file_exists(path):
+                valid_paths.append(path)
+            else:
+                warnings.warn(f"Server path '{path}' does not exist.")
+
+    CHARGE_RAISE_ON_MISSING_SERVER = (
+        os.getenv("CHARGE_ERROR_ON_MISSING_SERVER", "0") == "1"
+    )
+    if len(valid_paths) != len(_paths):
+        if CHARGE_RAISE_ON_MISSING_SERVER:
+            raise FileNotFoundError("One or more server paths do not exist.")
+    return valid_paths
+
+
 class Task(ABC):
 
     def __init__(
         self,
-        system_prompt=None,
-        user_prompt=None,
-        verification_prompt=None,
-        refinement_prompt=None,
+        system_prompt: Optional[str] = None,
+        user_prompt: Optional[str] = None,
+        verification_prompt: Optional[str] = None,
+        refinement_prompt: Optional[str] = None,
+        server_urls: Optional[Union[str, list]] = None,
+        server_files: Optional[Union[str, list]] = None,
         **kwargs,
     ):
         """
@@ -86,6 +157,8 @@ class Task(ABC):
             user_prompt (str, optional): The user prompt for the task.
             verification_prompt (str, optional): The verification prompt for the task.
             refinement_prompt (str, optional): The refinement prompt for the task.
+            server_urls (Union[str, list], optional): The server URLs for the task.
+            server_files (Union[str, list], optional): The server files for the task.
             **kwargs: Additional keyword arguments to be stored in the task.
 
         """
@@ -93,10 +166,15 @@ class Task(ABC):
         self.user_prompt = user_prompt
         self.verification_prompt = verification_prompt
         self.refinement_prompt = refinement_prompt
+
+        self.server_urls = check_and_store_server_paths(server_urls)
+        self.server_files = check_and_store_server_paths(server_files)
+
         for key, value in kwargs.items():
             if hasattr(self, key):
                 raise ValueError(f"Attribute {key} already exists in Task class.")
             setattr(self, key, value)
+
         self.constructor_args = {}
 
     def get_system_prompt(self) -> str:
@@ -119,7 +197,10 @@ class Task(ABC):
         self.structured_output_schema = schema
 
     def has_structured_output_schema(self) -> bool:
-        return hasattr(self, "structured_output_schema")
+        return (
+            hasattr(self, "structured_output_schema")
+            and self.structured_output_schema is not None
+        )
 
     def read_from_file(self, file_path: str, key: str) -> str:
         assert osp.isfile(file_path), f"File {file_path} does not exist"
@@ -174,3 +255,39 @@ class Task(ABC):
         """
         assert osp.isfile(file_path), f"File {file_path} does not exist"
         self.refinement_prompt = self.read_from_file(file_path, "refinement_prompt")
+
+    def has_verification_prompt(self) -> bool:
+        """
+        Check if the task has a verification prompt.
+        Returns:
+            bool: True if the task has a verification prompt, False otherwise.
+        """
+        return self.verification_prompt is not None
+
+    def has_refinement_prompt(self) -> bool:
+        """
+        Check if the task has a refinement prompt.
+        Returns:
+            bool: True if the task has a refinement prompt, False otherwise.
+        """
+        return self.refinement_prompt is not None
+
+    def check_output_formatting(self, content: str | bytes | bytearray) -> bool:
+        """
+        Check if the task has output formatting requirements.
+        Returns:
+            bool: True if the task has output formatting requirements, False otherwise.
+        """
+        if self.has_structured_output_schema():
+            return True
+
+        structured_output_schema = self.structured_output_schema
+
+        try:
+            parsed_output = structured_output_schema.model_validate_json(content)
+            return True
+        except Exception as e:
+            warnings.warn(
+                f"Output formatting check failed with error: {e}. Content: {content}"
+            )
+            return False

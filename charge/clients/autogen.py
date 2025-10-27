@@ -12,6 +12,7 @@ try:
         ChatCompletionClient,
         LLMMessage,
         AssistantMessage,
+        ModelInfo,
     )
     from openai import AsyncOpenAI
 
@@ -22,6 +23,7 @@ try:
     from autogen_agentchat.teams import RoundRobinGroupChat
     from autogen_agentchat.ui import Console
     from autogen_agentchat.conditions import TextMentionTermination
+
 except ImportError:
     raise ImportError(
         "Please install the autogen-agentchat package to use this module."
@@ -30,11 +32,286 @@ except ImportError:
 import asyncio
 from functools import partial
 import os
+import warnings
+from charge.clients.AgentPool import AgentPool, Agent
 from charge.clients.Client import Client
-from charge.clients.autogen_utils import generate_agent, list_client_tools
-from typing import Type, Optional, Dict, Union, List, Callable
+from charge.clients.autogen_utils import (
+    _list_wb_tools,
+    generate_agent,
+    list_client_tools,
+)
+from typing import Any, Type, Optional, Dict, Union, List, Callable, overload
 from charge.tasks.Task import Task
 from loguru import logger
+
+
+def create_autogen_model_client(
+    backend: str,
+    model: str,
+    api_key: Optional[str] = None,
+    model_kwargs: Optional[dict[str, Any]] = None,
+) -> Union[AsyncOpenAI, ChatCompletionClient]:
+    """
+    Creates an AutoGen model client based on the specified backend and model.
+
+    Args:
+        backend (str): The backend to use: "openai", "gemini", "ollama", "liveai" or "livchat".
+        model (str): The model name to use.
+        api_key (Optional[str], optional): API key for the model. Defaults to None.
+        model_kwargs (Optional[dict], optional): Additional keyword arguments for the model client. Defaults to None.
+    Returns:
+        Union[AsyncOpenAI, ChatCompletionClient]: The created model client.
+    """
+    model_info = ModelInfo(
+        vision=False,
+        function_calling=True,
+        json_output=True,
+        family=ModelFamily.UNKNOWN,
+        structured_output=True,
+    )
+    if backend == "ollama":
+        from autogen_ext.models.ollama import OllamaChatCompletionClient
+
+        model_client = OllamaChatCompletionClient(
+            model=model,
+            model_info=model_info,
+        )
+    else:
+        if api_key is None:
+            if backend == "gemini":
+                api_key = os.getenv("GOOGLE_API_KEY")
+            else:
+                api_key = os.getenv("OPENAI_API_KEY")
+        assert (
+            api_key is not None
+        ), "API key must be provided for OpenAI or Gemini backend"
+
+        # Disabled due to https://github.com/microsoft/autogen/issues/6937
+        # if backend in ["openai", "livai", "livchat"]:
+        #     self.model_client = AsyncOpenAI(
+        #         **self.model_kwargs,
+        #     )
+        # else:
+        from autogen_ext.models.openai import OpenAIChatCompletionClient
+
+        model_client = OpenAIChatCompletionClient(
+            model=model,
+            api_key=api_key,
+            model_info=model_info,
+            **model_kwargs if model_kwargs is not None else {},
+        )
+    return model_client
+
+
+class AutoGenAgent(Agent):
+    """
+    An AutoGen agent that interacts with MCP servers and runs tasks.
+
+
+    Args:
+        task (Task): The task to be performed by the agent.
+        **kwargs: Additional keyword arguments.
+    """
+
+    def __init__(
+        self,
+        task: Task,
+        model_client: Union[AsyncOpenAI, ChatCompletionClient],
+        agent_name: str,
+        max_retries: int = 3,
+        max_tool_calls: int = 30,
+        timeout: int = 60,
+        **kwargs,
+    ) -> None:
+        super().__init__(task=task, **kwargs)
+        self.max_retries = max_retries
+        self.max_tool_calls = max_tool_calls
+        self.no_tools = False
+        self.workbenches = []
+        self.agent_name = agent_name
+        self.model_client = model_client
+        self.timeout = timeout
+
+    def create_servers(self, paths: List[str], urls: List[str]) -> List[Any]:
+        """
+        Creates MCP servers from the task's server paths.
+
+        Returns:
+            List[Any]: List of MCP server parameters.
+        """
+        mcp_servers = []
+
+        for path in paths:
+            mcp_servers.append(
+                StdioServerParams(
+                    command="python3",
+                    args=[path],
+                    read_timeout_seconds=self.timeout,
+                )
+            )
+        for url in urls:
+            mcp_servers.append(
+                SseServerParams(
+                    url=url,
+                    timeout=self.timeout,
+                    sse_read_timeout=self.timeout,
+                )
+            )
+        return mcp_servers
+
+    async def setup_mcp_workbenches(self) -> None:
+        """
+        Sets up MCP workbenches from the task's server paths.
+
+        Returns:
+            None
+        """
+        mcp_files = self.task.server_files
+        mcp_urls = self.task.server_urls
+
+        self.mcps = self.create_servers(mcp_files, mcp_urls)
+
+        if len(self.mcps) == 0:
+            self.no_tools = True
+            return
+        self.workbenches = [McpWorkbench(server) for server in self.mcps]
+        await _list_wb_tools(self.workbenches)
+
+        await asyncio.gather(*[workbench.start() for workbench in self.workbenches])
+
+    async def close_workbenches(self) -> None:
+        """
+        Closes MCP workbenches.
+
+        Returns:
+            None
+        """
+        if self.no_tools:
+            return
+        await asyncio.gather(*[workbench.stop() for workbench in self.workbenches])
+
+    async def run(self, **kwargs):
+        """
+        Runs the agent.
+        """
+
+        # set up workbenches from task server paths
+        await self.setup_mcp_workbenches()
+        try:
+            agent = generate_agent(
+                self.model_client,
+                self.agent_name,
+                self.task.get_system_prompt(),
+                self.workbenches,
+                max_tool_calls=self.max_tool_calls,
+            )
+            for i in range(self.max_retries):
+                result = await agent.run(task=self.task.get_user_prompt())
+
+                if isinstance(result.messages[-1], TextMessage):
+                    content = result.messages[-1].content
+                    if self.task.check_output_formatting(content):
+                        break
+                else:
+                    warnings.warn(
+                        f"Last message is not a TextMessage. Retrying... {result.messages[-1]}\n"
+                        + f"Remaining retries: {self.max_retries - i - 1}"
+                    )
+
+        finally:
+            await self.close_workbenches()
+        return result
+
+
+class AutoGenPool(AgentPool):
+    """
+    An AutoGen agent pool that creates AutoGen agents.
+    Setup with a model client, backend, and model to spawn agents.
+
+    Args:
+        model_client (Union[AsyncOpenAI, ChatCompletionClient]): The model client to use.
+        model (str): The model name to use.
+        backend (str, optional): Backend to use: "openai", "gemini", "ollama", "liveai" or "livchat". Defaults to "openai".
+    """
+
+    AGENT_COUNT = 0
+
+    @overload
+    def __init__(
+        self,
+        model_client: Union[AsyncOpenAI, ChatCompletionClient],
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        *,
+        model: str,
+        backend: str = "openai",
+        model_kwargs: Optional[dict] = None,
+    ) -> None: ...
+
+    def __init__(
+        self,
+        model_client: Optional[Union[AsyncOpenAI, ChatCompletionClient]] = None,
+        model: Optional[str] = None,
+        backend: Optional[str] = "openai",
+        model_kwargs: Optional[dict] = None,
+    ):
+        super().__init__()
+        self.model_client = model_client
+
+        if self.model_client is None:
+            assert (
+                model is not None
+            ), "Model name must be provided if model_client is not given."
+            assert (
+                backend is not None
+            ), "Backend must be provided if model_client is not given."
+            self.model_client = create_autogen_model_client(
+                backend=backend, model=model, model_kwargs=model_kwargs
+            )
+        if self.model_client is None:
+            raise ValueError("Failed to create model client.")
+
+    def create_agent(
+        self,
+        task: Task,
+        max_retries: int = 3,
+        agent_name: Optional[str] = None,
+        model_context: Optional[UnboundedChatCompletionContext] = None,
+        **kwargs,
+    ):
+        """Creates an AutoGen agent for the given task.
+        Args:
+            task (Task): The task to be performed by the agent.
+            max_retries (int, optional): Maximum number of retries for failed tasks. Defaults to 3.
+            agent_name (Optional[str], optional): Name of the agent. If None, a default name will be assigned. Defaults to None.
+            model_context (Optional[UnboundedChatCompletionContext], optional): Model context for the agent. Defaults to None.
+            **kwargs: Additional keyword arguments.
+        Returns:
+            AutoGenAgent: The created AutoGen agent.
+        """
+        self.max_retries = max_retries
+        assert (
+            self.model_client is not None
+        ), "Model client must be initialized to create an agent."
+
+        AutoGenPool.AGENT_COUNT += 1
+        agent_name = (
+            f"CHARGE_AUTOGEN_AGENT_{AutoGenPool.AGENT_COUNT}"
+            if agent_name is None
+            else agent_name
+        )
+
+        return AutoGenAgent(
+            task=task,
+            model_client=self.model_client,
+            agent_name=agent_name,
+            max_retries=max_retries,
+            model_context=model_context,
+            **kwargs,
+        )
 
 
 class AutoGenClient(Client):
@@ -103,44 +380,12 @@ class AutoGenClient(Client):
         if model_client is not None:
             self.model_client = model_client
         else:
-            model_info = {
-                "vision": False,
-                "function_calling": True,
-                "json_output": True,
-                "family": ModelFamily.UNKNOWN,
-                "structured_output": True,
-            }
-            if backend == "ollama":
-                from autogen_ext.models.ollama import OllamaChatCompletionClient
-
-                self.model_client = OllamaChatCompletionClient(
-                    model=model,
-                    model_info=model_info,
-                )
-            else:
-                if api_key is None:
-                    if backend == "gemini":
-                        api_key = os.getenv("GOOGLE_API_KEY")
-                    else:
-                        api_key = os.getenv("OPENAI_API_KEY")
-                assert (
-                    api_key is not None
-                ), "API key must be provided for OpenAI or Gemini backend"
-
-                # Disabled due to https://github.com/microsoft/autogen/issues/6937
-                # if backend in ["openai", "livai", "livchat"]:
-                #     self.model_client = AsyncOpenAI(
-                #         **self.model_kwargs,
-                #     )
-                # else:
-                from autogen_ext.models.openai import OpenAIChatCompletionClient
-
-                self.model_client = OpenAIChatCompletionClient(
-                    model=model,
-                    api_key=api_key,
-                    model_info=model_info,
-                    **self.model_kwargs,
-                )
+            self.model_client = create_autogen_model_client(
+                backend=backend,
+                model=model,
+                api_key=api_key,
+                model_kwargs=self.model_kwargs,
+            )
 
         if server_path is None and server_url is None:
             self.setup_mcp_servers()
@@ -256,9 +501,7 @@ class AutoGenClient(Client):
         user_prompt = self.task.get_user_prompt()
         structured_output_schema = None
         if self.task.has_structured_output_schema():
-            structured_output_schema = (
-                self.task.get_structured_output_schema()
-            )
+            structured_output_schema = self.task.get_structured_output_schema()
 
         assert (
             user_prompt is not None
