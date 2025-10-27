@@ -40,7 +40,7 @@ from charge.clients.autogen_utils import (
     generate_agent,
     list_client_tools,
 )
-from typing import Any, Type, Optional, Dict, Union, List, Callable, overload
+from typing import Any, Tuple, Type, Optional, Dict, Union, List, Callable, overload
 from charge.tasks.Task import Task
 from loguru import logger
 
@@ -268,8 +268,13 @@ class AutoGenPool(AgentPool):
             assert (
                 backend is not None
             ), "Backend must be provided if model_client is not given."
+
+            model, backend, api_key, model_kwargs = AutoGenClient.configure(
+                model=model, backend=backend
+            )
+
             self.model_client = create_autogen_model_client(
-                backend=backend, model=model, model_kwargs=model_kwargs
+                backend=backend, model=model, api_key=api_key, model_kwargs=model_kwargs
             )
         if self.model_client is None:
             raise ValueError("Failed to create model client.")
@@ -417,7 +422,7 @@ class AutoGenClient(Client):
     @staticmethod
     def configure(
         model: Optional[str], backend: str
-    ) -> (str, str, str, Dict[str, str]):
+    ) -> Tuple[str, str, Optional[str], Dict[str, str]]:
         import httpx
 
         kwargs = {}
@@ -448,6 +453,7 @@ class AutoGenClient(Client):
 
         if not model:
             model = default_model
+        assert model is not None, "Model name must be provided."
         return (model, backend, API_KEY, kwargs)
 
     def check_invalid_response(self, result) -> bool:
