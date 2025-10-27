@@ -6,15 +6,19 @@
 ################################################################################
 
 from mcp.server.fastmcp import FastMCP
+from loguru import logger
 
 try:
     from rdkit import Chem
     from rdkit.Chem import AllChem, Descriptors
     from rdkit.Contrib.SA_Score import sascorer
-except ImportError:
-    raise ImportError("Please install the rdkit package to use this module.")
-
-from loguru import logger
+    HAS_SMILES = True
+except (ImportError, ModuleNotFoundError) as e:
+    HAS_SMILES = False
+    logger.warning(
+        "Please install the rdkit support packages to use this module."
+        "Install it with: pip install charge[rdkit]",
+    )
 
 def canonicalize_smiles(smiles: str) -> str:
     """
@@ -50,6 +54,8 @@ def verify_smiles(smiles: str) -> bool:
     Returns:
         bool: True if the SMILES is valid, False otherwise.
     """
+    if not HAS_SMILES:
+        raise ImportError("Please install the rdkit support packages to use this module.")
     try:
         global SMILES_VERIFICATION_COUNTER
         SMILES_VERIFICATION_COUNTER += 1
@@ -78,6 +84,8 @@ def get_synthesizability(smiles: str) -> float:
     Returns:
         float: The synthesizability score.
     """
+    if not HAS_SMILES:
+        raise ImportError("Please install the rdkit support packages to use this module.")
     try:
         # logger.info(f"Calculating synthesizability for SMILES: {smiles}")
         mol = Chem.MolFromSmiles(smiles)
@@ -106,6 +114,8 @@ def known_smiles(smiles: str) -> bool:
         bool: True if the SMILES is known to this MCP server, False otherwise.
     """
 
+    if not HAS_SMILES:
+        raise ImportError("Please install the rdkit support packages to use this module.")
     try:
         global NUM_HITS
         logger.info(f"Tool has been call: {NUM_HITS} times")

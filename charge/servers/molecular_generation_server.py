@@ -5,13 +5,20 @@
 ## SPDX-License-Identifier: Apache-2.0
 ################################################################################
 
+from loguru import logger
 try:
     from rdkit import Chem
+    HAS_RDKIT = True
+except (ImportError, ModuleNotFoundError) as e:
+    HAS_RDKIT = False
+    logger.warning(
+        "Please install the rdkit support packages to use this module."
+        "Install it with: pip install charge[rdkit]",
+    )
 except ImportError:
     raise ImportError("Please install the rdkit package to use this module.")
 import json
 import os
-from loguru import logger
 from charge.tasks.Task import Task
 from charge.servers.server_utils import add_server_arguments
 from mcp.server.fastmcp import FastMCP
@@ -71,6 +78,8 @@ def diagnose_smiles(smiles: str) -> str:
     Returns:
         str: The diagnosis of the SMILES string.
     """
+    if not HAS_RDKIT:
+        raise ImportError("Please install the rdkit support packages to use this module.")
     logger.info(f"Diagnosing SMILES string: {smiles}")
     task = DiagnoseSMILESTask()
     task.update_user_prompt(smiles)
@@ -111,6 +120,8 @@ def is_already_known(smiles: str) -> bool:
     Raises:
         ValueError: If the SMILES string is invalid.
     """
+    if not HAS_RDKIT:
+        raise ImportError("Please install the rdkit support packages to use this module.")
     if not Chem.MolFromSmiles(smiles):
         raise ValueError("Invalid SMILES string.")
 
@@ -144,6 +155,8 @@ def get_density(smiles: str) -> float:
     Returns:
         float: The density of the molecule.
     """
+    if not HAS_RDKIT:
+        raise ImportError("Please install the rdkit support packages to use this module.")
     density = hf.get_density(smiles)
     logger.info(f"Density for SMILES {smiles}: {density}")
     return density
@@ -156,6 +169,8 @@ mcp.tool()(SMILES_utils.get_synthesizability)
 
 
 if __name__ == "__main__":
+    if not HAS_RDKIT:
+        raise ImportError("Please install the rdkit support packages to use this module.")
     parser = argparse.ArgumentParser(description="Molecule Tools Server")
     Client.add_std_parser_arguments(parser)
     parser.add_argument(

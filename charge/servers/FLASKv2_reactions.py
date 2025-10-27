@@ -3,20 +3,23 @@ Persistent server that serves one or two FLASKv2 LLMs for forward reaction predi
 """
 
 import click
+from loguru import logger
+
 try:
     from transformers import AutoTokenizer, AutoModelForCausalLM, LlamaForCausalLM, PreTrainedTokenizer
     from peft import PeftModel
     from trl import apply_chat_template
     import torch
-except ImportError:
-    raise ImportError(
-        "Please install the [flask] optional packages to use this module."
+    HAS_FLASKV2 = True
+except (ImportError, ModuleNotFoundError) as e:
+    HAS_FLASKV2 = False
+    logger.warning(
+        "Please install the flask support packages to use this module."
+        "Install it with: pip install charge[flask]",
     )
 from mcp.server.fastmcp import FastMCP
 from typing import List, Optional
 from charge.servers.server_utils import update_mcp_network, get_hostname
-
-from loguru import logger
 
 
 def format_rxn_prompt(data: list[str], forward: bool) -> dict[str, list[dict[str, str]]]:
@@ -52,6 +55,10 @@ device = None
 
 
 def predict_reaction_internal(data: List[str], retrosynthesis: bool) -> List[str]:
+    if not HAS_FLASKV2:
+        raise ImportError(
+            "Please install the [flask] optional packages to use this module."
+        )
     SEQS = 3
     model = fwd_model if not retrosynthesis else retro_model
     with torch.inference_mode():
@@ -89,6 +96,10 @@ def predict_reaction_internal(data: List[str], retrosynthesis: bool) -> List[str
 @click.option("--port", type=int, default=8125, help="Port to run the server on")
 @click.option("--host", type=str, default=None, help="Host to run the server on")
 def main(model_dir_fwd: str, adapter_weights_fwd: str, model_dir_retro: str, adapter_weights_retro: str, port: str, host: Optional[str]):
+    if not HAS_FLASKV2:
+        raise ImportError(
+            "Please install the [flask] optional packages to use this module."
+        )
     if not model_dir_fwd and not model_dir_retro:
         raise ValueError("At least one model has to be given to the MCP server")
     global fwd_model, retro_model, tokenizer, device, retrosynthesis

@@ -5,14 +5,19 @@
 ## SPDX-License-Identifier: Apache-2.0
 ################################################################################
 
+from loguru import logger
 from mcp.server.fastmcp import FastMCP
 try:
     from rdkit import Chem
     from rdkit.Chem import AllChem, rdChemReactions
-except ImportError:
-    raise ImportError("Please install the rdkit package to use this module.")
+    HAS_SMARTS = True
+except (ImportError, ModuleNotFoundError) as e:
+    HAS_SMARTS = False
+    logger.warning(
+        "Please install the rdkit support packages to use this module."
+        "Install it with: pip install charge[rdkit]",
+    )
 
-from loguru import logger
 from typing import Tuple
 
 def verify_reaction_SMARTS(smarts: str) -> Tuple[bool, str]:
@@ -28,6 +33,8 @@ def verify_reaction_SMARTS(smarts: str) -> Tuple[bool, str]:
             bool: True if the SMARTS is valid, False if it is invalid.
             str: Error message if the SMARTS reaction is valid.
     """
+    if not HAS_SMARTS:
+        raise ImportError("Please install the rdkit support packages to use this module.")
     try:
         logger.info(f"Verifying SMARTS: {smarts}")
         rxn = AllChem.ReactionFromSmarts(smarts)
@@ -71,6 +78,8 @@ def verify_reaction(
                   False if it cannot..
             str: Error message if the SMARTS reaction is valid.
     """
+    if not HAS_SMARTS:
+        raise ImportError("Please install the rdkit support packages to use this module.")
     try:
         logger.info(
             f"Verifying reaction with SMARTS: {smarts}, Reactants: {reactants}, Products: {products}"

@@ -6,15 +6,19 @@
 ################################################################################
 
 from mcp.server.fastmcp import FastMCP
+from loguru import logger
 
 try:
     from rdkit import Chem
     from rdkit.Chem import AllChem, Descriptors
     from rdkit.Contrib.SA_Score import sascorer
-except ImportError:
-    raise ImportError("Please install the rdkit package to use this module.")
-
-from loguru import logger
+    HAS_SMILES = True
+except (ImportError, ModuleNotFoundError) as e:
+    HAS_SMILES = False
+    logger.warning(
+        "Please install the rdkit support packages to use this module."
+        "Install it with: pip install charge[rdkit]",
+    )
 
 from charge.servers.server_utils import add_server_arguments
 import argparse

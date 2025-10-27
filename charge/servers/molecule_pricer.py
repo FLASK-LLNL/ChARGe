@@ -1,8 +1,14 @@
+from loguru import logger
 try:
     import chemprice
     from chemprice import PriceCollector
-except ImportError:
-    raise ImportError("Please install the chemprop package to use this module.")
+    HAS_CHEMPRICE = True
+except (ImportError, ModuleNotFoundError) as e:
+    HAS_CHEMPRICE = False
+    logger.warning(
+        "Please install the chemprice support packages to use this module."
+        "Install it with: pip install charge[chemprice]",
+    )
 import os, sys
 
 def get_chemspace_prices(SMILES_list,best_only=True):
@@ -47,6 +53,9 @@ def get_chemspace_prices(SMILES_list,best_only=True):
 
     """    
 
+    if not HAS_CHEMPRICE:
+        raise ImportError("Please install the chemprice support packages to use this module.")
+
     pc = PriceCollector()
     chemspace_api_key = os.getenv("CHEMSPACE_API_KEY")
     if(chemspace_api_key):
@@ -69,7 +78,9 @@ def main(smiles_list,price_source='Chemspace'):
     Args:
         smiles_list (list[str]): A list of SMILES strings.
     """
-    
+
+    if not HAS_CHEMPRICE:
+        raise ImportError("Please install the chemprice support packages to use this module.")
     if(price_source=='Chemspace'):
         prices=get_chemspace_prices(smiles_list)
     print("Retrieved Prices from "+price_source+":")

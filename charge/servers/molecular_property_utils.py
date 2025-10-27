@@ -5,14 +5,19 @@
 ## SPDX-License-Identifier: Apache-2.0
 ################################################################################
 
+from loguru import logger
 try:
     from rdkit import Chem
     from rdkit.Chem import AllChem, Descriptors
     from rdkit.Contrib.SA_Score import sascorer
-except ImportError:
-    raise ImportError("Please install the rdkit package to use this module.")
+    HAS_RDKIT = True
+except (ImportError, ModuleNotFoundError) as e:
+    HAS_RDKIT = False
+    logger.warning(
+        "Please install the rdkit support packages to use this module."
+        "Install it with: pip install charge[rdkit]",
+    )
 
-from loguru import logger
 from charge.servers.SMILES_utils import get_synthesizability
 from charge.servers.get_chemprop2_preds import predict_with_chemprop
 from charge.servers.molecule_pricer import get_chemspace_prices
@@ -30,6 +35,8 @@ def get_density(smiles: str) -> float:
     Returns:
         float: Density of the molecule, returns 0.0 if there is an error.
     """
+    if not HAS_RDKIT:
+        raise ImportError("Please install the rdkit support packages to use this module.")
     try:
         # logger.info(f"Calculating density for SMILES: {smiles}")
         mol = Chem.MolFromSmiles(smiles)
@@ -74,6 +81,8 @@ def get_density_and_synthesizability(smiles: str) -> tuple[float, float]:
             float: Synthesizable score of the molecule, returns 10.0 if there is an error.
     """
 
+    if not HAS_RDKIT:
+        raise ImportError("Please install the rdkit support packages to use this module.")
     density = get_density(smiles)
     synthesizability = get_synthesizability(smiles)
     return density, synthesizability
@@ -126,6 +135,8 @@ def chemprop_preds_server(smiles: str,property:str) -> float:
     2.94
     """
 
+    if not HAS_RDKIT:
+        raise ImportError("Please install the rdkit support packages to use this module.")
     valid_properties = {'density', 'hof', 'alpha','cv','gap','homo','lumo','mu','r2','zpve','lipo'}
     if property not in valid_properties:
         raise ValueError(
@@ -160,5 +171,7 @@ def get_molecule_price(smiles):
     0.1056
     """
 
+    if not HAS_RDKIT:
+        raise ImportError("Please install the rdkit support packages to use this module.")
     price=get_chemspace_prices([smiles])
     return(price[0])    

@@ -5,21 +5,25 @@
 ## SPDX-License-Identifier: Apache-2.0
 ################################################################################
 
-
 import logging
+from loguru import logger
 
 try:
     from aizynthfinder.aizynthfinder import AiZynthFinder
     from aizynthfinder.utils.logging import setup_logger
 
     setup_logger(console_level=logging.INFO)
-except ImportError:
-    raise ImportError("Please install the aizynthfinder package to use this module.")
+    HAS_AIZYNTHFINDER = True
+except (ImportError, ModuleNotFoundError) as e:
+    HAS_AIZYNTHFINDER = False
+    logger.warning(
+        "Please install the aizynthfinder support packages to use this module."
+        "Install it with: pip install charge[aizynthfinder]",
+    )
 import json
 
 from dataclasses import dataclass, asdict
 from typing import Any, Dict, List, Optional
-from loguru import logger
 from charge.servers.SMILES_utils import verify_smiles
 
 
@@ -138,6 +142,9 @@ def is_molecule_synthesizable(smiles: str) -> bool:
     Raises:
         ValueError:  If the molecule is not valid.
     """
+    if not HAS_AIZYNTHFINDER:
+        raise ImportError("Please install the aizynthfinder support packages to use this module.")
+
     logger.info(f"Checking if molecule {smiles} is synthesizable.")
 
     if not verify_smiles(smiles):
@@ -173,6 +180,9 @@ def find_synthesis_routes(smiles: str) -> list[dict]:
     Raises:
         ValueError:  If the molecule is not valid.
     """
+    if not HAS_AIZYNTHFINDER:
+        raise ImportError("Please install the aizynthfinder support packages to use this module.")
+
     logger.info(f"Find a synthesis route for molecule {smiles}.")
 
     if not verify_smiles(smiles):
