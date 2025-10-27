@@ -19,8 +19,12 @@ dependencies = [
     "click",
 ]
 
-[tool.setuptools]
-packages = ["charge"]
+# [tool.setuptools]
+# packages = ["charge"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["charge*"]
 
 # This creates the console script
 [project.scripts]
