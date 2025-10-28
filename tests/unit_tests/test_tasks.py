@@ -1,5 +1,6 @@
 import json
 import pytest
+import requests_mock
 
 
 @pytest.mark.parametrize(
@@ -106,3 +107,25 @@ def test_Task_no_url_raise_error():
         )
 
         assert task.server_urls == []  # No valid server URLs found
+
+
+def test_Task_with_valid_and_invalid_urls():
+    from charge.tasks.Task import Task
+
+    valid_url = "http://valid_server_url/sse"
+    invalid_url = "http://invalid_server_url/sse"
+
+    with requests_mock.Mocker() as m:
+        m.get(valid_url, status_code=200)
+        m.get(invalid_url, status_code=404)
+
+        with pytest.warns(UserWarning):
+            task = Task(
+                system_prompt="System Prompt",
+                user_prompt="User Prompt",
+                server_urls=[valid_url, invalid_url],
+            )
+
+            assert task.server_urls == [
+                valid_url
+            ]  # Only the valid URL should be retained

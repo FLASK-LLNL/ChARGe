@@ -104,7 +104,7 @@ def check_and_store_server_paths(server_paths: Optional[Union[str, list]]) -> li
     )
     if len(valid_paths) != len(_paths):
         if CHARGE_RAISE_ON_MISSING_SERVER:
-            raise FileNotFoundError("One or more server paths do not exist.")
+            raise ValueError("One or more server paths do not exist.")
     return valid_paths
 
 
