@@ -118,6 +118,7 @@ class Task(ABC):
         refinement_prompt: Optional[str] = None,
         server_urls: Optional[Union[str, list]] = None,
         server_files: Optional[Union[str, list]] = None,
+        structured_output_schema: Optional[Type[BaseModel]] = None,
         **kwargs,
     ):
         """
@@ -170,6 +171,8 @@ class Task(ABC):
         self.server_urls = check_and_store_server_paths(server_urls)
         self.server_files = check_and_store_server_paths(server_files)
 
+        self.structured_output_schema = structured_output_schema
+
         for key, value in kwargs.items():
             if hasattr(self, key):
                 raise ValueError(f"Attribute {key} already exists in Task class.")
@@ -182,6 +185,12 @@ class Task(ABC):
 
     def get_user_prompt(self) -> str:
         return self.user_prompt or ""
+
+    def get_verification_prompt(self) -> str:
+        return self.verification_prompt or ""
+
+    def get_refinement_prompt(self) -> str:
+        return self.refinement_prompt or ""
 
     def register_buffer(self, name: str, value: str):
         self.constructor_args[name] = value
@@ -278,7 +287,10 @@ class Task(ABC):
         Returns:
             bool: True if the task has output formatting requirements, False otherwise.
         """
-        if self.has_structured_output_schema():
+        if (
+            not self.has_structured_output_schema()
+            or self.structured_output_schema is None
+        ):
             return True
 
         structured_output_schema = self.structured_output_schema

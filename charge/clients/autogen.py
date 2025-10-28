@@ -45,6 +45,45 @@ from charge.tasks.Task import Task
 from loguru import logger
 
 
+def model_configure(
+    backend: str,
+    model: Optional[str] = None,
+) -> Tuple[str, str, Optional[str], Dict[str, str]]:
+    import httpx
+
+    kwargs = {}
+    API_KEY = None
+    default_model = None
+    if backend in ["openai", "gemini", "livai", "livchat"]:
+        if backend == "openai":
+            API_KEY = os.getenv("OPENAI_API_KEY")
+            default_model = "gpt-5"
+            # kwargs["parallel_tool_calls"] = False
+            kwargs["reasoning_effort"] = "high"
+        elif backend == "livai" or backend == "livchat":
+            API_KEY = os.getenv("OPENAI_API_KEY")
+            BASE_URL = os.getenv("LIVAI_BASE_URL")
+            assert (
+                BASE_URL is not None
+            ), "LivAI Base URL must be set in environment variable"
+            default_model = "gpt-4.1"
+            kwargs["base_url"] = BASE_URL
+            kwargs["http_client"] = httpx.AsyncClient(verify=False)
+        else:
+            API_KEY = os.getenv("GOOGLE_API_KEY")
+            default_model = "gemini-flash-latest"
+            kwargs["parallel_tool_calls"] = False
+            kwargs["reasoning_effort"] = "high"
+        assert API_KEY is not None, f"API key must be set for backend {backend}"
+    elif backend in ["ollama"]:
+        default_model = "gpt-oss:latest"
+
+    if not model:
+        model = default_model
+    assert model is not None, "Model name must be provided."
+    return (model, backend, API_KEY, kwargs)
+
+
 def create_autogen_model_client(
     backend: str,
     model: str,
@@ -190,7 +229,7 @@ class AutoGenAgent(Agent):
             return
         await asyncio.gather(*[workbench.stop() for workbench in self.workbenches])
 
-    async def run(self, **kwargs):
+    async def run(self, **kwargs) -> Any:
         """
         Runs the agent.
         """
@@ -220,7 +259,7 @@ class AutoGenAgent(Agent):
 
         finally:
             await self.close_workbenches()
-        return result
+        return result.messages[-1].content
 
 
 class AutoGenPool(AgentPool):
@@ -269,10 +308,9 @@ class AutoGenPool(AgentPool):
                 backend is not None
             ), "Backend must be provided if model_client is not given."
 
-            model, backend, api_key, model_kwargs = AutoGenClient.configure(
+            model, backend, api_key, model_kwargs = model_configure(
                 model=model, backend=backend
             )
-
             self.model_client = create_autogen_model_client(
                 backend=backend, model=model, api_key=api_key, model_kwargs=model_kwargs
             )
@@ -423,38 +461,7 @@ class AutoGenClient(Client):
     def configure(
         model: Optional[str], backend: str
     ) -> Tuple[str, str, Optional[str], Dict[str, str]]:
-        import httpx
-
-        kwargs = {}
-        API_KEY = None
-        default_model = None
-        if backend in ["openai", "gemini", "livai", "livchat"]:
-            if backend == "openai":
-                API_KEY = os.getenv("OPENAI_API_KEY")
-                default_model = "gpt-5"
-                # kwargs["parallel_tool_calls"] = False
-                kwargs["reasoning_effort"] = "high"
-            elif backend == "livai" or backend == "livchat":
-                API_KEY = os.getenv("OPENAI_API_KEY")
-                BASE_URL = os.getenv("LIVAI_BASE_URL")
-                assert (
-                    BASE_URL is not None
-                ), "LivAI Base URL must be set in environment variable"
-                default_model = "gpt-4.1"
-                kwargs["base_url"] = BASE_URL
-                kwargs["http_client"] = httpx.AsyncClient(verify=False)
-            else:
-                API_KEY = os.getenv("GOOGLE_API_KEY")
-                default_model = "gemini-flash-latest"
-                kwargs["parallel_tool_calls"] = False
-                kwargs["reasoning_effort"] = "high"
-        elif backend in ["ollama"]:
-            default_model = "gpt-oss:latest"
-
-        if not model:
-            model = default_model
-        assert model is not None, "Model name must be provided."
-        return (model, backend, API_KEY, kwargs)
+        return model_configure(model, backend)
 
     def check_invalid_response(self, result) -> bool:
         answer_invalid = False
