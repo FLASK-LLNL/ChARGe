@@ -158,8 +158,10 @@ class Task(ABC):
             user_prompt (str, optional): The user prompt for the task.
             verification_prompt (str, optional): The verification prompt for the task.
             refinement_prompt (str, optional): The refinement prompt for the task.
-            server_urls (Union[str, list], optional): The server URLs for the task.
-            server_files (Union[str, list], optional): The server files for the task.
+            server_urls (Union[str, list], optional): The MCP server URLs to use with over SSE protocol
+                                                       for the task.
+            server_files (Union[str, list], optional): The MCP server files to use with over STDIO protocl
+                                                       for the task.
             **kwargs: Additional keyword arguments to be stored in the task.
 
         """
