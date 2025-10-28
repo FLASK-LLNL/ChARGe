@@ -1,11 +1,6 @@
 import pytest
 
 
-@pytest.mark.dependency()
-def test_autogen_import():
-    import charge.clients.autogen
-
-
 @pytest.fixture
 def autogen_module():
     import charge.clients.autogen
@@ -13,7 +8,6 @@ def autogen_module():
     return charge.clients.autogen
 
 
-@pytest.mark.dependency(depends=["test_autogen_import"])
 def test_default_configure_ollama(autogen_module):
     model_configure = autogen_module.model_configure
     backend = "ollama"
@@ -24,7 +18,6 @@ def test_default_configure_ollama(autogen_module):
     assert model_kwargs == {}
 
 
-@pytest.mark.dependency(depends=["test_autogen_import"])
 def test_missing_api_gemini(autogen_module):
     model_configure = autogen_module.model_configure
     backend = "gemini"
@@ -34,7 +27,6 @@ def test_missing_api_gemini(autogen_module):
     assert "API key must be set for backend gemini" in str(excinfo.value)
 
 
-@pytest.mark.dependency(depends=["test_autogen_import"])
 def test_default_configure_gemini(autogen_module):
     model_configure = autogen_module.model_configure
     backend = "gemini"
@@ -49,7 +41,6 @@ def test_default_configure_gemini(autogen_module):
     }
 
 
-@pytest.mark.dependency(depends=["test_autogen_import"])
 def test_missing_api_key_openai(autogen_module):
     model_configure = autogen_module.model_configure
     backend = "openai"
@@ -59,7 +50,6 @@ def test_missing_api_key_openai(autogen_module):
     assert "API key must be set for backend openai" in str(excinfo.value)
 
 
-@pytest.mark.dependency(depends=["test_autogen_import"])
 def test_default_configure_openai(autogen_module):
     model_configure = autogen_module.model_configure
     backend = "openai"
@@ -71,7 +61,6 @@ def test_default_configure_openai(autogen_module):
     assert model_kwargs == {"reasoning_effort": "high"}
 
 
-@pytest.mark.dependency(depends=["test_autogen_import"])
 def test_default_configure_livchat(autogen_module):
     import httpx
 
