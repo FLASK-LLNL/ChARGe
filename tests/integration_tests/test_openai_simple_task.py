@@ -46,6 +46,7 @@ class TestOpenAISimpleTask:
     async def test_openai_structured_output_task(self):
         from charge.tasks.Task import Task
         from pydantic import BaseModel
+        import re
 
         class MathAnswerSchema(BaseModel):
             answer: int
@@ -61,4 +62,4 @@ class TestOpenAISimpleTask:
 
         response = await agent.run()
         print("Response from Agent:", response)
-        assert '"answer": 42' in response
+        assert re.search(r'"answer":\s*42', response)
