@@ -79,3 +79,30 @@ def test_Task_check_output_formatting_invalid(task_with_schema):
 
     with pytest.warns(UserWarning, match="Output formatting check failed with error:"):
         assert task.check_output_formatting(invalid_output) is False
+
+
+def test_Task_no_url_raise_error():
+    from charge.tasks.Task import Task
+
+    # When CHARGE_RAISE_ON_MISSING_SERVER is set to True, ValueError should be raised
+    pytest.MonkeyPatch().setenv("CHARGE_ERROR_ON_MISSING_SERVER", "1")
+    with pytest.raises(ValueError) as excinfo:
+        with pytest.warns(UserWarning):
+            task = Task(
+                system_prompt="System Prompt",
+                user_prompt="User Prompt",
+                server_urls="http://non_existent_server_url/sse",
+            )
+
+            assert task.server_urls == []  # No valid server URLs found
+
+    # When CHARGE_RAISE_ON_MISSING_SERVER is set to False, a warning should be issued
+    pytest.MonkeyPatch().setenv("CHARGE_ERROR_ON_MISSING_SERVER", "0")
+    with pytest.warns(UserWarning):
+        task = Task(
+            system_prompt="System Prompt",
+            user_prompt="User Prompt",
+            server_urls="http://non_existent_server_url/sse",
+        )
+
+        assert task.server_urls == []  # No valid server URLs found
