@@ -7,6 +7,7 @@
 try:
     from autogen_agentchat.agents import AssistantAgent
     from autogen_core.model_context import UnboundedChatCompletionContext
+    from autogen_core.memory import ListMemory
     from autogen_core.models import (
         ChatCompletionClient,
         LLMMessage,
@@ -89,6 +90,7 @@ def generate_agent(
     system_prompt: str,
     workbenches: List[McpWorkbench],
     max_tool_calls: int,
+    memory: Optional[List[ListMemory]] = None,
     callback: Optional[Callable] = None,
 ):
     if isinstance(model_client, AsyncOpenAI):
@@ -112,6 +114,7 @@ def generate_agent(
             model_context=ReasoningModelContext(
                 thoughts_callback if callback is None else callback
             ),
+            memory=memory,
             # output_content_type=structured_output_schema,
         )
     else:

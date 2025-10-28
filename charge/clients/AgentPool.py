@@ -11,6 +11,7 @@ class Agent:
     def __init__(self, task: Task, **kwargs):
         self.task = task
         self.kwargs = kwargs
+        self.context_history = []
 
     @abstractmethod
     def run(self, **kwargs) -> Any:
@@ -18,6 +19,13 @@ class Agent:
         Abstract method to run the Agent's task.
         """
         raise NotImplementedError("Method 'run' is not implemented.")
+
+    @abstractmethod
+    def get_context_history(self) -> list:
+        """
+        Abstract method to get the Agent's context history.
+        """
+        raise NotImplementedError("Method 'get_context_history' is not implemented.")
 
 
 class AgentPool:

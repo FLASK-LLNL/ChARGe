@@ -157,6 +157,7 @@ class AutoGenAgent(Agent):
         task: Task,
         model_client: Union[AsyncOpenAI, ChatCompletionClient],
         agent_name: str,
+        memory: Optional[Any] = None,
         max_retries: int = 3,
         max_tool_calls: int = 30,
         timeout: int = 60,
@@ -170,6 +171,7 @@ class AutoGenAgent(Agent):
         self.agent_name = agent_name
         self.model_client = model_client
         self.timeout = timeout
+        self.memory = memory
 
     def create_servers(self, paths: List[str], urls: List[str]) -> List[Any]:
         """
@@ -247,6 +249,8 @@ class AutoGenAgent(Agent):
             for i in range(self.max_retries):
                 result = await agent.run(task=self.task.get_user_prompt())
 
+                self.context_history.append(result)
+
                 if isinstance(result.messages[-1], TextMessage):
                     content = result.messages[-1].content
                     if self.task.check_output_formatting(content):
@@ -260,6 +264,12 @@ class AutoGenAgent(Agent):
         finally:
             await self.close_workbenches()
         return result.messages[-1].content
+
+    def get_context_history(self) -> list:
+        """
+        Returns the context history of the agent.
+        """
+        return self.context_history
 
 
 class AutoGenPool(AgentPool):
