@@ -53,9 +53,7 @@ class TestOpenAISimpleTask:
 
         task = Task(
             system_prompt="You are a helpful assistant.",
-            user_prompt="What is 20 plus 22?"
-            "Please provide the answer in the give JSON format"
-            + f"{MathAnswerSchema.model_json_schema()} \n\n",
+            user_prompt="What is 20 plus 22?",
             structured_output_schema=MathAnswerSchema,
         )
 
