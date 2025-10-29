@@ -382,6 +382,26 @@ class AutoGenPool(AgentPool):
         self.agent_dict[agent_name] = agent
         return agent
 
+    def list_all_agents(self) -> list:
+        """Lists all agents in the pool.
+
+        Returns:
+            list: List of agent names.
+        """
+        return self.agent_list
+
+    def get_agent_by_name(self, name: str) -> AutoGenAgent:
+        """Gets an agent by name.
+
+        Args:
+            name (str): The name of the agent.
+
+        Returns:
+            AutoGenAgent: The agent with the given name.
+        """
+        assert name in self.agent_dict, f"Agent with name {name} does not exist."
+        return self.agent_dict[name]
+
 
 class AutoGenClient(Client):
     def __init__(
