@@ -34,6 +34,8 @@ class AgentPool:
     """
 
     def __init__(self, **kwargs):
+        self.agent_list = []
+        self.agent_dict = {}
         pass
 
     @abstractmethod
@@ -46,3 +48,17 @@ class AgentPool:
         Abstract method to create and return an Agent instance.
         """
         raise NotImplementedError("Method 'create_agent' is not implemented.")
+
+    @abstractmethod
+    def list_all_agents(self) -> list:
+        """
+        Abstract method to get a list of all Agents in the pool.
+        """
+        raise NotImplementedError("Method 'list_all_agents' is not implemented.")
+
+    @abstractmethod
+    def get_agent_by_name(self, name: str) -> Agent:
+        """
+        Abstract method to get an Agent by name.
+        """
+        raise NotImplementedError("Method 'get_agent_by_name' is not implemented.")

@@ -364,7 +364,14 @@ class AutoGenPool(AgentPool):
             else agent_name
         )
 
-        return AutoGenAgent(
+        if agent_name in self.agent_list:
+            warnings.warn(
+                f"Agent with name {agent_name} already exists. Creating another agent with the same name."
+            )
+        else:
+            self.agent_list.append(agent_name)
+
+        agent = AutoGenAgent(
             task=task,
             model_client=self.model_client,
             agent_name=agent_name,
@@ -372,6 +379,8 @@ class AutoGenPool(AgentPool):
             model_context=model_context,
             **kwargs,
         )
+        self.agent_dict[agent_name] = agent
+        return agent
 
 
 class AutoGenClient(Client):
