@@ -246,8 +246,15 @@ class AutoGenAgent(Agent):
                 self.workbenches,
                 max_tool_calls=self.max_tool_calls,
             )
+            user_prompt = self.task.get_user_prompt()
+            if self.task.has_structured_output_schema():
+                user_prompt += (
+                    "\n\n Please provide the answer in the following JSON format: "
+                    + f"{self.task.get_structured_output_schema().model_json_schema()}\n\n"
+                )
+
             for i in range(self.max_retries):
-                result = await agent.run(task=self.task.get_user_prompt())
+                result = await agent.run(task=user_prompt)
 
                 self.context_history.append(result)
 
