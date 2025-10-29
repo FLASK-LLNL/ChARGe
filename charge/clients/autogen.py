@@ -507,7 +507,7 @@ class AutoGenClient(Client):
     def configure(
         model: Optional[str], backend: str
     ) -> Tuple[str, str, Optional[str], Dict[str, str]]:
-        return model_configure(model, backend)
+        return model_configure(model=model, backend=backend)
 
     def check_invalid_response(self, result) -> bool:
         answer_invalid = False
