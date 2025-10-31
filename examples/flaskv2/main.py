@@ -45,7 +45,7 @@ def main():
     # CLI arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("--lead-molecules", nargs='+', default=["CC(=O)O[C@H](C)CCN"])
-    parser.add_argument("--retrosynthesis", action='store_true', help="Whether to perform a retrosynthesis task.")
+    parser.add_argument("--retrosynthesis", action='store_true', default=False, help="Whether to perform a retrosynthesis task.")
     parser.add_argument("--client", type=str, default="autogen", choices=["autogen", "gemini"])
     Client.add_std_parser_arguments(parser)
     args = parser.parse_args()
