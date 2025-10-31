@@ -154,7 +154,7 @@ def main(model_dir_fwd: str, model_dir_retro: str, adapter_weights_fwd: str, ada
             Args:
                 products (list[str]): a list of product molecules in SMILES representation.
             Returns:
-                list[str]: a list of predictions, each of which is a json string listing the predicted reactant molecule(s) in SMILES, 
+                list[str]: a list of predictions, each of which is a json string listing the predicted reactant molecule(s) in SMILES,
                     as well as potential (re)agents and solvents used in the reaction.
             """
             logger.debug('Calling `predict_reaction_reactants`')
