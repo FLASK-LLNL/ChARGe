@@ -1,11 +1,11 @@
 import argparse
 import asyncio
 import os
-from charge.experiments.Experiment import Experiment
+from charge.tasks.Task import Task
 from charge.clients.Client import Client
 
 
-class RetrosynthesisExperiment(Experiment):
+class RetrosynthesisTask(Task):
     def __init__(self, lead_molecules: list[str]):
         mols = '\n'.join(lead_molecules)
         system_prompt = (
@@ -23,7 +23,7 @@ class RetrosynthesisExperiment(Experiment):
         self.user_prompt = user_prompt
 
 
-class ForwardSynthesisExperiment(Experiment):
+class ForwardSynthesisTask(Task):
     def __init__(self, lead_molecules: list[str]):
         mols = '\n'.join(lead_molecules)
         system_prompt = (
@@ -45,7 +45,7 @@ def main():
     # CLI arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("--lead-molecules", nargs='+', default=["CC(=O)O[C@H](C)CCN"])
-    parser.add_argument("--retrosynthesis", action='store_true', help="Whether to perform a retrosynthesis experiment.")
+    parser.add_argument("--retrosynthesis", action='store_true', help="Whether to perform a retrosynthesis task.")
     parser.add_argument("--client", type=str, default="autogen", choices=["autogen", "gemini"])
     Client.add_std_parser_arguments(parser)
     args = parser.parse_args()
@@ -54,13 +54,13 @@ def main():
         from charge.clients.gemini import GeminiClient
         client_key = os.getenv("GOOGLE_API_KEY")
         assert client_key is not None, "GOOGLE_API_KEY must be set in environment"
-        runner = GeminiClient(experiment_type=myexperiment, api_key=client_key)
+        runner = GeminiClient(task=mytask, api_key=client_key)
     elif args.client == "autogen":
         from charge.clients.autogen import AutoGenClient
-        experiment = RetrosynthesisExperiment(args.lead_molecules) if args.retrosynthesis else ForwardSynthesisExperiment(args.lead_molecules)
+        task = RetrosynthesisTask(args.lead_molecules) if args.retrosynthesis else ForwardSynthesisTask(args.lead_molecules)
         (model, backend, API_KEY, kwargs) = AutoGenClient.configure(args.model, args.backend)
         runner = AutoGenClient(
-            experiment_type=experiment,
+            task=task,
             model=model,
             backend=backend,
             api_key=API_KEY,
@@ -68,7 +68,7 @@ def main():
             server_url=args.server_urls,
         )
         results = asyncio.run(runner.run())
-        print(f"[{model} orchestrated] Experiment completed. Results: {results}")
+        print(f"[{model} orchestrated] Task completed. Results: {results}")
 
 
 if __name__ == "__main__":

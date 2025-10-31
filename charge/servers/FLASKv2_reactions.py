@@ -17,6 +17,7 @@ except (ImportError, ModuleNotFoundError) as e:
         "Install it with: pip install charge[flask]",
     )
 
+from charge.servers.server_utils import update_mcp_network, get_hostname
 
 def format_rxn_prompt(data: dict, forward: bool) -> dict:
     required_keys = ['reactants', 'products', 'agents', 'solvents', 'catalysts', 'atmospheres']
@@ -68,18 +69,25 @@ def predict_reaction_internal(molecules: list[str], retrosynthesis: bool) -> lis
 @click.option("--transport", type=click.Choice(['stdio', 'streamable-http', 'sse']), help="MCP transport type", default="sse")
 @click.option("--port", type=int, default=8125, help="Port to run the server on")
 @click.option("--host", type=str, default=None, help="Host to run the server on")
-@click.option("--transport", type=click.Choice(['stdio', 'streamable-http', 'sse']), help="MCP transport type", default="sse")
-def main(model_dir_fwd: str, adapter_weights_fwd: str, model_dir_retro: str, adapter_weights_retro: str, transport: str, port: str, host: Optional[str]):
+def main(model_dir_fwd: str, model_dir_retro: str, adapter_weights_fwd: str, adapter_weights_retro: str, transport: str, port: str, host: Optional[str]):
     if not HAS_FLASKV2:
         raise ImportError(
             "Please install the [flask] optional packages to use this module."
         )
     if not model_dir_fwd and not model_dir_retro:
         raise ValueError("At least one model has to be given to the MCP server")
-    
+
+    if host is None:
+        _, host = get_hostname()
+
+    mcp = FastMCP("FLASKv2 Reaction Predictor",
+                  port=port,
+                  website_url=f"{host}",
+    )
+
     # Init MCP server
     mcp = FastMCP("FLASKv2 Reaction Predictor", host=host, port=port)
-    
+
     # Make HF models and tokenizer global objects
     global fwd_model, retro_model, tokenizer
     fwd_model = None
