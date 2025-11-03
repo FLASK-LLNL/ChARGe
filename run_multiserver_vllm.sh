@@ -13,17 +13,22 @@ MATRIX_NODE="34"
 ## GPT-OSS-20b
 #export VLLM_URL="http://192.168.128.${MATRIX_NODE}:8010/v1"
 #export VLLM_MODEL="/p/vast1/flask/models/marathe1/gpt-oss-20b"
+
 ## GPT-OSS-120b
 export VLLM_URL="http://192.168.128.${MATRIX_NODE}:8011/v1"
 export VLLM_MODEL="/p/vast1/flask/models/marathe1/gpt-oss-120b"
 
 # Reasoning level for GPT-OSS
-export OSS_REASONING="low" # Options: ["low", "medium", "high"]
+export OSS_REASONING="medium" # Options: ["low", "medium", "high"]
 
-cd experiments/Retrosynthesis
+
+cd experiments/Multi_Server_Experiments
 
 python main.py \
-    --client autogen \
+    --server-urls "http://127.0.0.1:8000/sse" "http://127.0.0.1:8001/sse" \
     --backend vllm \
-    --server-path reaction_server.py \
-    --user-prompt "Generate a new reaction SMARTS and reactants for the product ${PRODUCT_SMILES}"
+    --model gpt-oss-120b
+
+#    --client autogen \
+#    --server-path reaction_server.py \
+#    --user-prompt "Generate a new reaction SMARTS and reactants for the product ${PRODUCT_SMILES}"
