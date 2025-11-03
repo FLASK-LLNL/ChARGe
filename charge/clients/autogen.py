@@ -83,6 +83,7 @@ def model_configure(
     elif backend in ["huggingface"]:
         default_model = None  # Must be provided via model path
     elif backend in ["vllm"]:
+        kwargs["reasoning_effort"] = os.getenv("OSS_REASONING", "medium")
         default_model = "gpt-oss"  # Default vLLM model name
 
     if not model:
@@ -144,13 +145,39 @@ def create_autogen_model_client(
         # Extract vLLM-specific kwargs
         vllm_url = model_kwargs.pop("vllm_url", os.getenv("VLLM_URL", "http://localhost:8000/v1"))
         vllm_model = model_kwargs.pop("vllm_model", os.getenv("VLLM_MODEL", model))
+        reasoning_effort = model_kwargs.pop("reasoning_effort", "medium")
         
-        model_client = VLLMClient(
-            base_url=vllm_url,
-            model_name=vllm_model,
-            model_info=model_info,
-            **model_kwargs,
-        )
+        print(f"\n  ==> GPT-OSS reasoning effort: {reasoning_effort}")
+        
+        # Use ReasoningCaptureClient if available, otherwise use VLLMClient
+        try:
+            from charge.clients.reasoning import ReasoningCaptureClient
+            from autogen_ext.models.openai import OpenAIChatCompletionClient
+            
+            vllm_model_info = ModelInfo(
+                vision=False,
+                function_calling=True,
+                json_output=False,
+                family=ModelFamily.UNKNOWN,
+                structured_output=False,
+            )
+            
+            model_client = ReasoningCaptureClient(
+                model=vllm_model,
+                api_key="EMPTY",
+                base_url=vllm_url,
+                model_info=vllm_model_info,
+                parallel_tool_calls=False,
+                extra_body={"reasoning_effort": reasoning_effort},
+            )
+        except ImportError:
+            # Fall back to regular VLLMClient if ReasoningCaptureClient not available
+            model_client = VLLMClient(
+                base_url=vllm_url,
+                model_name=vllm_model,
+                model_info=model_info,
+                **model_kwargs,
+            )
     else:
         if api_key is None:
             if backend == "gemini":
