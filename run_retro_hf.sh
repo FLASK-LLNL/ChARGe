@@ -1,16 +1,17 @@
 #!/bin/bash
 
 # Configuration
-LOCAL_MODEL_PATH="/p/vast1/flask/models/gpt-oss-120b"  # UPDATE THIS!
+#export LOCAL_MODEL_PATH="/p/vast1/flask/models/marathe1/gpt-oss-20b"
+export LOCAL_MODEL_PATH="/p/vast1/flask/models/marathe1/gpt-oss-120b"
 PRODUCT_SMILES="c1cc(ccc1N)O"  # Default from main.py
 
-cd experiments/Retrosynthesis
+cd examples/Retrosynthesis
 
 python main.py \
     --client autogen \
     --backend huggingface \
-    --server-path reaction_server.py \
     --user-prompt "Generate a new reaction SMARTS and reactants for the product ${PRODUCT_SMILES}"
-#    --local-model-path "${LOCAL_MODEL_PATH}" \
+
+#    --server-path reaction_server.py \
 #    --device auto \
 #    --quantization 4bit
