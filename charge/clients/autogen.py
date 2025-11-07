@@ -182,7 +182,7 @@ def create_autogen_model_client(
             )
         else:
             from autogen_ext.models.openai import OpenAIChatCompletionClient
-            # Fall back to OpenAIChatCompletionClient
+            # Use OpenAIChatCompletionClient
             model_client = OpenAIChatCompletionClient(
                 model=vllm_model,
                 api_key="EMPTY",
@@ -190,7 +190,7 @@ def create_autogen_model_client(
                 model_info=vllm_model_info,
                 parallel_tool_calls=False, # False for gpt-oss
                 extra_body={
-                    "reasoning_effort": reasoning_effort
+                    "reasoning_effort": reasoning_effort,
                     "max_tokens": max_tokens,
                     },
             )
