@@ -13,3 +13,10 @@ Once the SSE server is running, you can start the chat client by executing:
 python3 main.py --server_url <server_url>
 ```
 
+To use the `vllm` backend, set the following environment variables before running:
+
+```bash
+export VLLM_URL="<url-of-vllm-model>"
+export VLLM_MODEL="<path-to-model-weights>"  # e.g., /usr/workspace/gpt-oss-120b
+export OSS_REASONING="low"                   # Options: ["low", "medium", "high"]
+```
