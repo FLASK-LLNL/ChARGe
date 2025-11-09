@@ -124,6 +124,7 @@ class RetrosynthesisTask(Task):
         self,
         user_prompt,
         system_prompt: Optional[str] = None,  # Add optional parameter
+        **kwargs,
     ):
         # Use provided system prompt or fall back to default
         if system_prompt is None:
@@ -132,6 +133,7 @@ class RetrosynthesisTask(Task):
         super().__init__(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
+            **kwargs,
         )
         self.system_prompt = system_prompt
         self.user_prompt = user_prompt + TEMPLATE_REACTION_SCHEMA_PROMPT

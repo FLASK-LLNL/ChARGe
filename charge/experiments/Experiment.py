@@ -24,11 +24,11 @@ class Experiment(object):
         self.kwargs = kwargs
 
     @abstractmethod
-    def create_agent_with_experiment_state(self, task):
+    def create_agent_with_experiment_state(self, task, **kwargs):
         # Create an agent that incorporates the experiment state
 
         # Default implementation is no context is shared across agents
-        return self.agent_pool.create_agent(task=task)
+        return self.agent_pool.create_agent(task=task, **kwargs)
 
     @abstractmethod
     def save_agent_state(self, agent):
