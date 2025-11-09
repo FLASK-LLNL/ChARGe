@@ -1,7 +1,7 @@
 from charge.experiments import Experiment
 from charge.clients.AgentPool import Agent, AgentPool
 from charge.tasks.Task import Task
-from typing import List, Union
+from typing import List, Union, Optional
 
 try:
     from autogen_core.memory import MemoryContent, MemoryMimeType
@@ -16,7 +16,11 @@ except ImportError:
 
 class AutoGenExperiment(Experiment):
     def __init__(
-        self, task: Union[Task, List[Task]], agent_pool: AutoGenPool, *args, **kwargs
+        self,
+        task: Optional[Union[Task, List[Task]]],
+        agent_pool: AutoGenPool,
+        *args,
+        **kwargs,
     ):
         super().__init__(task=task, agent_pool=agent_pool, *args, **kwargs)
         # Initialize Autogen specific parameters here
