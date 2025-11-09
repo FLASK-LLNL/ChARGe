@@ -97,3 +97,10 @@ class Experiment(object):
 
     def run(self) -> None:
         asyncio.run(self.run_async())
+
+    def reset(self):
+        """
+        Resets the experiment state.
+        """
+        self.finished_tasks = []
+        self.agent_pool.reset()

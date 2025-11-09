@@ -64,3 +64,10 @@ class AutoGenExperiment(Experiment):
         return self.agent_pool.create_agent(
             task=task, memory=[self.model_context], **kwargs
         )
+
+    def reset(self):
+        """
+        Resets the experiment state, including the model context.
+        """
+        super().reset()
+        self.model_context = ChARGeListMemory()
