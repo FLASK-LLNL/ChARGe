@@ -60,5 +60,7 @@ class AutoGenExperiment(Experiment):
         self.model_context = ChARGeListMemory()
         self.model_context.load_memory_content(state_json)
 
-    def create_agent_with_experiment_state(self, task):
-        return self.agent_pool.create_agent(task=task, memory=[self.model_context])
+    def create_agent_with_experiment_state(self, task, **kwargs):
+        return self.agent_pool.create_agent(
+            task=task, memory=[self.model_context], **kwargs
+        )
