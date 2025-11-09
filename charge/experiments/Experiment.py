@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Any, List, Union
+from typing import Any, List, Union, Optional
 from charge.tasks.Task import Task
 from charge.clients.AgentPool import Agent, AgentPool
 from charge._utils import maybe_await_async
@@ -8,8 +8,14 @@ import asyncio
 
 class Experiment(object):
     def __init__(
-        self, task: Union[Task, List[Task]], agent_pool: AgentPool, *args, **kwargs
+        self,
+        task: Optional[Union[Task, List[Task]]],
+        agent_pool: AgentPool,
+        *args,
+        **kwargs,
     ):
+        if task is None:
+            task = []
         self.tasks = task if isinstance(task, list) else [task]
         self.finished_tasks = []
 
