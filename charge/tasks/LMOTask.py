@@ -81,7 +81,7 @@ class LMOTask(Task):
     ):
 
         if user_prompt is None:
-            user_prompt = USER_PROMPT.format(lead_molecule) + SCHEMA_PROMPT
+            user_prompt = USER_PROMPT.format(lead_molecule)
         if system_prompt is None:
             system_prompt = SYSTEM_PROMPT
 
