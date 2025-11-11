@@ -4,9 +4,14 @@ from abc import ABC, abstractclassmethod
 
 
 class SmilesTokenizer(ABC):
+    """Base class for tokenizing SMILES strings.
+    This base class comes with a default tokenization implementaion (based on regular expression)
+    but does not have a vocab mapping, i.e., a token-to-id mapping.
+    Derived classes must implement token-to-id and id-to-token mappings.
+    """
     def __init__(self) -> None:
-        SMILES_TOKENIZER_PATTERN = r"(\%\([0-9]{3}\)|\[[^\]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n|o|s|p|\||\(|\)|\.|=|#|-|\+|\\|\/|:|~|@|\?|>>?|\*|\$|\%[0-9]{2}|[0-9])"
-        self.regex_pattern = SMILES_TOKENIZER_PATTERN
+        self.regex_pattern = \
+            r"(\%\([0-9]{3}\)|\[[^\]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n|o|s|p|\||\(|\)|\.|=|#|-|\+|\\|\/|:|~|@|\?|>>?|\*|\$|\%[0-9]{2}|[0-9])"
         self.regex = re.compile(self.regex_pattern)
 
     def tokenize(self, smiles: str) -> list[str]:
@@ -33,9 +38,9 @@ class SmilesTokenizer(ABC):
     def batch_decode(self, ids_list: list[list[int]]) -> list[str]:
         return [self.decode(ids) for ids in ids_list]
     
-    def __call__(self, smiles: str | list[str]) -> list[int] | list[list[int]]:
+    def __call__(self, smiles: str | list[str]) -> list[list[int]]:
         if isinstance(smiles, str):
-            return self.encode(smiles)
+            return self.batch_encode([smiles])
         elif isinstance(smiles, list):
             return self.batch_encode(smiles)
         else:
@@ -60,7 +65,8 @@ class ChemformerTokenizer(SmilesTokenizer):
         # Load Chemformer-specific vocab file
         with open(vocab_path, 'r') as f:
             vocab_config = json.load(f)
-        assert 'vocabulary' in vocab_config and 'properties' in vocab_config
+        assert 'vocabulary' in vocab_config and 'properties' in vocab_config, \
+            'Vocab file does not have the right Chemformer-specific format.'
         self.vocab = {token: i for i, token in enumerate(vocab_config['vocabulary'])}
         self.ids_to_tokens = {v: k for k, v in self.vocab.items()}
         self.special_tokens = vocab_config['properties'].get('special_tokens', {})
