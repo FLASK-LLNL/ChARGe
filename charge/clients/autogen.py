@@ -233,10 +233,11 @@ class AutoGenAgent(Agent):
             return
         await asyncio.gather(*[workbench.stop() for workbench in self.workbenches])
 
-    async def run(self, **kwargs) -> Any:
+    async def run(self, **kwargs) -> str:
         """
         Runs the agent.
         """
+        content = ""
 
         # set up workbenches from task server paths
         await self.setup_mcp_workbenches()
@@ -263,8 +264,10 @@ class AutoGenAgent(Agent):
                 self.context_history.append(result)
 
                 if isinstance(result.messages[-1], TextMessage):
-                    content = result.messages[-1].content
-                    if self.task.check_output_formatting(content):
+                    proposed_content = result.messages[-1].content
+                    if self.task.check_output_formatting(proposed_content):
+                        content = proposed_content
+
                         break
                 else:
                     warnings.warn(
@@ -274,7 +277,7 @@ class AutoGenAgent(Agent):
 
         finally:
             await self.close_workbenches()
-        return result.messages[-1].content
+        return content
 
     async def chat(
         self,
