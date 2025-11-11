@@ -136,7 +136,7 @@ class RetrosynthesisTask(Task):
             **kwargs,
         )
         self.system_prompt = system_prompt
-        self.user_prompt = user_prompt + TEMPLATE_REACTION_SCHEMA_PROMPT
+        self.user_prompt = user_prompt
         self.set_structured_output_schema(ReactionOutputSchema)
         print(
             "RetrosynthesisTask initialized with the provided prompts:"
@@ -175,7 +175,7 @@ class TemplateFreeRetrosynthesisTask(Task):
             **kwargs,
         )
         self.system_prompt = system_prompt
-        self.user_prompt = user_prompt + TEMPLATE_FREE_REACTION_SCHEMA_PROMPT
+        self.user_prompt = user_prompt
         self.set_structured_output_schema(TemplateFreeReactionOutputSchema)
         print(
             "TemplateFreeRetrosynthesisTask initialized with the provided prompts:"
