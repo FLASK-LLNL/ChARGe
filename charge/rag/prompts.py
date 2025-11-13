@@ -62,15 +62,15 @@ class ReactionDataPrompt_RAGv2(ReactionDataPrompt):
         self.instruction = ''.join([
             "Given the input data in [INPUT DATA], a list of expert predictions is provided in [EXPERT PREDICTIONS], ",
             "and a list of support examples is provided in [SUPPORT EXAMPLES].\n",
-            f"Each line in [EXPERT PREDICTIONS] is expert-predicted {output_role} for the input data based on an expert chemical reaction model.\n",
+            f"Each line in [EXPERT PREDICTIONS] is an prediction for [INPUT DATA], and is based on an expert chemical reaction model.\n",
             "Each line in [SUPPORT EXAMPLES] consists of three columns:\n",
             f"(1) {input_role} similar to the input data, retrieved from a chemical reaction database,\n",
             f"(2) ground truth {output_role} for column (1), retrieved from the same database,\n",
             f"(3) expert-predicted {output_role} for column (1), based on the same expert model used in [EXPERT PREDICTIONS].\n",
             "Learn from the pattern in [SUPPORT EXAMPLES] to correct or improve [EXPERT PREDICTIONS]. ",
             "If none of the [EXPERT PREDICTIONS] are chemically plausible or consistent with the learned patterns, ",
-            "construct a corrected or hybrid prediction guided by [SUPPORT EXAMPLES] and your chemistry expertise, ",
+            "construct a corrected or hybrid prediction guided by [SUPPORT EXAMPLES] and your chemistry expertise. ",
             "Your prediction output must follow [OUTPUT FORMAT].",
         ])
         self.expert_predictions = ''
-        self.support_data = ''
+        self.support_examples = ''
