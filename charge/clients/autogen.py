@@ -216,7 +216,7 @@ def create_autogen_model_client(
             model=model,
             api_key=api_key,
             model_info=model_info,
-            **model_kwargs,
+            **model_kwargs if model_kwargs is not None else {},
         )
     return model_client
 
