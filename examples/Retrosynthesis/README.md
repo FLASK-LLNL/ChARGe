@@ -23,7 +23,7 @@ And example user prompt would be:
 
 The `--client` argument can be either `autogen` or `gemini`, depending on which client you want to use. Default is `autogen`.
 
-The `--backend` is used for the `autogen` client and can be `ollama`, `livai`, `openai`, `gemini`, or `livchat`. The default is `openai`. This decides which model provider to use for the client. 
+The `--backend` is used for the `autogen` client and can be `ollama`, `livai`, `openai`, `gemini`, `vllm`, or `livchat`. The default is `openai`. This decides which model provider to use for the client. 
 
 Some providers such as `ollama` and `openai` provide multiple models. You can specify the model using the `--model` argument. The model name should be compatible with the provider.
 
@@ -33,6 +33,13 @@ For example, to use `autogen` with `ollama` backend and `gpt-oss:latest` model, 
 python main.py --client autogen --backend ollama --model gpt-oss:latest --server-path reaction_server.py --user-prompt "Generate a new reaction SMARTS and reactants for the target molecule: CC(=O)OC1=CC=CC=C1C(=O)O" 
 ``` 
 
+To use the `vllm` backend, set the following environment variables before running:
+
+```bash
+export VLLM_URL="<url-of-vllm-model>"
+export VLLM_MODEL="<path-to-model-weights>"  # e.g., /usr/workspace/gpt-oss-120b
+export OSS_REASONING="low"                   # Options: ["low", "medium", "high"]
+```
 
 ## Notes
 - Ensure you have the required dependencies installed, including ChARGe and RDKit.

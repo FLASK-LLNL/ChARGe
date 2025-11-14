@@ -30,6 +30,14 @@ python main.py --backend <backend> --model <model> --server-urls <server_url>/ss
 The `--retrosynthesis` arguments specifies that a `RetrosynthesisExperiment` is performed. Otherwise a `ForwardSynthesisExperiment` will be performed.
 The `--lead-molecules` argument can take a single SMILES string such as `"CC(=O)O[C@H](C)CCN"` (typically in the case of retrosynthesis) or multiple SMILES strings separated by space, such as `"CC" "O=O"` (typically in the case of forward synthesis). You should probably put `--lead-molecules` as the last argument on the command line.
 
+To use the `vllm` backend, set the following environment variables before running:
+
+```bash
+export VLLM_URL="<url-of-vllm-model>"
+export VLLM_MODEL="<path-to-model-weights>"  # e.g., /usr/workspace/gpt-oss-120b
+export OSS_REASONING="low"                   # Options: ["low", "medium", "high"]
+```
+
 
 ## Example AI summary output
 
