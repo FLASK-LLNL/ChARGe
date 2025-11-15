@@ -1,7 +1,9 @@
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 from autogen_core.models import CreateResult, RequestUsage
+from autogen_agentchat.messages import ThoughtEvent
 import json
 from loguru import logger
+import logging
 
 class ReasoningCaptureClient(OpenAIChatCompletionClient):
     """Wrapper that captures reasoning from raw API responses"""
@@ -55,13 +57,32 @@ class ReasoningCaptureClient(OpenAIChatCompletionClient):
         """Clear reasoning history"""
         self.reasoning_history = []
 
-import logging
-import json
-import sys
-from autogen_agentchat.messages import ThoughtEvent
-
 class ReasoningCapture(logging.Handler):
-    """Custom log handler to capture reasoning from autogen_core.events"""
+    """
+    Custom log handler to capture reasoning from autogen_core.events
+
+    # Usage:
+    reasoning_capture = ReasoningCapture()
+    reasoning_capture.setLevel(logging.INFO)
+    logging.getLogger("autogen_core.events").addHandler(reasoning_capture)
+
+    # Run agent
+    agent = AssistantAgent(...)
+    answer_invalid, result = await self.step(agent, user_prompt)
+
+    # Inject reasoning into result
+    result = reasoning_capture.inject_into_result(result)
+
+    # Now result.messages contains all ThoughtEvents with intermediate reasoning!
+    all_reasoning = reasoning_capture.get_reasoning_history()
+    logger.info("\n==>> All reasoning steps (including intermediate):")
+    for i, reasoning in enumerate(all_reasoning, 1):
+    logger.info(f"{i}. {reasoning}")
+
+    # And you can also access them from result.messages:
+    thought_messages = [msg for msg in result.messages if hasattr(msg, 'type') and msg.type == 'ThoughtEvent']
+    logger.info(f"\nThoughtEvents in result: {len(thought_messages)}")
+    """
     
     def __init__(self):
         super().__init__()
@@ -123,26 +144,3 @@ class ReasoningCapture(logging.Handler):
             result.messages = new_messages
         
         return result
-
-
-### Usage:
-##reasoning_capture = ReasoningCapture()
-##reasoning_capture.setLevel(logging.INFO)
-##logging.getLogger("autogen_core.events").addHandler(reasoning_capture)
-##
-### Run agent
-##agent = AssistantAgent(...)
-##answer_invalid, result = await self.step(agent, user_prompt)
-##
-### Inject reasoning into result
-##result = reasoning_capture.inject_into_result(result)
-##
-### Now result.messages contains all ThoughtEvents with intermediate reasoning!
-##all_reasoning = reasoning_capture.get_reasoning_history()
-##print("\n==>> All reasoning steps (including intermediate):")
-##for i, reasoning in enumerate(all_reasoning, 1):
-##    print(f"{i}. {reasoning}")
-##
-### And you can also access them from result.messages:
-##thought_messages = [msg for msg in result.messages if hasattr(msg, 'type') and msg.type == 'ThoughtEvent']
-##print(f"\nThoughtEvents in result: {len(thought_messages)}")
