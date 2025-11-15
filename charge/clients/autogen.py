@@ -102,7 +102,7 @@ def create_autogen_model_client(
     Creates an AutoGen model client based on the specified backend and model.
 
     Args:
-        backend (str): The backend to use: "openai", "gemini", "ollama", "huggingface", "vllm", "liveai" or "livchat".
+        backend (str): The backend to use: "openai", "gemini", "ollama", "huggingface", "vllm", or "livai".
         model (str): The model name to use.
         api_key (Optional[str], optional): API key for the model. Defaults to None.
         model_kwargs (Optional[dict], optional): Additional keyword arguments for the model client. Defaults to None.
@@ -500,7 +500,7 @@ class AutoGenPool(AgentPool):
     Args:
         model_client (Union[AsyncOpenAI, ChatCompletionClient]): The model client to use.
         model (str): The model name to use.
-        backend (str, optional): Backend to use: "openai", "gemini", "ollama", "huggingface", "vllm", "liveai" or "livchat". Defaults to "openai".
+        backend (str, optional): Backend to use: "openai", "gemini", "ollama", "huggingface", "vllm", or "livai". Defaults to "openai".
     """
 
     AGENT_COUNT = 0
@@ -640,7 +640,7 @@ class AutoGenClient(Client):
             task (Type[Task]): The task class to use.
             path (str, optional): Path to save generated MCP server files. Defaults to ".".
             max_retries (int, optional): Maximum number of retries for failed tasks. Defaults to 3.
-            backend (str, optional): Backend to use: "openai", "gemini", "ollama", "huggingface", "vllm", "liveai" or "livchat". Defaults to "openai".
+            backend (str, optional): Backend to use: "openai", "gemini", "ollama", "huggingface", "vllm", or "livai". Defaults to "openai".
             model (str, optional): Model name to use. Defaults to "gpt-4".
             model_client (Optional[ChatCompletionClient], optional): Pre-initialized model client. If provided, `backend`, `model`, and `api_key` are ignored. Defaults to None.
             api_key (Optional[str], optional): API key for the model. Defaults to None.
