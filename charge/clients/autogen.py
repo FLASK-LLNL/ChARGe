@@ -44,6 +44,8 @@ from charge.clients.autogen_utils import (
 from typing import Any, Tuple, Type, Optional, Dict, Union, List, Callable, overload
 from charge.tasks.Task import Task
 from loguru import logger
+import json
+from functools import partial
 
 
 def model_configure(
@@ -106,7 +108,7 @@ def create_autogen_model_client(
         vision=False,
         function_calling=True,
         json_output=True,
-        family=ModelFamily.UNKNOWN,
+        family=f"{backend}:{model}",
         structured_output=True,
     )
     if backend == "ollama":
@@ -534,7 +536,7 @@ class AutoGenClient(Client):
         self.check_response = check_response
         self.max_multi_turns = max_multi_turns
         self.mcp_timeout = mcp_timeout
-        self.thoughts_callback = thoughts_callback
+        self.thoughts_callback = partial(thoughts_callback, f"{backend}:{model}")
 
         if model_client is not None:
             self.model_client = model_client

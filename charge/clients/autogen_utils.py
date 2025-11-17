@@ -36,6 +36,7 @@ from typing import Type, Optional, Dict, Union, List, Callable
 from loguru import logger
 import dataclasses
 import json
+from functools import partial
 
 
 class ReasoningModelContext(UnboundedChatCompletionContext):
@@ -71,32 +72,32 @@ class ReasoningModelContext(UnboundedChatCompletionContext):
                 print("Model: ", assistant_message.content)
 
 
-def thoughts_callback(assistant_message):
+def thoughts_callback(model_family, assistant_message):
     # print("In callback:", assistant_message)
     if assistant_message.type == "UserMessage":
-        print(f"User: {assistant_message.content}")
+        print(f"[{model_family}] User: {assistant_message.content}")
     elif assistant_message.type == "AssistantMessage":
 
         if assistant_message.thought is not None:
-            print(f"Model thought: {assistant_message.thought}")
+            print(f"[{model_family}] Model thought: {assistant_message.thought}")
         if isinstance(assistant_message.content, list):
             for item in assistant_message.content:
                 if hasattr(item, "name") and hasattr(item, "arguments"):
-                    print(f"Function call: {item.name} with args {item.arguments}")
+                    print(f"[{model_family}] Function call: {item.name} with args {item.arguments}")
                 else:
-                    print(f"Model: {item}")
+                    print(f"[{model_family}] Model: {item}")
     elif assistant_message.type == "FunctionExecutionResultMessage":
 
         for result in assistant_message.content:
             if result.is_error:
-                print(f"Function {result.name} errored with output: {result.content}")
+                print(f"[{model_family}] Function {result.name} errored with output: {result.content}")
             else:
-                print(f"Function {result.name} returned: {result.content}")
+                print(f"[{model_family}] Function {result.name} returned: {result.content}")
     else:
         if hasattr(assistant_message, "message"):
-            print("Model: ", assistant_message.message.content)
+            print("[{model_family}] Model: ", assistant_message.message.content)
         elif hasattr(assistant_message, "content"):
-            print("Model: ", assistant_message.content)
+            print("[{model_family}] Model: ", assistant_message.content)
 
 
 def generate_agent(
@@ -119,6 +120,9 @@ def generate_agent(
         )
     elif isinstance(model_client, ChatCompletionClient):
         # TODO: Convert this to use custom agent in the future
+        partial_thoughts_callback = partial(callback, model_client.model_info['family'])
+        if callback:
+            partial_thoughts_callback = partial(callback, model_client.model_info['family'])
         agent = AssistantAgent(
             name="Assistant",
             model_client=model_client,
@@ -127,7 +131,7 @@ def generate_agent(
             max_tool_iterations=max_tool_calls,
             reflect_on_tool_use=True,
             model_context=ReasoningModelContext(
-                thoughts_callback if callback is None else callback
+                partial_thoughts_callback# if callback is None else callback
             ),
             **kwargs,
             # output_content_type=structured_output_schema,
