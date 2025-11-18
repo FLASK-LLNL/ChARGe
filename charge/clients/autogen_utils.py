@@ -37,7 +37,6 @@ from loguru import logger
 from pydantic import BaseModel
 import json
 
-
 class ReasoningModelContext(UnboundedChatCompletionContext):
     """A model context for reasoning models."""
 
@@ -45,6 +44,8 @@ class ReasoningModelContext(UnboundedChatCompletionContext):
         super().__init__()
         self.name = name
         self.custom_callback = callback
+        if callback:
+            callback.name = name
 
     async def get_messages(self) -> List[LLMMessage]:
         messages = await super().get_messages()
