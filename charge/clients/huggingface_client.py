@@ -12,6 +12,7 @@ except ImportError:
     raise ImportError(
         "Please install the autogen-agentchat package to use this module."
     )
+from loguru import logger
 
 
 class HuggingFaceLocalClient(ChatCompletionClient):
@@ -208,7 +209,7 @@ class HuggingFaceLocalClient(ChatCompletionClient):
                 )
                 return formatted
             except Exception as e:
-                print(f"DEBUG: Chat template failed: {e}, using fallback")
+                logger.debug(f"DEBUG: Chat template failed: {e}, using fallback")
         
         # Fallback to simple formatting
         formatted = []

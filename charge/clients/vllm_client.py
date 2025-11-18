@@ -13,6 +13,7 @@ except ImportError:
     raise ImportError(
         "Please install the required packages: pip install autogen-agentchat openai"
     )
+from loguru import logger
 
 
 class VLLMClient(ChatCompletionClient):

@@ -1,7 +1,7 @@
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 from autogen_core.models import CreateResult, RequestUsage
-import sys
 import json
+from loguru import logger
 
 class ReasoningCaptureClient(OpenAIChatCompletionClient):
     """Wrapper that captures reasoning from raw API responses"""
@@ -13,10 +13,9 @@ class ReasoningCaptureClient(OpenAIChatCompletionClient):
     async def create(self, messages, **kwargs):
         """Intercept the raw API call to capture reasoning_content"""
         
-        sys.stderr.write("\n" + "="*80 + "\n")
-        sys.stderr.write("ReasoningCaptureClient.create() called\n")
-        sys.stderr.write(f"kwargs keys: {kwargs.keys()}\n")
-        sys.stderr.flush()
+        logger.info("\n" + "="*80 + "\n")
+        logger.info("ReasoningCaptureClient.create() called\n")
+        logger.info(f"kwargs keys: {kwargs.keys()}\n")
         
         # The model is passed in the request, extract it from kwargs if present
         # OR get it from the parent class's stored configuration
@@ -24,10 +23,9 @@ class ReasoningCaptureClient(OpenAIChatCompletionClient):
         if not model_name:
             # Try to access parent's model info
             if hasattr(self, '_model_info'):
-                sys.stderr.write(f"Found _model_info\n")
+                logger.info(f"Found _model_info\n")
             # Just call parent - it knows how to handle it
-            sys.stderr.write("Calling parent's create method\n")
-            sys.stderr.flush()
+            logger.info("Calling parent's create method\n")
             
             # Call parent but we need to intercept the actual HTTP response
             # The problem is the parent converts it already
@@ -36,17 +34,16 @@ class ReasoningCaptureClient(OpenAIChatCompletionClient):
         # Actually, let's just call parent and extract from the result
         response = await super().create(messages, **kwargs)
         
-        sys.stderr.write(f"Got response, type: {type(response)}\n")
-        sys.stderr.write(f"Response has thought: {hasattr(response, 'thought')}\n")
+        logger.info(f"Got response, type: {type(response)}\n")
+        logger.info(f"Response has thought: {hasattr(response, 'thought')}\n")
         if hasattr(response, 'thought'):
-            sys.stderr.write(f"Thought value: {response.thought}\n")
+            logger.info(f"Thought value: {response.thought}\n")
             if response.thought:
                 self.reasoning_history.append(response.thought)
-                sys.stderr.write("[CAPTURED REASONING]\n")
-                sys.stderr.write(f"{response.thought}\n")
+                logger.info("[CAPTURED REASONING]\n")
+                logger.info(f"{response.thought}\n")
         
-        sys.stderr.write("="*80 + "\n\n")
-        sys.stderr.flush()
+        logger.info("="*80 + "\n\n")
         
         return response
     
@@ -84,8 +81,7 @@ class ReasoningCapture(logging.Handler):
                             reasoning = message.get("reasoning_content")
                             if reasoning:
                                 self.reasoning_history.append(reasoning)
-                                sys.stderr.write(f"\n[CAPTURED INTERMEDIATE REASONING]\n{reasoning}\n\n")
-                                sys.stderr.flush()
+                                logger.info(f"\n[CAPTURED INTERMEDIATE REASONING]\n{reasoning}\n\n")
             except (json.JSONDecodeError, KeyError):
                 pass
     

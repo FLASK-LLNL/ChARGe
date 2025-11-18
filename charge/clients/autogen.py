@@ -155,7 +155,7 @@ def create_autogen_model_client(
         if reasoning_effort=="high": 
             max_tokens = 16000
         
-        print(f"\n  ==> GPT-OSS reasoning effort: {reasoning_effort}")
+        logger.info(f"\n  ==> GPT-OSS reasoning effort: {reasoning_effort}")
 
         vllm_model_info = ModelInfo(
             vision=False,
@@ -404,7 +404,7 @@ class AutoGenAgent(Agent):
                         else output_callback
                     ),
                 )
-                print("\n" + "-" * 45)
+                logger.info("\n" + "-" * 45)
                 _input = (
                     input_callback()
                     if input_callback is not None
@@ -663,7 +663,7 @@ class AutoGenClient(Client):
                     answer_invalid = True
                     break
             except Exception as e:
-                print(f"Error during verification with {method.__name__}: {e}")
+                logger.error(f"Error during verification with {method.__name__}: {e}")
                 answer_invalid = True
                 break
         return answer_invalid
@@ -689,7 +689,7 @@ class AutoGenClient(Client):
             new_user_prompt = (
                 "The previous response was invalid. Please try again.\n\n" + task
             )
-            # print("Retrying with new prompt...")
+            # logger.info("Retrying with new prompt...")
             result = await agent.run(task=new_user_prompt)
             if isinstance(result.messages[-1], TextMessage):
                 answer_invalid = self.check_invalid_response(
