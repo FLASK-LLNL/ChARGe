@@ -7,11 +7,12 @@
 
 from mcp.server.fastmcp import FastMCP
 from loguru import logger
+from charge.servers.ServerToolkit import ServerToolkit
+
 
 try:
-    from rdkit import Chem
-    from rdkit.Chem import AllChem, Descriptors
-    from rdkit.Contrib.SA_Score import sascorer
+    import charge.servers.SMILES_utils as smiles
+
     HAS_SMILES = True
 except (ImportError, ModuleNotFoundError) as e:
     HAS_SMILES = False
@@ -20,27 +21,43 @@ except (ImportError, ModuleNotFoundError) as e:
         "Install it with: pip install charge[rdkit]",
     )
 
-from charge.servers.server_utils import add_server_arguments
-import argparse
 
-parser = argparse.ArgumentParser()
-add_server_arguments(parser)
-args = parser.parse_args()
+class SMILESServer(ServerToolkit):
+    """
+    A ChARGe server that provides SMILES based tools.
+    """
 
-SMILES_mcp = FastMCP(
-    "[RDKit-SMILES] Chem and BioInformatics MCP Server",
-    port=args.port,
-    website_url=f"{args.host}",
-)
+    def __init__(self, mcp: FastMCP):
+        """
+        Initialize the SMILESServer.
 
-logger.info("[RDKit-SMILES] Starting Chem and BioInformatics MCP Server")
+        Args:
+            mcp (FastMCP): The MCP instance to register the function with.
+        """
+        super().__init__(mcp)
 
-import charge.servers.SMILES_utils as smiles
+        if HAS_SMILES:
+            self.register_function_as_tool(self.mcp, smiles.canonicalize_smiles)
+            self.register_function_as_tool(self.mcp, smiles.verify_smiles)
+            self.register_function_as_tool(self.mcp, smiles.get_synthesizability)
+            self.register_function_as_tool(self.mcp, smiles.known_smiles)
 
-SMILES_mcp.tool()(smiles.canonicalize_smiles)
 
-SMILES_mcp.tool()(smiles.verify_smiles)
+if __name__ == "__main__":
+    from charge.servers.server_utils import add_server_arguments
+    import argparse
 
-SMILES_mcp.tool()(smiles.get_synthesizability)
+    parser = argparse.ArgumentParser()
+    add_server_arguments(parser)
+    args = parser.parse_args()
 
-SMILES_mcp.tool()(smiles.known_smiles)
+    SMILES_mcp = FastMCP(
+        "[RDKit-SMILES] Chem and BioInformatics MCP Server",
+        port=args.port,
+        website_url=f"{args.host}",
+    )
+
+    logger.info("[RDKit-SMILES] Starting Chem and BioInformatics MCP Server")
+
+    sm = SMILESServer(SMILES_mcp)
+    sm.run(transport=args.transport)

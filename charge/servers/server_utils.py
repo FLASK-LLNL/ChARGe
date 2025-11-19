@@ -17,10 +17,11 @@ def add_server_arguments(parser: argparse.ArgumentParser) -> None:
         "--host", type=str, default=None, help="Host to run the server on"
     )
     parser.add_argument(
-        '--transport', type=str,
-        help='MCP transport type',
-        choices=['stdio', 'streamable-http', 'sse'],
-        default='sse'
+        "--transport",
+        type=str,
+        help="MCP transport type",
+        choices=["stdio", "streamable-http", "sse"],
+        default="sse",
     )
 
 
@@ -28,8 +29,10 @@ def update_mcp_network(mcp: FastMCP, host: str, port: str):
     mcp.settings.host = host
     mcp.settings.port = port
 
+
 def get_hostname():
     import socket
+
     hostname = socket.gethostname()
     try:
         host = socket.gethostbyname(hostname)
@@ -37,8 +40,10 @@ def get_hostname():
         host = "127.0.0.1"
     return hostname, host
 
+
 def try_get_public_hostname():
     import socket
+
     hostname = socket.gethostname()
     try:
         public_hostname = hostname + "-pub"
