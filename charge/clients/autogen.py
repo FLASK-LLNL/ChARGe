@@ -167,7 +167,7 @@ class AutoGenAgent(Agent):
         timeout: int = 60,
         backend: Optional[str] = None,
         model_kwargs: Optional[dict] = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         super().__init__(task=task, **kwargs)
         self.max_retries = max_retries

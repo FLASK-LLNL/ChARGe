@@ -1,3 +1,16 @@
+################################################################################
+## Copyright 2025 Lawrence Livermore National Security, LLC. and Binghamton University.
+## See the top-level LICENSE file for details.
+##
+## SPDX-License-Identifier: Apache-2.0
+################################################################################
+
+"""
+This module defines the LMOTask class, which is responsible for generating and validating
+novel small molecules based on a lead molecule. It uses a Large Language Model (LLM)
+to propose molecules that meet specific criteria regarding binding affinity,
+synthesizability, and density.
+"""
 import charge
 from charge.tasks.Task import Task
 from charge.servers import SMILES_utils
@@ -43,7 +56,19 @@ class MoleculeOutputSchema(BaseModel):
 
     @field_validator("smiles_list")
     @classmethod
-    def validate_smiles_list(cls, smiles_list):
+    def validate_smiles_list(cls, smiles_list: List[str]) -> List[str]:
+        """
+        Validate that the input is a list of valid SMILES strings.
+
+        Args:
+            smiles_list (List[str]): The list of SMILES strings to validate.
+
+        Returns:
+            List[str]: The validated list of SMILES strings.
+
+        Raises:
+            ValueError: If the input is not a list, contains non-strings, or contains invalid SMILES.
+        """
         if not isinstance(smiles_list, list):
             raise ValueError("smiles_list must be a list.")
         for smiles in smiles_list:
@@ -54,9 +79,21 @@ class MoleculeOutputSchema(BaseModel):
         return smiles_list
 
     def as_list(self) -> List[str]:
+        """
+        Return the list of SMILES strings.
+
+        Returns:
+            List[str]: The list of SMILES strings.
+        """
         return self.smiles_list
 
     def as_dict(self) -> dict:
+        """
+        Return the object as a dictionary.
+
+        Returns:
+            dict: A dictionary representation of the object.
+        """
         return {
             "reasoning_summary": self.reasoning_summary,
             "smiles_list": self.smiles_list,
@@ -70,6 +107,12 @@ Return your answer as a JSON object matching this schema:
 
 
 class LMOTask(Task):
+    """
+    This class defines the LMOTask, which is responsible for generating and validating
+    novel small molecules based on a lead molecule. It uses a Large Language Model (LLM)
+    to propose molecules that meet specific criteria regarding binding affinity,
+    synthesizability, and density.
+    """
     def __init__(
         self,
         lead_molecule: str,
@@ -108,10 +151,13 @@ class LMOTask(Task):
         Check if the proposed SMILES string is valid.
         If it is valid, checks if its synthesizability score is less than or equal to the lead molecule
         and if its density is greater than or equal to the lead molecule.
+        
         Args:
             smiles (str): The proposed SMILES string.
+        
         Returns:
             bool: True if the proposal is valid and meets the criteria, False otherwise.
+        
         Raises:
             ValueError: If the SMILES string is invalid or does not meet the criteria.
         """
@@ -137,12 +183,16 @@ class LMOTask(Task):
         """
         Check if the proposed SMILES strings are valid and meet the criteria.
         The criteria are:
+
         1. The SMILES must be valid.
+
         2. The synthesizability score must be less than or equal to the lead molecule.
+
         3. The density must be greater than or equal to the lead molecule.
 
         Args:
-            smiles (str): The proposed  list of SMILES strings.
+            smiles_list_as_string (str): The proposed list of SMILES strings as a string.
+        
         Returns:
             bool: True if the proposal is valid and meets the criteria, False otherwise.
 

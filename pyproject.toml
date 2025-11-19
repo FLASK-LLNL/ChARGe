@@ -45,5 +45,13 @@ test = ["pytest", "pytest-asyncio", "pytest-mock", "responses", "httpx", "reques
 
 # Define a set of optional packages for use when deploying persistent data services
 pds = ["charge[aizynthfinder,autogen,rdkit,chemprice]"]
+docs = [
+    "mkdocs",
+    "mkdocstrings[python]",
+    "mkdocs-gen-files",
+    "mkdocs-literate-nav",
+    "mkdocs-section-index",
+    "mkdocs-readthedocs-theme"
+]
 
-all = ["charge[ollama,gemini,autogen,rdkit,flask,aizynthfinder,chemprop,chemprice]"]
+all = ["charge[ollama,gemini,autogen,rdkit,flask,aizynthfinder,chemprop,chemprice,docs]"]

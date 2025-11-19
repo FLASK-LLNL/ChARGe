@@ -2,9 +2,9 @@ import atexit
 import readline
 import inspect
 import asyncio
+from typing import Any
 
-
-def enable_cmd_history_and_shell_integration(history: str):
+def enable_cmd_history_and_shell_integration(history: str) -> None:
     """Enable persistent command-line history and integrate with the interactive shell.
     Attempts to load an existing readline history file, sets the in-memory history
     length to 1000, and registers an atexit handler to persist history on exit.
@@ -28,7 +28,7 @@ def enable_cmd_history_and_shell_integration(history: str):
     atexit.register(readline.write_history_file, history)
 
 
-async def maybe_await_async(var, *args, **kwargs):
+async def maybe_await_async(var: Any, *args: Any, **kwargs: Any) -> Any:
     """Utility function to handle both synchronous and asynchronous callables or values.
     Args:
         var: A value, callable, or awaitable.

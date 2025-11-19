@@ -1,0 +1,30 @@
+```
+################################################################################
+## Copyright 2025 Lawrence Livermore National Security, LLC. and Binghamton University.
+## See the top-level LICENSE file for details.
+##
+## SPDX-License-Identifier: Apache-2.0
+################################################################################
+Copyright (c) 2025, Lawrence Livermore National Security, LLC. and Binghamton University.
+Produced at the Lawrence Livermore National Laboratory and Binghamton University.
+Written by the FLASK Research Team (Shehtab Zaman, Kenneth Chiu, Bhavya Kailkhura,
+Tal Ben-Nun, Brian Van Essen, et al.) listed in the CONTRIBUTORS file.
+
+LLNL-CODE-2006345.
+All rights reserved.
+
+This file is part of FLASK Project: Foundation Learning AI for Synthesis Knowledge.
+For details, see https://github.com/FLASK-LLNL
+
+Licensed under the Apache License, Version 2.0 (the "Licensee"); you
+may not use this file except in compliance with the License.  You may
+obtain a copy of the License at:
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+implied. See the License for the specific language governing
+permissions and limitations under the license.
+```

@@ -27,7 +27,7 @@ def verify_reaction_SMARTS(smarts: str) -> Tuple[bool, str]:
     The bool indicates if the SMARTS is valid, and the str is an error message if it is not.
 
     Args:
-        smiles (str): The input SMILES string.
+        smarts (str): The input SMARTS string.
     Returns:
         A tuple containing:
             bool: True if the SMARTS is valid, False if it is invalid.

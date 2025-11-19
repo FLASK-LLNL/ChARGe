@@ -1,0 +1,36 @@
+site_name: ChARGe
+
+nav:
+  - Home: index.md
+  - About: about.md
+  - Reference: reference/ # The trailing slash tells literate-nav to look inside this directory
+  - LICENSE: LICENSE.md
+plugins:
+  - search
+  - gen-files:
+      scripts:
+        # 1. This is the script that will generate the .md files and the SUMMARY.md
+        -   scripts/gen_ref_pages.py 
+  - literate-nav:
+      # 2. This tells mkdocs-literate-nav where to find the generated nav file
+      nav_file: SUMMARY.md
+  - section-index # 3. Optional, but highly recommended
+  - mkdocstrings:
+      handlers:
+        python:
+          # Optional global settings for the Python handler
+          options:
+            show_root_heading: true
+            docstring_style: google 
+            extra:
+              show_source: false
+              show_members_order: true
+              paths: [.] # IMPORTANT: tell mkdocstrings where to find your package source
+
+theme: 
+  name: readthedocs
+  language: en
+  highlightjs: true
+  hljs_languages:
+    - python
+            

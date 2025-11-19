@@ -27,6 +27,7 @@ def canonicalize_smiles(smiles: str) -> str:
 
     Args:
         smiles (str): The input SMILES string.
+
     Returns:
         str: The canonicalized SMILES string.
     """
@@ -51,6 +52,7 @@ def verify_smiles(smiles: str) -> bool:
 
     Args:
         smiles (str): The input SMILES string.
+
     Returns:
         bool: True if the SMILES is valid, False otherwise.
     """
@@ -81,6 +83,7 @@ def get_synthesizability(smiles: str) -> float:
 
     Args:
         smiles (str): The input SMILES string.
+
     Returns:
         float: The synthesizability score.
     """
@@ -110,6 +113,7 @@ def known_smiles(smiles: str) -> bool:
 
     Args:
         smiles (str): The input SMILES string.
+
     Returns:
         bool: True if the SMILES is known to this MCP server, False otherwise.
     """

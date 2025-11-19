@@ -7,6 +7,13 @@ import textwrap
 def task_to_mcp(class_info, methods_list) -> str:
     """
     Convert an Task class to an MCP server definition string.
+
+    Args:
+        class_info (dict): A dictionary containing information about the class.
+        methods_list (list): A list of methods to be converted to MCP server definition strings.
+    
+    Returns:
+        str: A string representing the MCP server definition.
     """
     return_str = ""
     return_str += "from mcp.server.fastmcp import FastMCP\n"

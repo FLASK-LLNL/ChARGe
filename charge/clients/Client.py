@@ -1,3 +1,9 @@
+################################################################################
+## Copyright 2025 Lawrence Livermore National Security, LLC. and Binghamton University.
+## See the top-level LICENSE file for details.
+##
+## SPDX-License-Identifier: Apache-2.0
+################################################################################
 from typing import Type, Dict, Optional
 from abc import ABC, abstractmethod
 from charge.tasks.Task import Task
@@ -10,11 +16,25 @@ import warnings
 import argparse
 import atexit
 import readline
+from charge.agents.Agent import Agent
+
+
 
 class Client:
+    """Base client class for orchestrating tasks and interacting with MCP servers.
+
+    Subclasses must implement configuration, execution, and interaction methods.
+    """
     def __init__(
         self, task: Task, path: str = ".", max_retries: int = 3
     ):
+        """Initialize the client with a task instance.
+
+        Args:
+            task: The Task object this client will manage.
+            path: Directory path for generated files.
+            max_retries: Maximum number of retry attempts for server communication.
+        """
         self.task = task
         self.path = path
         self.max_retries = max_retries
@@ -24,10 +44,15 @@ class Client:
         self._setup()
 
     def reset(self):
+        """Reset internal message and reasoning traces to start a fresh run."""
         self.messages = []
         self.reasoning_trace = []
 
     def _setup(self):
+        """Inspect the task class and collect verifier methods.
+
+        Populates ``self.verifier_methods`` with methods marked as verifiers.
+        """
         cls_info = inspect_class(self.task)
         methods = inspect.getmembers(self.task, predicate=inspect.ismethod)
         name = cls_info["name"]
@@ -46,6 +71,10 @@ class Client:
         self.verifier_methods = verifier_methods
 
     def setup_mcp_servers(self):
+        """Generate MCP server files for hypothesis and verifier methods.
+
+        Creates Python files containing MCP representations of task methods.
+        """
 
         class_info = inspect_class(self.task)
         name = class_info["name"]
@@ -77,26 +106,53 @@ class Client:
 
     @abstractmethod
     def configure(model: str, backend: str) -> (str, str, str, Dict[str, str]):
+        """Configure the client with model and backend details.
+
+        Returns a tuple of (model, backend, additional_info, config_dict).
+        """
         raise NotImplementedError("Subclasses must implement this method.")
 
     @abstractmethod
     async def run(self):
+        """Execute the full task workflow.
+
+        Subclasses should implement the orchestration logic here.
+        """
         raise NotImplementedError("Subclasses must implement this method.")
 
     @abstractmethod
-    async def step(self, agent, task: str):
+    async def step(self, agent: Agent, task: str):
+        """Perform a single step of the task using the given agent.
+
+        Args:
+            agent: The agent performing the step.
+            task: Description of the task step.
+        """
         raise NotImplementedError("Subclasses must implement this method.")
 
     @abstractmethod
     async def chat(self):
+        """Interactively chat with the orchestrator.
+
+        Subclasses should handle chat I/O.
+        """
         raise NotImplementedError("Subclasses must implement this method.")
 
     @abstractmethod
     async def refine(self, feedback: str):
+        """Refine the task based on feedback.
+
+        Args:
+            feedback: Feedback string to adjust the task execution.
+        """
         raise NotImplementedError("Subclasses must implement this method.")
 
     @staticmethod
     def add_std_parser_arguments(parser: argparse.ArgumentParser):
+        """Utility method to add standard command‑line arguments for the client.
+
+        Populates an ``argparse.ArgumentParser`` with common options.
+        """
         parser.add_argument(
             "--model",
             type=str,

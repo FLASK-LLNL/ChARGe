@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pydantic import BaseModel
-from typing import Type, Union, Optional
+from typing import Type, Union, Optional, Any
 import os
 import os.path as osp
 import warnings
@@ -18,7 +18,7 @@ class Task(ABC):
         server_urls: Optional[Union[str, list]] = None,
         server_files: Optional[Union[str, list]] = None,
         structured_output_schema: Optional[Type[BaseModel]] = None,
-        **kwargs,
+        **kwargs: Any,
     ):
         """
         Base class for defining an task, which is composed of a set of steps:
