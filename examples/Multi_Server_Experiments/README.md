@@ -17,9 +17,9 @@ The STDIO servers will be started automatically by the client.
 ## Running the Multi-Server Client
 Once the SSE server is running, you can start the multi-server client by executing:
 ```bash
-python3 main.py --server_urls <sse_server_1_url> <sse_server_2_url> --backend <backend> --model <model_name>
+python3 main.py --server-urls <sse_server_1_url> <sse_server_2_url> --backend <backend> --model <model_name>
 ```
 
-The `--server_urls` argument can take multiple server URLs (space-separated) that the client will connect to. Each URL must end with `/sse`.
+The `--server-urls` argument can take multiple server URLs (space-separated) that the client will connect to. Each URL must end with `/sse`.
 
 

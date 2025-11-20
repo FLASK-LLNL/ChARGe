@@ -3,7 +3,13 @@
 This experiment focuses on retrosynthesis, where the goal is to determine a synthetic route to a target molecule from simpler starting materials. 
 
 ## Running the Experiment
-To run the experiment, execute the `main.py` script. You can configure the model and server paths as needed.
+To run the experiment, first setup the server:
+
+```bash
+python3 ../../charge/servers/retrosynthesis_reaction_server.py
+```
+
+Then execute the `main.py` script. You can configure the model and server paths as needed.
 
 ```bash
 python main.py --client <client_type> --backend <backend_type> --model <model_name_or_path> --server-path <server_path> --user-prompt "<user_prompt>"

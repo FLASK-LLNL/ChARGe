@@ -5,17 +5,14 @@ description = "ChARGe: Chemistry-tool for Automated Reasoning and Generation"
 authors = []
 license = {file = "LICENSE"}
 readme = "README.md"
-requires-python = ">=3.10"
+# The upper limit of <3.12 is due to AiZynthFinder
+requires-python = ">=3.10, <3.12"
 dependencies = [
     "mcp>=1.10.0",
     "jsonschema>=4.17.3",
     "loguru>=0.7.0",
-    "rdkit>=2025.3.6",
-    "autogen-agentchat>=0.7.5",
-    "autogen-ext>=0.7.5",
-    "openai>=2.1.0",
-    "tiktoken>=0.11.0",
-    "ollama>=0.6.0",
+    "pydantic>=2.10.7",
+    "click",
 ]
 
 [tool.setuptools]
@@ -24,7 +21,12 @@ packages = ["charge"]
 [project.optional-dependencies]
 ollama = ["ollama>=0.5.0"]
 gemini = ["google-genai >=1.19.0"]
-autogen = ["autogen-agentchat>=0.7.0", "autogen-core>=0.7.0", "autogen-ext>=0.7.0", "openai>=2.0.0", "tiktoken>=0.10.0"]
+autogen = ["autogen-agentchat>=0.7.0", "autogen-core>=0.7.0", "autogen-ext>=0.7.0", "openai>=2.0.0", "tiktoken>=0.10.0", "autogen-ext[openai]"]
 rdkit = ["rdkit>=2025.3.6"]
+flask = ["transformers", "peft", "trl", "torch>=2.8.0"]
+# This is the manually identified set of necessary tools for AiZynthFinder 4.4.0 to work with a --no-deps install
+# pip3 install --no-deps aizynthfinder reaction-utils
+aizynthfinder = ["paretoset", "rdchiral", "wrapt_timeout_decorator", "swifter", "apted", "scipy", "onnxruntime", "dask[dataframe]>=2025.9.0", "tables"]
+chemprop = ["chemprop>=2.2.0", "torch>=2.8.0", "lightning"]
 
-all = ["charge[ollama,gemini,autogen,rdkit]"]
+all = ["charge[ollama,gemini,autogen,rdkit,flask,aizynthfinder,chemprop]"]

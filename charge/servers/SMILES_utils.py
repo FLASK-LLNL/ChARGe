@@ -6,6 +6,7 @@
 ################################################################################
 
 from mcp.server.fastmcp import FastMCP
+
 try:
     from rdkit import Chem
     from rdkit.Chem import AllChem, Descriptors
@@ -14,9 +15,6 @@ except ImportError:
     raise ImportError("Please install the rdkit package to use this module.")
 
 from loguru import logger
-import logging
-
-logging.basicConfig(level=logging.DEBUG)
 
 def canonicalize_smiles(smiles: str) -> str:
     """
@@ -33,11 +31,15 @@ def canonicalize_smiles(smiles: str) -> str:
         mol = Chem.MolFromSmiles(smiles)
         return Chem.MolToSmiles(mol)
     except Exception as e:
+        logger.error(f"Error canonicalizing SMILES: {smiles}")
         return "Invalid SMILES"
+
+
 #        return smiles
 
 # Persistent counter to demonstrate statefulness
 SMILES_VERIFICATION_COUNTER = 0
+
 
 def verify_smiles(smiles: str) -> bool:
     """
@@ -54,10 +56,17 @@ def verify_smiles(smiles: str) -> bool:
         logger.info(
             f"Verifying SMILES: {smiles} used {SMILES_VERIFICATION_COUNTER} times"
         )
-        Chem.MolFromSmiles(smiles)
-        return True
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is not None:
+            logger.info(f"SMILES is valid: {smiles}")
+            return True
+        else:
+            logger.error(f"SMILES is invalid: {smiles}")
+            return False
     except Exception as e:
+        logger.error(f"SMILES is invalid: {smiles}")
         return False
+
 
 def get_synthesizability(smiles: str) -> float:
     """
@@ -82,8 +91,10 @@ def get_synthesizability(smiles: str) -> float:
         logger.error(f"Error creating molecule from SMILES: {e}")
         return 10.0
 
+
 database_of_smiles = []
 NUM_HITS = 1
+
 
 def known_smiles(smiles: str) -> bool:
     """
@@ -113,6 +124,3 @@ def known_smiles(smiles: str) -> bool:
 
     except Exception as e:
         return False
-
-
-    

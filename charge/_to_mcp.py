@@ -1,4 +1,4 @@
-from charge.Experiment import Experiment
+from charge.experiments.Experiment import Experiment
 from typing import Type
 import inspect
 import textwrap

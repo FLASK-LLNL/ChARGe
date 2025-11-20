@@ -1,8 +1,23 @@
+################################################################################
+## Copyright 2025 Lawrence Livermore National Security, LLC. and Binghamton University.
+## See the top-level LICENSE file for details.
+##
+## SPDX-License-Identifier: Apache-2.0
+################################################################################
 try:
     from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
-    from autogen_core.models import ModelFamily, ChatCompletionClient
+    from autogen_core.model_context import UnboundedChatCompletionContext
+    from autogen_core.models import (
+        ModelFamily,
+        ChatCompletionClient,
+        LLMMessage,
+        AssistantMessage,
+    )
+    from openai import AsyncOpenAI
+
+    # from autogen_ext.agents.openai import OpenAIAgent
     from autogen_ext.tools.mcp import StdioServerParams, McpWorkbench, SseServerParams
-    from autogen_agentchat.messages import TextMessage
+    from autogen_agentchat.messages import TextMessage, ThoughtEvent
     from autogen_agentchat.conditions import HandoffTermination, TextMentionTermination
     from autogen_agentchat.teams import RoundRobinGroupChat
     from autogen_agentchat.ui import Console
@@ -12,11 +27,14 @@ except ImportError:
         "Please install the autogen-agentchat package to use this module."
     )
 
+import asyncio
 from functools import partial
 import os
 from charge.clients.Client import Client
-from typing import Type, Optional, Dict, Union
-from charge.Experiment import Experiment
+from charge.clients.autogen_utils import generate_agent
+from typing import Type, Optional, Dict, Union, List, Callable
+from charge.experiments.Experiment import Experiment
+from loguru import logger
 
 
 class AutoGenClient(Client):
@@ -27,16 +45,18 @@ class AutoGenClient(Client):
         max_retries: int = 3,
         backend: str = "openai",
         model: str = "gpt-4",
-        model_client: Optional[ChatCompletionClient] = None,
+        model_client: Optional[Union[AsyncOpenAI, ChatCompletionClient]] = None,
         api_key: Optional[str] = None,
         model_info: Optional[dict] = None,
         model_kwargs: Optional[dict] = None,
         server_path: Optional[Union[str, list[str]]] = None,
         server_url: Optional[Union[str, list[str]]] = None,
         server_kwargs: Optional[dict] = None,
-        max_tool_calls: int = 15,
+        max_tool_calls: int = 30,
         check_response: bool = False,
         max_multi_turns: int = 100,
+        mcp_timeout: int = 60,
+        thoughts_callback: Optional[Callable] = None,
     ):
         """Initializes the AutoGenClient.
 
@@ -44,7 +64,7 @@ class AutoGenClient(Client):
             experiment_type (Type[Experiment]): The experiment class to use.
             path (str, optional): Path to save generated MCP server files. Defaults to ".".
             max_retries (int, optional): Maximum number of retries for failed tasks. Defaults to 3.
-            backend (str, optional): Backend to use: "openai", "gemini", "ollama", "livai" or "livchat". Defaults to "openai".
+            backend (str, optional): Backend to use: "openai", "gemini", "ollama", "liveai" or "livchat". Defaults to "openai".
             model (str, optional): Model name to use. Defaults to "gpt-4".
             model_client (Optional[ChatCompletionClient], optional): Pre-initialized model client. If provided, `backend`, `model`, and `api_key` are ignored. Defaults to None.
             api_key (Optional[str], optional): API key for the model. Defaults to None.
@@ -62,6 +82,9 @@ class AutoGenClient(Client):
             check_response (bool, optional): Whether to check the response using verifier methods.
                                              Defaults to False (Will be set to True in the future).
             max_multi_turns (int, optional): Maximum number of multi-turn interactions. Defaults to 100.
+            mcp_timeout (int, optional): Timeout in seconds for MCP server responses. Defaults to 60 s.
+            thoughts_callback (Optional[Callable], optional): Optional callback function to handle model thoughts.
+                                                            Defaults to None.
         Raises:
             ValueError: If neither `server_path` nor `server_url` is provided and MCP servers cannot be generated.
         """
@@ -74,6 +97,8 @@ class AutoGenClient(Client):
         self.max_tool_calls = max_tool_calls
         self.check_response = check_response
         self.max_multi_turns = max_multi_turns
+        self.mcp_timeout = mcp_timeout
+        self.thoughts_callback = thoughts_callback
 
         if model_client is not None:
             self.model_client = model_client
@@ -93,8 +118,6 @@ class AutoGenClient(Client):
                     model_info=model_info,
                 )
             else:
-                from autogen_ext.models.openai import OpenAIChatCompletionClient
-
                 if api_key is None:
                     if backend == "gemini":
                         api_key = os.getenv("GOOGLE_API_KEY")
@@ -103,8 +126,15 @@ class AutoGenClient(Client):
                 assert (
                     api_key is not None
                 ), "API key must be provided for OpenAI or Gemini backend"
-                #os.environ["OPENAI_BASE_URL"] = self.model_kwargs.get("base_url", "")
-                #print("[DEBUG] env OPENAI_BASE_URL =", os.environ.get("OPENAI_BASE_URL"))
+
+                # Disabled due to https://github.com/microsoft/autogen/issues/6937
+                # if backend in ["openai", "livai", "livchat"]:
+                #     self.model_client = AsyncOpenAI(
+                #         **self.model_kwargs,
+                #     )
+                # else:
+                from autogen_ext.models.openai import OpenAIChatCompletionClient
+                
                 self.model_client = OpenAIChatCompletionClient(
                     model=model,
                     api_key=api_key,
@@ -119,18 +149,30 @@ class AutoGenClient(Client):
                 if isinstance(server_path, str):
                     server_path = [server_path]
                 for sp in server_path:
-                    self.servers.append(StdioServerParams(command="python3", args=[sp]))
+                    self.servers.append(
+                        StdioServerParams(
+                            command="python3",
+                            args=[sp],
+                            read_timeout_seconds=self.mcp_timeout,
+                        )
+                    )
             if server_url is not None:
                 if isinstance(server_url, str):
                     server_url = [server_url]
                 for su in server_url:
                     self.servers.append(
-                        SseServerParams(url=su, **(server_kwargs or {}))
+                        SseServerParams(
+                            url=su,
+                            timeout=self.mcp_timeout,
+                            sse_read_timeout=self.mcp_timeout,
+                            **(server_kwargs or {}),
+                        )
                     )
-        self.messages = []
-        #(f"[DEBUG] Using backend={self.backend}, base_url={self.model_kwargs.get('base_url')}")
 
-    def configure(model: Optional[str], backend: str) -> (str, str, str, Dict[str, str]):
+    @staticmethod
+    def configure(
+        model: Optional[str], backend: str
+    ) -> (str, str, str, Dict[str, str]):
         import httpx
 
         kwargs = {}
@@ -139,8 +181,8 @@ class AutoGenClient(Client):
         if backend in ["openai", "gemini", "livai", "livchat"]:
             if backend == "openai":
                 API_KEY = os.getenv("OPENAI_API_KEY")
-                default_model = "gpt-4"
-                kwargs["parallel_tool_calls"] = False
+                default_model = "gpt-5"
+                # kwargs["parallel_tool_calls"] = False
                 kwargs["reasoning_effort"] = "high"
             elif backend == "livai" or backend == "livchat":
                 API_KEY = os.getenv("OPENAI_API_KEY")
@@ -150,12 +192,7 @@ class AutoGenClient(Client):
                 ), "LivAI Base URL must be set in environment variable"
                 default_model = "gpt-4.1"
                 kwargs["base_url"] = BASE_URL
-                kwargs["http_client"] = httpx.AsyncClient(
-                    verify=False,
-                    trust_env=False,
-                    http2=False,
-                    timeout=60,
-                )
+                kwargs["http_client"] = httpx.AsyncClient(verify=False)
             else:
                 API_KEY = os.getenv("GOOGLE_API_KEY")
                 default_model = "gemini-flash-latest"
@@ -217,38 +254,75 @@ class AutoGenClient(Client):
     async def run(self):
         system_prompt = self.experiment_type.get_system_prompt()
         user_prompt = self.experiment_type.get_user_prompt()
+        structured_output_schema = None
+        if self.experiment_type.has_structured_output_schema():
+            structured_output_schema = (
+                self.experiment_type.get_structured_output_schema()
+            )
+
         assert (
             user_prompt is not None
         ), "User prompt must be provided for single-turn run."
 
-        assert (
-            len(self.servers) > 0
-        ), "No MCP servers available. Please provide server_path or server_url."
+        workbenches = [McpWorkbench(server) for server in self.servers]
 
-        wokbenches = [McpWorkbench(server) for server in self.servers]
+        # Report on which tools are available
+        for wb in workbenches:
+            tools = await wb.list_tools()
+            server_params = wb._server_params
+            if isinstance(server_params, SseServerParams):
+                msg = server_params.url
+            elif isinstance(server_params, StdioServerParams):
+                msg = ' '.join(server_params.args)
+            else:
+                msg = "Unknown server params"
+            logger.info(f"Workbench: {msg}")
+            for tool in tools:
+                logger.info(f"\tTool: {tool['name']}")
 
         # Start the servers
-        for workbench in wokbenches:
-            await workbench.start()
 
-        # async with McpWorkbench(self.server) as workbench:
-        #     # TODO: Convert this to use custom agent in the future
-        agent = AssistantAgent(
-            name="Assistant",
-            model_client=self.model_client,
-            system_message=system_prompt,
-            workbench=wokbenches,
-            max_tool_iterations=self.max_tool_calls,
-        )
+        await asyncio.gather(*[workbench.start() for workbench in workbenches])
 
-        answer_invalid, result = await self.step(agent, user_prompt)
+        try:
+            agent = generate_agent(
+                self.model_client,
+                self.model,
+                system_prompt,
+                workbenches,
+                self.max_tool_calls,
+                self.thoughts_callback,
+            )
+            answer_invalid, result = await self.step(agent, user_prompt)
 
-        for workbench in wokbenches:
-            await workbench.stop()
+        finally:
+
+            await asyncio.gather(*[workbench.stop() for workbench in workbenches])
 
         if answer_invalid:
+            # Maybe convert this to a warning and let the user handle it
+            # warnings.warn("Failed to get a valid response after maximum retries.")
+            # return None
             raise ValueError("Failed to get a valid response after maximum retries.")
         else:
+            if structured_output_schema is not None:
+                # Parse the output using the structured output schema
+                assert isinstance(result.messages[-1], TextMessage)
+                content = result.messages[-1].content
+                try:
+                    parsed_output = structured_output_schema.model_validate_json(
+                        content
+                    )
+                    return parsed_output
+                except Exception as e:
+                    # warnings.warn(f"Failed to parse output: {e}")
+                    # return result.messages[-1].content
+
+                    # We could also potentially reprompt the model to fix the output
+                    # but for now, we just raise an error
+                    raise ValueError(f"Failed to parse output: {e}")
+            # gracefully close the
+            await agent.close()
             return result.messages[-1].content
 
     async def chat(self):
@@ -268,14 +342,8 @@ class AutoGenClient(Client):
         for workbench in wokbenches:
             await workbench.start()
 
-        # TODO: Convert this to use custom agent in the future
-        agent = AssistantAgent(
-            name="Assistant",
-            model_client=self.model_client,
-            system_message=system_prompt,
-            workbench=workbench,
-            max_tool_iterations=self.max_tool_calls,
-            reflect_on_tool_use=True,
+        agent = generate_agent(
+            self.model_client, self.model, system_prompt, [], self.max_tool_calls
         )
 
         user = UserProxyAgent("USER", input_func=input)

@@ -1,6 +1,6 @@
 from typing import Type, Dict, Optional
 from abc import ABC, abstractmethod
-from charge.Experiment import Experiment
+from charge.experiments.Experiment import Experiment
 from charge._tags import is_verifier, is_hypothesis
 from charge.inspector import inspect_class
 import inspect
@@ -8,7 +8,8 @@ import os
 from charge._to_mcp import experiment_to_mcp
 import warnings
 import argparse
-
+import atexit
+import readline
 
 class Client:
     def __init__(
@@ -19,7 +20,12 @@ class Client:
         self.max_retries = max_retries
         self.servers = []
         self.messages = []
+        self.reasoning_trace = []
         self._setup()
+
+    def reset(self):
+        self.messages = []
+        self.reasoning_trace = []
 
     def _setup(self):
         cls_info = inspect_class(self.experiment_type)
@@ -89,6 +95,7 @@ class Client:
     async def refine(self, feedback: str):
         raise NotImplementedError("Subclasses must implement this method.")
 
+    @staticmethod
     def add_std_parser_arguments(parser: argparse.ArgumentParser):
         parser.add_argument(
             "--model",
@@ -110,5 +117,17 @@ class Client:
             help="Backend to use for the orchestrator client",
         )
         parser.add_argument(
-            "--server-urls", nargs="*", type=str, default="http://127.0.0.1:8000/sse"
+            "--server-urls", nargs="*", type=str, default=["http://127.0.0.1:8000/sse"]
         )
+        parser.add_argument(
+            "--history", action="store", type=str, default=".charge-chat-client-history"
+        )
+
+    def enable_cmd_history_and_shell_integration(history: str):
+        try:
+            readline.read_history_file(history)
+            readline.set_history_length(1000)
+        except FileNotFoundError:
+            pass
+
+        atexit.register(readline.write_history_file, history)

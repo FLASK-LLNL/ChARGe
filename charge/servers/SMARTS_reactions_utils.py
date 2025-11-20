@@ -13,10 +13,7 @@ except ImportError:
     raise ImportError("Please install the rdkit package to use this module.")
 
 from loguru import logger
-import logging
 from typing import Tuple
-
-logging.basicConfig(level=logging.DEBUG)
 
 def verify_reaction_SMARTS(smarts: str) -> Tuple[bool, str]:
     """
