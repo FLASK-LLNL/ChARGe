@@ -21,6 +21,7 @@ except (ImportError, ModuleNotFoundError) as e:
 from charge.servers.SMILES_utils import get_synthesizability
 from charge.servers.get_chemprop2_preds import predict_with_chemprop
 from charge.servers.molecule_pricer import get_chemspace_prices
+from charge.servers.nnp_predictor import compute_band_gap
 import sys
 import os
 
@@ -175,3 +176,27 @@ def get_molecule_price(smiles):
         raise ImportError("Please install the rdkit support packages to use this module.")
     price=get_chemspace_prices([smiles])
     return(price[0])    
+
+def get_gap(smiles: str) -> float:
+    """
+    Retrieve HOMO-LUMO band gap for the molecule specified by the SMILES string, smiles.
+
+    Parameters
+    ----------
+    smiles : str
+        A SMILES string for the molecule of interest.
+
+    Returns
+    -------
+    float
+        Returns float representing the HOMO-LUMO band gap of the given SMILES string.
+
+    Examples
+    --------
+    >>> get_gap("O=CCOC=O")
+    0.2217
+    """
+
+    if not HAS_RDKIT:
+        raise ImportError("Please install the rdkit support packages to use this module.")
+    return compute_band_gap(smiles)
