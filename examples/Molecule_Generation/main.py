@@ -1,7 +1,7 @@
 import argparse
 import asyncio
 import time
-from charge.experiments.LMOExperiment import LMOExperiment as LeadMoleculeOptimization
+from charge.tasks.LMOTask import LMOTask as LeadMoleculeOptimization
 import os
 from charge.clients.Client import Client
 import charge.utils.helper_funcs as helper_funcs
@@ -30,7 +30,7 @@ parser.add_argument(
     "--max_iterations",
     type=int,
     default=5,
-    help="Maximum number of iterations to run the experiment.",
+    help="Maximum number of iterations to run the task.",
 )
 
 # Add standard CLI arguments
@@ -41,7 +41,7 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
 
-    myexperiment = LeadMoleculeOptimization(lead_molecule=args.lead_molecule)
+    mytask = LeadMoleculeOptimization(lead_molecule=args.lead_molecule)
     server_path = args.server_path
     server_urls = args.server_urls
     assert server_urls is not None, "Server URLs must be provided"
@@ -53,7 +53,7 @@ if __name__ == "__main__":
 
         client_key = os.getenv("GOOGLE_API_KEY")
         assert client_key is not None, "GOOGLE_API_KEY must be set in environment"
-        runner = GeminiClient(experiment_type=myexperiment, api_key=client_key)
+        runner = GeminiClient(task=mytask, api_key=client_key)
     elif args.client == "autogen":
         from charge.clients.autogen import AutoGenClient
 
@@ -62,7 +62,7 @@ if __name__ == "__main__":
         )
 
         runner = AutoGenClient(
-            experiment_type=myexperiment,
+            task=mytask,
             model=model,
             backend=backend,
             api_key=API_KEY,
@@ -74,7 +74,7 @@ if __name__ == "__main__":
     mol_file_path = args.json_file
 
     lead_molecule_smiles = args.lead_molecule
-    logger.info(f"Starting experiment with lead molecule: {lead_molecule_smiles}")
+    logger.info(f"Starting task with lead molecule: {lead_molecule_smiles}")
     parent_id = 0
     node_id = 0
     lead_molecule_data = helper_funcs.post_process_smiles(
@@ -87,7 +87,7 @@ if __name__ == "__main__":
     )
     logger.info(f"Storing found molecules in {mol_file_path}")
 
-    # Run the experiment in a loop
+    # Run the task in a loop
     new_molecules = helper_funcs.get_list_from_json_file(
         file_path=mol_file_path
     )  # Start with known molecules
@@ -100,7 +100,7 @@ if __name__ == "__main__":
         try:
             iteration += 1
             if iteration >= max_iterations:
-                logger.info("Reached maximum iterations. Ending experiment.")
+                logger.info("Reached maximum iterations. Ending task.")
                 break
             results = asyncio.run(runner.run())
             results = results.as_list()  # Convert to list of strings
@@ -137,12 +137,12 @@ if __name__ == "__main__":
             if len(new_molecules) >= 5:  # Collect 5 new molecules then stop
                 break
         except KeyboardInterrupt:
-            logger.info("Experiment interrupted by user.")
+            logger.info("Task interrupted by user.")
             break
         except Exception as e:
             logger.error(f"An error occurred: {e}")
-            logger.info("Restarting the experiment...")
+            logger.info("Restarting the task...")
             runner.reset()
             continue
 
-    logger.info(f"Experiment completed. Results: {new_molecules}")
+    logger.info(f"Task completed. Results: {new_molecules}")

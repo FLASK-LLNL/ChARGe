@@ -1,12 +1,12 @@
 import argparse
 import asyncio
-from charge.experiments.Experiment import Experiment
+from charge.tasks.Task import Task
 from charge.clients.Client import Client
 from charge.clients.autogen import AutoGenClient
 from charge.servers.AiZynthTools import find_synthesis_routes
 from charge.servers.log_progress import LOG_PROGRESS_SYSTEM_PROMPT
 
-class AiZynthFinderExperiment(Experiment):
+class AiZynthFinderTask(Task):
     def __init__(self, lead_molecule: str):
         system_prompt = "You are a world-class chemist. Your task is to perform retrosynthesis for a target molecule." + LOG_PROGRESS_SYSTEM_PROMPT
 
@@ -32,7 +32,7 @@ def main():
 
     (model, backend, API_KEY, kwargs) = AutoGenClient.configure(args.model, args.backend)
     runner = AutoGenClient(
-        experiment_type=AiZynthFinderExperiment(lead_molecule=args.lead_molecule),
+        task=AiZynthFinderTask(lead_molecule=args.lead_molecule),
         backend=backend,
         model=model,
         api_key=API_KEY,
@@ -40,7 +40,7 @@ def main():
         server_url=args.server_urls,
     )
     results = asyncio.run(runner.run())
-    print(f"[{model} orchestrated] Experiment completed. Results: {results}")
+    print(f"[{model} orchestrated] Task completed. Results: {results}")
 
 
 if __name__ == "__main__":

@@ -1,46 +1,106 @@
-from abc import ABC, abstractmethod
-from pydantic import BaseModel
-from typing import Type
+from abc import abstractmethod
+from typing import Any, List, Union, Optional
+from charge.tasks.Task import Task
+from charge.clients.AgentPool import Agent, AgentPool
+from charge._utils import maybe_await_async
+import asyncio
 
 
-class Experiment(ABC):
-
+class Experiment(object):
     def __init__(
         self,
-        system_prompt=None,
-        user_prompt=None,
-        verification_prompt=None,
-        refinement_prompt=None,
+        task: Optional[Union[Task, List[Task]]],
+        agent_pool: AgentPool,
+        *args,
         **kwargs,
     ):
-        self.system_prompt = system_prompt
-        self.user_prompt = user_prompt
-        self.verification_prompt = verification_prompt
-        self.refinement_prompt = refinement_prompt
-        for key, value in kwargs.items():
-            if hasattr(self, key):
-                raise ValueError(f"Attribute {key} already exists in Experiment class.")
-            setattr(self, key, value)
-        self.constructor_args = {}
+        if task is None:
+            task = []
+        self.tasks = task if isinstance(task, list) else [task]
+        self.finished_tasks = []
 
-    def get_system_prompt(self) -> str:
-        return self.system_prompt or ""
+        self.agent_pool = agent_pool
+        self.args = args
+        self.kwargs = kwargs
 
-    def get_user_prompt(self) -> str:
-        return self.user_prompt or ""
+    @abstractmethod
+    def create_agent_with_experiment_state(self, task, **kwargs):
+        # Create an agent that incorporates the experiment state
 
-    def register_buffer(self, name: str, value: str):
-        self.constructor_args[name] = value
+        # Default implementation is no context is shared across agents
+        return self.agent_pool.create_agent(task=task, **kwargs)
 
-    def get_structured_output_schema(self):
-        assert (
-            self.has_structured_output_schema()
-        ), "structured_output_schema not implemented"
+    @abstractmethod
+    def save_agent_state(self, agent):
+        # Save the state of the agent
+        raise NotImplementedError("Subclasses must implement save_agent_state method")
 
-        return self.structured_output_schema  # type: ignore
+    @abstractmethod
+    def save_agent_state_async(self, agent):
+        # Save the state of the agent
+        raise NotImplementedError("Subclasses must implement save_agent_state method")
 
-    def set_structured_output_schema(self, schema: Type[BaseModel]):
-        self.structured_output_schema = schema
+    @abstractmethod
+    def add_to_context(self, agent: Agent, task: Task, result):
+        # Add the result to the context of the task
+        raise NotImplementedError("Subclasses must implement add_to_context method")
 
-    def has_structured_output_schema(self) -> bool:
-        return hasattr(self, "structured_output_schema")
+    @abstractmethod
+    def save_state(self):
+        # Save the state of the experiment
+        raise NotImplementedError("Subclasses must implement save_state method")
+
+    @abstractmethod
+    def load_state(self, state):
+        # Load the state of the experiment
+        raise NotImplementedError("Subclasses must implement load_state method")
+
+    def num_finished_tasks(self) -> int:
+        """Returns the number of finished tasks.
+
+        Returns:
+            int: Number of finished tasks.
+        """
+        return len(self.finished_tasks)
+
+    def remaining_tasks(self) -> int:
+        """Returns the number of remaining tasks.
+
+        Returns:
+            int: Number of remaining tasks.
+        """
+        return len(self.tasks)
+
+    def add_task(self, task: Task):
+        """Adds a new task to the experiment.
+        Args:
+            task (Task): The task to be added.
+        """
+        self.tasks.append(task)
+
+    def get_finished_tasks(self) -> List[Any]:
+        """Returns the list of finished tasks.
+
+        Returns:
+            List[Any]: List of finished tasks.
+        """
+        return self.finished_tasks
+
+    async def run_async(self, **kwargs) -> None:
+        while self.tasks:
+            current_task = self.tasks.pop(0)
+            agent = self.create_agent_with_experiment_state(task=current_task, **kwargs)
+            result = await maybe_await_async(agent.run)
+            await maybe_await_async(self.add_to_context, agent, current_task, result)
+            self.finished_tasks.append((current_task, result))
+            self.save_agent_state(agent)
+
+    def run(self) -> None:
+        asyncio.run(self.run_async())
+
+    def reset(self):
+        """
+        Resets the experiment state.
+        """
+        self.finished_tasks = []
+        self.agent_pool.reset()

@@ -1,4 +1,7 @@
 from __future__ import annotations
+import logging
+from loguru import logger
+
 try:
     import click
     import torch
@@ -6,8 +9,13 @@ try:
     from lightning import pytorch as pl
     from chemprop import data, models, featurizers
     from chemprop.models import MPNN
-except ImportError:
-    raise ImportError("Please install the chemprop package to use this module.")
+    HAS_CHEMPROP = True
+except (ImportError, ModuleNotFoundError) as e:
+    HAS_CHEMPROP = False
+    logger.warning(
+        "Please install the chemprop support packages to use this module."
+        "Install it with: pip install charge[chemprop]",
+    )
 from typing import List
 import numpy as np
 import os, sys
@@ -38,6 +46,9 @@ def predict_with_chemprop(
     List[List[float]]
         Predictions: for each input SMILES, a list of output values (one per task).
     """
+    if not HAS_CHEMPROP:
+        raise ImportError("Please install the chemprop support packages to use this module.")
+
     # Load model
     mpnn=MPNN.load_from_file(checkpoint_path)
     #model = model.to(device)
@@ -62,6 +73,9 @@ def predict_with_chemprop(
 @click.option("--model-dir", envvar="CHEMPROP_BASE_PATH", help="Path to chemprop model")
 @click.option("--device", envvar="CHEMPROP_SERVER_DEVICE", default="cpu", help="Device to use for the chemprop server: cpu, cuda")
 def main(model_dir: str, device: str):
+    if not HAS_CHEMPROP:
+        raise ImportError("Please install the chemprop support packages to use this module.")
+
     chemprop_base_path=model_dir
     if(chemprop_base_path):
         ckpt = os.path.join(chemprop_base_path, "gap/model_0/best.pt")

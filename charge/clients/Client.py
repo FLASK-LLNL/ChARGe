@@ -1,11 +1,11 @@
 from typing import Type, Dict, Optional
 from abc import ABC, abstractmethod
-from charge.experiments.Experiment import Experiment
+from charge.tasks.Task import Task
 from charge._tags import is_verifier, is_hypothesis
 from charge.inspector import inspect_class
 import inspect
 import os
-from charge._to_mcp import experiment_to_mcp
+from charge._to_mcp import task_to_mcp
 import warnings
 import argparse
 import atexit
@@ -13,9 +13,9 @@ import readline
 
 class Client:
     def __init__(
-        self, experiment_type: Experiment, path: str = ".", max_retries: int = 3
+        self, task: Task, path: str = ".", max_retries: int = 3
     ):
-        self.experiment_type = experiment_type
+        self.task = task
         self.path = path
         self.max_retries = max_retries
         self.servers = []
@@ -28,8 +28,8 @@ class Client:
         self.reasoning_trace = []
 
     def _setup(self):
-        cls_info = inspect_class(self.experiment_type)
-        methods = inspect.getmembers(self.experiment_type, predicate=inspect.ismethod)
+        cls_info = inspect_class(self.task)
+        methods = inspect.getmembers(self.task, predicate=inspect.ismethod)
         name = cls_info["name"]
 
         verifier_methods = []
@@ -38,7 +38,7 @@ class Client:
                 verifier_methods.append(method)
         if len(verifier_methods) < 1:
             warnings.warn(
-                f"Experiment class {name} has no verifier methods. "
+                f"Task class {name} has no verifier methods. "
                 + "It's recommended to have at least one verifier method."
                 + "Automatic verification will fail without any verifier methods."
             )
@@ -47,10 +47,10 @@ class Client:
 
     def setup_mcp_servers(self):
 
-        class_info = inspect_class(self.experiment_type)
+        class_info = inspect_class(self.task)
         name = class_info["name"]
 
-        methods = inspect.getmembers(self.experiment_type, predicate=inspect.ismethod)
+        methods = inspect.getmembers(self.task, predicate=inspect.ismethod)
 
         verifier_methods = []
         hypothesis_methods = []
@@ -61,18 +61,18 @@ class Client:
                 hypothesis_methods.append(method)
         if len(verifier_methods) < 1:
             raise ValueError(
-                f"Experiment class {name} must have at least one verifier method."
+                f"Task class {name} must have at least one verifier method."
             )
         if len(hypothesis_methods) > 1:
             filename = os.path.join(self.path, f"{name}_hypotheses.py")
             with open(filename, "w") as f:
-                f.write(experiment_to_mcp(class_info, hypothesis_methods))
+                f.write(task_to_mcp(class_info, hypothesis_methods))
             self.hypothesis_server_path = filename
 
         # Not used but generated for future
         # verifier_filename = os.path.join(self.path, f"{name}_verifiers.py")
         # with open(verifier_filename, "w") as f:
-        #     f.write(experiment_to_mcp(class_info, verifier_methods))
+        #     f.write(task_to_mcp(class_info, verifier_methods))
         # self.verifier_server_path = verifier_filename
 
     @abstractmethod
@@ -122,12 +122,3 @@ class Client:
         parser.add_argument(
             "--history", action="store", type=str, default=".charge-chat-client-history"
         )
-
-    def enable_cmd_history_and_shell_integration(history: str):
-        try:
-            readline.read_history_file(history)
-            readline.set_history_length(1000)
-        except FileNotFoundError:
-            pass
-
-        atexit.register(readline.write_history_file, history)
