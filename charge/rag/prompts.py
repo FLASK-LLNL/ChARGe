@@ -41,11 +41,15 @@ class ReactionDataPrompt:
 class ReactionDataPrompt_RAG(ReactionDataPrompt):
     def __init__(self, forward: bool) -> None:
         super().__init__(forward=forward)
-        self.sections['instruction'] = (
-            "Given the input data in [INPUT DATA], a list of similar reactions is provided in [SIMILAR REACTIONS].\n"
-            "Consider these similar reactions and make you prediction, which must follow [OUTPUT FORMAT]."
-        )
-        self.sections['similar reactions'] = ''
+        self.sections['instruction'] = ''.join([
+            "You are given a data table in [DATA TABLE]. In this table, each row/line consists of two columns: \n",
+            "(1) reaction data input,\n",
+            "(2) ground truth output retrieved from a database.\n",
+            "In one line the ground truth output is missing as denoted by '???'. ",
+            "Make several predictions (e.g., 3 to 5 different predictions) for this missing value. ",
+            "Your predictions must follow [OUTPUT FORMAT]. ",
+            "Observe the pattern in the table as guidance for your predictions.",
+        ])
 
 
 class ReactionDataPrompt_RAGv2(ReactionDataPrompt):
