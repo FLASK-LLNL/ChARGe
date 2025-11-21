@@ -51,7 +51,7 @@ from loguru import logger
 def model_configure(
     backend: str,
     model: Optional[str] = None,
-    API_KEY: Optional[str] = None,
+    api_key: Optional[str] = None,
     base_url: Optional[str] = None,
 ) -> Tuple[str, str, Optional[str], Dict[str, str]]:
     import httpx
@@ -60,14 +60,14 @@ def model_configure(
     default_model = None
     if backend in ["openai", "gemini", "livai", "livchat"]:
         if backend == "openai":
-            if not API_KEY:
-                API_KEY = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                api_key = os.getenv("OPENAI_API_KEY")
             default_model = "gpt-5"
             # kwargs["parallel_tool_calls"] = False
             kwargs["reasoning_effort"] = "high"
         elif backend == "livai" or backend == "livchat":
-            if not API_KEY:
-                API_KEY = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                api_key = os.getenv("OPENAI_API_KEY")
             BASE_URL = os.getenv("LIVAI_BASE_URL")
             assert (
                 BASE_URL is not None
@@ -76,19 +76,19 @@ def model_configure(
             kwargs["base_url"] = BASE_URL
             kwargs["http_client"] = httpx.AsyncClient(verify=False)
         else:
-            if not API_KEY:
-                API_KEY = os.getenv("GOOGLE_API_KEY")
+            if not api_key:
+                api_key = os.getenv("GOOGLE_API_KEY")
             default_model = "gemini-flash-latest"
             kwargs["parallel_tool_calls"] = False
             kwargs["reasoning_effort"] = "high"
-        assert API_KEY is not None, f"API key must be set for backend {backend}"
+        assert api_key is not None, f"API key must be set for backend {backend}"
     elif backend in ["ollama"]:
         default_model = "gpt-oss:latest"
 
     if not model:
         model = default_model
     assert model is not None, "Model name must be provided."
-    return (model, backend, API_KEY, kwargs)
+    return (model, backend, api_key, kwargs)
 
 
 def create_autogen_model_client(
@@ -602,7 +602,7 @@ class AutoGenPool(AgentPool):
             ), "Backend must be provided if model_client is not given."
 
             model, backend, api_key, model_kwargs = model_configure(
-                model=model, backend=backend, API_KEY=api_key, base_url=base_url
+                model=model, backend=backend, api_key=api_key, base_url=base_url
             )
             self.model_client = create_autogen_model_client(
                 backend=backend, model=model, api_key=api_key, model_kwargs=model_kwargs
