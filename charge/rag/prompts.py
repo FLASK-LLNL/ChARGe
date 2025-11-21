@@ -10,8 +10,10 @@ class ReactionDataPrompt:
         self.sections = dict()
         self.sections['role'] = 'You are an expert chemist.'
         self.sections['task'] = 'Forward synthesis prediction' if forward else 'Retrosynthesis prediction'
-        self.sections['instruction'] = \
-            "Given the input data in [INPUT DATA], perform your task and make your predictions, which must follow [OUTPUT FORMAT]."
+        self.sections['instruction'] = ''.join([
+            "Given the input data in [INPUT DATA], perform your task and make several predictions (e.g., 3 to 5 different predictions), ",
+            "which must follow [OUTPUT FORMAT]."
+        ])
         self.sections['output format'] = ''.join([
             "Each prediction must be a JSON string on a newline, formatted as: ",
             '{\"products\": [...]}' if forward else '{\"reactants\": [...], \"agents\": [...], \"solvents\": [...]}',
