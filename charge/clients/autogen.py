@@ -62,23 +62,28 @@ def model_configure(
         if backend == "openai":
             if not api_key:
                 api_key = os.getenv("OPENAI_API_KEY")
+            if not base_url:
+                kwargs["base_url"] = base_url
             default_model = "gpt-5"
             # kwargs["parallel_tool_calls"] = False
             kwargs["reasoning_effort"] = "high"
         elif backend == "livai" or backend == "livchat":
             if not api_key:
                 api_key = os.getenv("OPENAI_API_KEY")
-            BASE_URL = os.getenv("LIVAI_BASE_URL")
-            assert (
-                BASE_URL is not None
-            ), "LivAI Base URL must be set in environment variable"
+            if not base_url:
+                base_url = os.getenv("LIVAI_BASE_URL")
+                assert (
+                    base_url is not None
+                ), "LivAI Base URL must be set in environment variable"
             default_model = "gpt-4.1"
-            kwargs["base_url"] = BASE_URL
+            kwargs["base_url"] = base_url
             kwargs["http_client"] = httpx.AsyncClient(verify=False)
         else:
             if not api_key:
                 api_key = os.getenv("GOOGLE_API_KEY")
             default_model = "gemini-flash-latest"
+            if not base_url:
+                kwargs["base_url"] = base_url
             kwargs["parallel_tool_calls"] = False
             kwargs["reasoning_effort"] = "high"
         assert api_key is not None, f"API key must be set for backend {backend}"
