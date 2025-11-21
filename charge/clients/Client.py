@@ -96,17 +96,18 @@ class Client:
         raise NotImplementedError("Subclasses must implement this method.")
 
     @staticmethod
-    def add_std_parser_arguments(parser: argparse.ArgumentParser):
+    def add_std_parser_arguments(parser: argparse.ArgumentParser, defaults: Optional[Dict[str, str]] = None):
+        defaults = defaults or {}
         parser.add_argument(
             "--model",
             type=str,
-            default=None,
+            default=defaults.get("model", None),
             help="Model to use for the orchestrator",
         )
         parser.add_argument(
             "--backend",
             type=str,
-            default="ollama",
+            default=defaults.get("backend", "ollama"),
             choices=[
                 "ollama",
                 "openai",
