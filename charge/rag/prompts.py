@@ -38,6 +38,17 @@ class ReactionDataPrompt:
         return f'{self.__class__.__name__}({sections_str})'
 
 
+class ReactionDataPrompt_ExpertOnly(ReactionDataPrompt):
+    def __init__(self, forward: bool) -> None:
+        super().__init__(forward=forward)
+        self.sections['instruction'] = ''.join([
+            "Given the input data in [INPUT DATA], a predicted output is provided in [EXPERT PREDICTION], ",
+            "which is based on an expert chemical reaction model. ",
+            "Consider this expert prediction and make your own predictions (e.g., 3 to 5 different predictions). ",
+            "Your predictions must follow [OUTPUT FORMAT].",
+        ])
+
+
 class ReactionDataPrompt_RAG(ReactionDataPrompt):
     def __init__(self, forward: bool) -> None:
         super().__init__(forward=forward)
