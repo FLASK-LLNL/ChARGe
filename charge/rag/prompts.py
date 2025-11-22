@@ -99,3 +99,41 @@ class ReactionDataPrompt_RAGv3(ReactionDataPrompt):
             "Observe the pattern in the table and the expert predictions as guidance. ",
             "Note that the expert predictions may or may not be biased.",
         ])
+
+
+class ReactionDataPrompt_RAGv4(ReactionDataPrompt):
+    """
+    RAGv4 builds on RAGv3 by:
+      - Adding a per-row Neighbor Distance column in [DATA TABLE]
+      - Defining Neighbor Distance explicitly as the distance between each row's input and the target row's input
+      - Including that definition directly within the instruction text
+      - Maintaining backward compatibility with previous output formats
+    """
+    def __init__(self, forward: bool) -> None:
+        super().__init__(forward=forward)
+
+        neighbor_distance_definition = (
+            "The Neighbor Distance is a non-negative value representing the distance between this row's input "
+            "and the target row's input (the row with '???'). Smaller distances indicate greater similarity, "
+            "and 0 represents the closest possible match under the chosen similarity metric."
+        )
+
+        self.sections['instruction'] = ''.join([
+            "You are given a data table in [DATA TABLE]. Each row has four columns:\n",
+            "(1) reaction data input,\n",
+            "(2) ground truth output retrieved from a database,\n",
+            "(3) predicted output from an expert chemical reaction model,\n",
+            "(4) Neighbor Distance between this row's input and the input in the final row (the row with '???').\n",
+            "Exactly one row has the ground truth output missing, denoted by '???'. ",
+            "Make several predictions (e.g., 3 to 5 different predictions) for this missing value. ",
+            "Your predictions must follow [OUTPUT FORMAT]. ",
+            "Use the expert predictions and the examples in the table as guidance, but note that expert predictions may be biased. ",
+            "Use the Neighbor Distance column to prioritize the most relevant rows when inferring patterns.\n\n",
+            f"{neighbor_distance_definition}\n\n",
+            "Guidelines for using the table:\n",
+            "- Treat smaller Neighbor Distances as stronger evidence; 0 represents the closest possible match under the similarity metric.\n",
+            "- Favor patterns that recur among multiple rows with small Neighbor Distances.\n",
+            "- Cross-check expert predictions against nearby (low-distance) ground truths to detect and correct biases.\n",
+            "- If no directly consistent pattern is found, synthesize a corrected or hybrid prediction using nearest-neighbor ground truths, ",
+            "chemical reasoning, and your expertise.",
+        ])
