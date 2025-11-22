@@ -35,9 +35,9 @@ class FaissDataRetriever:
             data = [json.loads(line) for line in f]
         return data
 
-    def search_similar(self, query: ndarray, k: int) -> tuple[list[list[int]], list[list[Any]]]:
+    def search_similar(self, query: ndarray, k: int) -> tuple[list[list[float]], list[list[int]], list[list[Any]]]:
         D, I = self.faiss_index.search(query, k)
         similar = []
         for row in I:
             similar.append([self.data[i] for i in row])
-        return I.tolist(), similar
+        return D.tolist(), I.tolist(), similar
