@@ -54,6 +54,11 @@ def model_configure(
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
 ) -> Tuple[str, str, Optional[str], Dict[str, str]]:
+    """
+    Raises:
+        ValueError: If API key does not exist and is needed.
+
+    """
     import httpx
 
     kwargs = {}
@@ -86,7 +91,8 @@ def model_configure(
                 kwargs["base_url"] = base_url
             kwargs["parallel_tool_calls"] = False
             kwargs["reasoning_effort"] = "high"
-        assert api_key is not None, f"API key must be set for backend {backend}"
+        if api_key is None:
+            raise ValueError(f"API key must be set for backend {backend}")
     elif backend in ["ollama"]:
         default_model = "gpt-oss:latest"
 
