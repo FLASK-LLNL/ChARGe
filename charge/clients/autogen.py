@@ -69,7 +69,7 @@ def model_configure(
             kwargs["reasoning_effort"] = "high"
         elif backend == "livai" or backend == "livchat":
             if not api_key:
-                api_key = os.getenv("OPENAI_API_KEY")
+                api_key = os.getenv("LIVAI_API_KEY")
             if not base_url:
                 base_url = os.getenv("LIVAI_BASE_URL")
                 assert (
