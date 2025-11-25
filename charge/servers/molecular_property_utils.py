@@ -19,8 +19,6 @@ except (ImportError, ModuleNotFoundError) as e:
     )
 
 from charge.servers.SMILES_utils import get_synthesizability
-from charge.servers.get_chemprop2_preds import predict_with_chemprop
-from charge.servers.molecule_pricer import get_chemspace_prices
 import sys
 import os
 
@@ -134,6 +132,11 @@ def chemprop_preds_server(smiles: str,property:str) -> float:
     >>> chemprop_preds_server("c1ccccc1", "lipo")
     2.94
     """
+    try:
+        from charge.servers.get_chemprop2_preds import predict_with_chemprop
+    except Exception as e:
+        logger.warning("Please install the chemprop support packages to use this module.")
+        return 0.0
 
     if not HAS_RDKIT:
         raise ImportError("Please install the rdkit support packages to use this module.")
@@ -170,8 +173,14 @@ def get_molecule_price(smiles):
     >>> get_molecule_price("CCO")
     0.1056
     """
+    try:
+        from charge.servers.molecule_pricer import get_chemspace_prices
+    except Exception as e:
+        logger.warning("Please install the chemprice support packages to use this module.")
+        return 0.0
 
     if not HAS_RDKIT:
         raise ImportError("Please install the rdkit support packages to use this module.")
+
     price=get_chemspace_prices([smiles])
     return(price[0])    

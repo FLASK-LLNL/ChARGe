@@ -37,6 +37,40 @@ from loguru import logger
 from pydantic import BaseModel
 import json
 
+_POSSIBLE_CONNECTION_ERRORS: List[Type[Exception]] = [ConnectionError]
+
+try:
+    from openai._exceptions import (
+        APIConnectionError,
+        AuthenticationError,
+        NotFoundError,
+    )
+
+    _POSSIBLE_CONNECTION_ERRORS += [
+        APIConnectionError,
+        AuthenticationError,
+        NotFoundError,
+    ]
+except ImportError:
+    pass
+
+
+try:
+    from ollama import RequestError
+
+    _POSSIBLE_CONNECTION_ERRORS.append(RequestError)
+except ImportError:
+    pass
+
+POSSIBLE_CONNECTION_ERRORS = tuple(_POSSIBLE_CONNECTION_ERRORS)
+
+
+class chargeConnectionError(Exception):
+    """Custom exception for connection errors in ChARGe."""
+
+    pass
+
+
 class ReasoningModelContext(UnboundedChatCompletionContext):
     """A model context for reasoning models."""
 

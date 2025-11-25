@@ -36,12 +36,15 @@ import warnings
 from charge.clients.AgentPool import AgentPool, Agent
 from charge.clients.Client import Client
 from charge.clients.autogen_utils import (
+    POSSIBLE_CONNECTION_ERRORS,
     ChARGeListMemory,
     _list_wb_tools,
     generate_agent,
     list_client_tools,
     CustomConsole,
     cli_chat_callback,
+    _POSSIBLE_CONNECTION_ERRORS,
+    chargeConnectionError,
 )
 from typing import Any, Tuple, Type, Optional, Dict, Union, List, Callable, overload
 from charge.tasks.Task import Task
@@ -51,40 +54,68 @@ from loguru import logger
 def model_configure(
     backend: str,
     model: Optional[str] = None,
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
 ) -> Tuple[str, str, Optional[str], Dict[str, str]]:
+    """
+    Raises:
+        ValueError: If API key does not exist and is needed.
+
+    """
     import httpx
 
     kwargs = {}
-    API_KEY = None
     default_model = None
-    if backend in ["openai", "gemini", "livai", "livchat"]:
+    if backend in ["openai", "gemini", "livai", "livchat", "llamame"]:
         if backend == "openai":
-            API_KEY = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                api_key = os.getenv("OPENAI_API_KEY")
+            if not base_url:
+                kwargs["base_url"] = base_url
             default_model = "gpt-5"
             # kwargs["parallel_tool_calls"] = False
             kwargs["reasoning_effort"] = "high"
         elif backend == "livai" or backend == "livchat":
-            API_KEY = os.getenv("OPENAI_API_KEY")
-            BASE_URL = os.getenv("LIVAI_BASE_URL")
-            assert (
-                BASE_URL is not None
-            ), "LivAI Base URL must be set in environment variable"
+            if not api_key:
+                api_key = os.getenv("LIVAI_API_KEY")
+            if not base_url:
+                base_url = os.getenv("LIVAI_BASE_URL")
+                if base_url is None:
+                    raise ValueError(
+                        f"LivAI Base URL must be set in environment variable for backend {backend}"
+                    )
             default_model = "gpt-4.1"
-            kwargs["base_url"] = BASE_URL
+            kwargs["base_url"] = base_url
             kwargs["http_client"] = httpx.AsyncClient(verify=False)
+        elif backend == "llamame":
+            if not api_key:
+                api_key = os.getenv("LLAMAME_API_KEY")
+            if not base_url:
+                base_url = os.getenv("LLAMAME_BASE_URL")
+                if base_url is None:
+                    raise ValueError(
+                        f"LLamaMe Base URL must be set in environment variable for backend {backend}"
+                    )
+            default_model = "openai/gpt-oss-120b "
+            kwargs["base_url"] = base_url
+            # kwargs["http_client"] = httpx.AsyncClient(verify=False)
         else:
-            API_KEY = os.getenv("GOOGLE_API_KEY")
+            if not api_key:
+                api_key = os.getenv("GOOGLE_API_KEY")
             default_model = "gemini-flash-latest"
+            if not base_url:
+                kwargs["base_url"] = base_url
             kwargs["parallel_tool_calls"] = False
             kwargs["reasoning_effort"] = "high"
-        assert API_KEY is not None, f"API key must be set for backend {backend}"
+        if api_key is None:
+            raise ValueError(f"API key must be set for backend {backend}")
     elif backend in ["ollama"]:
         default_model = "gpt-oss:latest"
 
     if not model:
         model = default_model
     assert model is not None, "Model name must be provided."
-    return (model, backend, API_KEY, kwargs)
+    return (model, backend, api_key, kwargs)
 
 
 def create_autogen_model_client(
@@ -408,7 +439,10 @@ class AutoGenAgent(Agent):
                     )
                     logger.warning(error_msg)
                     last_error = ValueError("Output validation failed")
-
+            except POSSIBLE_CONNECTION_ERRORS as api_err:
+                error_msg = f"Attempt {attempt}: API connection error: {api_err}"
+                logger.error(error_msg)
+                raise chargeConnectionError(error_msg)
             except Exception as e:
                 error_msg = f"Attempt {attempt}: Unexpected error: {e}"
                 logger.error(error_msg)
@@ -574,6 +608,8 @@ class AutoGenPool(AgentPool):
         *,
         model: str,
         backend: str = "openai",
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
         model_kwargs: Optional[dict] = None,
     ) -> None: ...
 
@@ -582,6 +618,8 @@ class AutoGenPool(AgentPool):
         model_client: Optional[Union[AsyncOpenAI, ChatCompletionClient]] = None,
         model: Optional[str] = None,
         backend: Optional[str] = "openai",
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
         model_kwargs: Optional[dict] = None,
     ):
         super().__init__()
@@ -596,7 +634,7 @@ class AutoGenPool(AgentPool):
             ), "Backend must be provided if model_client is not given."
 
             model, backend, api_key, model_kwargs = model_configure(
-                model=model, backend=backend
+                model=model, backend=backend, api_key=api_key, base_url=base_url
             )
             self.model_client = create_autogen_model_client(
                 backend=backend, model=model, api_key=api_key, model_kwargs=model_kwargs
