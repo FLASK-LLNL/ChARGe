@@ -49,6 +49,16 @@ class ReactionDataPrompt_ExpertOnly(ReactionDataPrompt):
         ])
 
 
+class ReactionDataPrompt_CopyExpert(ReactionDataPrompt):
+    def __init__(self, forward: bool) -> None:
+        super().__init__(forward=forward)
+        self.sections['instruction'] = ''.join([
+            "Given the input data in [INPUT DATA], a list of predicted outputs is provided in [EXPERT PREDICTION], ",
+            "which is based on an expert chemical reaction model. ",
+            "In your response, please simply copy these expert predictions, which should already follow [OUTPUT FORMAT].",
+        ])
+
+
 class ReactionDataPrompt_RAG(ReactionDataPrompt):
     def __init__(self, forward: bool) -> None:
         super().__init__(forward=forward)
