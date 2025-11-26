@@ -92,7 +92,7 @@ def model_configure(
 
     kwargs = {}
     default_model = None
-    if backend in ["openai", "gemini", "livai", "livchat", "llamame"]:
+    if backend in ["openai", "gemini", "livai", "livchat", "llamame", "alcf"]:
         if backend == "openai":
             if not api_key:
                 api_key = os.getenv("OPENAI_API_KEY")
@@ -135,6 +135,23 @@ def model_configure(
             kwargs["http_client"] = httpx.AsyncClient(
                 verify=False,
                 transport=LoggingTransport()
+            )
+        elif backend == "alcf":
+            if not api_key:
+                api_key = os.getenv("ALCF_API_KEY")
+            if not api_key:
+                from inference_auth_token import get_access_token
+                api_key = get_access_token()
+            if not base_url:
+                base_url = os.getenv("ALCF_BASE_URL")
+                if base_url is None:
+                    raise ValueError(
+                        f"ALCF Base URL must be set in environment variable for backend {backend}"
+                    )
+            default_model = "openai/gpt-oss-120b "
+            kwargs["base_url"] = base_url
+            kwargs["http_client"] = httpx.AsyncClient(
+                verify=False, transport=LoggingTransport()
             )
         else:
             if not api_key:
