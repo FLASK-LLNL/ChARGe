@@ -10,7 +10,7 @@ authors = []
 license = {file = "LICENSE"}
 readme = "README.md"
 # The upper limit of <3.12 is due to AiZynthFinder
-requires-python = ">=3.10, <3.12"
+requires-python = ">=3.11, <3.12"
 dependencies = [
     "mcp>=1.10.0",
     "jsonschema>=4.17.3",
@@ -18,10 +18,6 @@ dependencies = [
     "pydantic>=2.10.7",
     "click",
     "rdkit>=2025.3.6",
-    "autogen-agentchat>=0.7.5",
-    "autogen-ext>=0.7.5",
-    "openai>=2.1.0",
-    "tiktoken>=0.11.0",
 ]
 
 # [tool.setuptools]
