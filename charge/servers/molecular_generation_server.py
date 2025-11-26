@@ -6,8 +6,10 @@
 ################################################################################
 
 from loguru import logger
+
 try:
     from rdkit import Chem
+
     HAS_RDKIT = True
 except (ImportError, ModuleNotFoundError) as e:
     HAS_RDKIT = False
@@ -15,39 +17,32 @@ except (ImportError, ModuleNotFoundError) as e:
         "Please install the rdkit support packages to use this module."
         "Install it with: pip install charge[rdkit]",
     )
-except ImportError:
-    raise ImportError("Please install the rdkit package to use this module.")
+
 import json
 import os
 from charge.tasks.Task import Task
-from charge.servers.server_utils import add_server_arguments
+from charge.servers.server_utils import add_server_arguments, update_mcp_network
 from mcp.server.fastmcp import FastMCP
-from charge.clients.autogen import AutoGenClient
+from charge.clients.autogen import AutoGenPool
 from charge.clients.Client import Client
 import asyncio
 from charge.servers import SMILES_utils
 import charge.utils.helper_funcs as hf
 import argparse
+from typing import Optional
 
-parser = argparse.ArgumentParser()
-add_server_arguments(parser)
-args = parser.parse_args()
 
 mcp = FastMCP(
     "SMILES Diagnosis and retrieval MCP Server",
-    port=args.port,
-    website_url=f"{args.host}",
 )
 
-MODEL = "gpt-oss:latest"
-BACKEND = "ollama"
-API_KEY = None
-KWARGS = {}
+
 JSON_FILE_PATH = f"{os.getcwd()}/known_molecules.json"
+AGENT_POOL: AutoGenPool | None = None
 
 
 class DiagnoseSMILESTask(Task):
-    def __init__(self):
+    def __init__(self, smiles: str, *args, **kwargs):
         system_prompt = (
             "You are a world-class chemist. Your task is to diagnose and evaluate "
             "the quality of the provided SMILES strings. You will be given invalid"
@@ -56,16 +51,14 @@ class DiagnoseSMILESTask(Task):
         )
 
         user_prompt = (
-            "Diagnose the followig SMILES string {0}. Give it a short and concise "
+            f"Diagnose the followig SMILES string {smiles}. Give it a short and concise "
             "explanation of what is wrong with it, and if possible, provide a corrected "
             "version of the SMILES string. If the SMILES string is valid, simply state "
             "'The SMILES string is valid.'"
         )
-        super().__init__(system_prompt=system_prompt, user_prompt=user_prompt)
-
-    def update_user_prompt(self, smiles: str) -> None:
-        assert self.user_prompt is not None
-        self.user_prompt.format(smiles)
+        super().__init__(
+            system_prompt=system_prompt, user_prompt=user_prompt, *args, **kwargs
+        )
 
 
 @mcp.tool()
@@ -79,17 +72,18 @@ def diagnose_smiles(smiles: str) -> str:
         str: The diagnosis of the SMILES string.
     """
     if not HAS_RDKIT:
-        raise ImportError("Please install the rdkit support packages to use this module.")
+        raise ImportError(
+            "Please install the rdkit support packages to use this module."
+        )
     logger.info(f"Diagnosing SMILES string: {smiles}")
-    task = DiagnoseSMILESTask()
-    task.update_user_prompt(smiles)
-    diagnose_agent = AutoGenClient(
-        task=task,
-        model=MODEL,
-        backend=BACKEND,
-        api_key=API_KEY,
-        model_kwargs=KWARGS,
-    )
+    task = DiagnoseSMILESTask(smiles=smiles)
+
+    global AGENT_POOL
+    assert (
+        AGENT_POOL is not None
+    ), "Agent pool is not initialized. Diagnoise Tool not available."
+
+    diagnose_agent = AGENT_POOL.create_agent(task=task)
 
     try:
         response = asyncio.run(diagnose_agent.run())
@@ -121,7 +115,9 @@ def is_already_known(smiles: str) -> bool:
         ValueError: If the SMILES string is invalid.
     """
     if not HAS_RDKIT:
-        raise ImportError("Please install the rdkit support packages to use this module.")
+        raise ImportError(
+            "Please install the rdkit support packages to use this module."
+        )
     if not Chem.MolFromSmiles(smiles):
         raise ValueError("Invalid SMILES string.")
 
@@ -156,7 +152,9 @@ def get_density(smiles: str) -> float:
         float: The density of the molecule.
     """
     if not HAS_RDKIT:
-        raise ImportError("Please install the rdkit support packages to use this module.")
+        raise ImportError(
+            "Please install the rdkit support packages to use this module."
+        )
     density = hf.get_density(smiles)
     logger.info(f"Density for SMILES {smiles}: {density}")
     return density
@@ -168,10 +166,24 @@ mcp.tool()(SMILES_utils.verify_smiles)
 mcp.tool()(SMILES_utils.get_synthesizability)
 
 
+def setup_autogen_pool(
+    model: str, backend: str, api_key: Optional[str], base_url: Optional[str]
+):
+    global AGENT_POOL
+    AGENT_POOL = AutoGenPool(
+        model=model, backend=backend, api_key=api_key, base_url=base_url
+    )
+
+
 if __name__ == "__main__":
     if not HAS_RDKIT:
-        raise ImportError("Please install the rdkit support packages to use this module.")
+        raise ImportError(
+            "Please install the rdkit support packages to use this module."
+        )
     parser = argparse.ArgumentParser(description="Molecule Tools Server")
+
+    add_server_arguments(parser)
+
     Client.add_std_parser_arguments(parser)
     parser.add_argument(
         "--json_file",
@@ -179,16 +191,32 @@ if __name__ == "__main__":
         default="known_molecules.json",
         help="Path to the JSON file containing known molecules.",
     )
+    parser.add_argument(
+        "--api_key",
+        type=str,
+        default=None,
+        help="API key for the backend model, if required.",
+    )
+
+    parser.add_argument(
+        "--base-url",
+        type=str,
+        default=None,
+        help="Base URL for the AutoGen server, if applicable.",
+    )
 
     args = parser.parse_args()
-    # global MODEL, BACKEND, API_KEY, KWARGS, JSON_FILE_PATH
-    MODEL = args.model if args.model else MODEL
-    BACKEND = args.backend if args.backend else BACKEND
-    MODEL, BACKEND, API_KEY, KWARGS = AutoGenClient.configure(
-        model=MODEL, backend=BACKEND
-    )
-    logger.info(f"Using model: {MODEL} on backend: {BACKEND}")
+
+    model = args.model
+    backend = args.backend
+    base_url = args.server_urls
+    api_key = args.api_key
+
+    setup_autogen_pool(model, backend, api_key, base_url)
+
+    logger.info(f"Using model: {model} on backend: {backend}")
     JSON_FILE_PATH = args.json_file if args.json_file else JSON_FILE_PATH
     logger.info(f"Using known molecules database at: {JSON_FILE_PATH}")
 
+    update_mcp_network(mcp, args.host, args.port)
     mcp.run(transport="sse")

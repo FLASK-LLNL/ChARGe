@@ -50,6 +50,33 @@ from typing import Any, Tuple, Type, Optional, Dict, Union, List, Callable, over
 from charge.tasks.Task import Task
 from loguru import logger
 
+import logging
+import httpx
+
+# Configure httpx logging for network-level debugging
+class LoggingTransport(httpx.AsyncHTTPTransport):
+    """Custom transport that logs all HTTP requests and responses."""
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        # Log request details (mask API key)
+        headers_copy = dict(request.headers)
+        if "authorization" in headers_copy:
+            auth_header = headers_copy["authorization"]
+            if auth_header.startswith("Bearer "):
+                masked_key = auth_header[:14] + "..." + auth_header[-4:]
+                headers_copy["authorization"] = masked_key
+
+        logger.debug(f"HTTP Request: {request.method} {request.url}")
+        logger.debug(f"Request Headers: {headers_copy}")
+        try:
+            response = await super().handle_async_request(request)
+            logger.debug(f"HTTP Response: {response.status_code}")
+            logger.debug(f"Response Headers: {dict(response.headers)}")
+            return response
+        except Exception as e:
+            logger.error(f"HTTP Request Failed: {type(e).__name__}: {e}")
+            raise
+
 
 def model_configure(
     backend: str,
@@ -62,7 +89,6 @@ def model_configure(
         ValueError: If API key does not exist and is needed.
 
     """
-    import httpx
 
     kwargs = {}
     default_model = None
@@ -70,11 +96,16 @@ def model_configure(
         if backend == "openai":
             if not api_key:
                 api_key = os.getenv("OPENAI_API_KEY")
-            if not base_url:
+            if base_url:
                 kwargs["base_url"] = base_url
             default_model = "gpt-5"
             # kwargs["parallel_tool_calls"] = False
             kwargs["reasoning_effort"] = "high"
+            kwargs["http_client"] = httpx.AsyncClient(
+                verify=False,
+                transport=LoggingTransport()
+            )
+            logger.warning(f"BVE I am here in the openai backend with the kwargs {kwargs}")
         elif backend == "livai" or backend == "livchat":
             if not api_key:
                 api_key = os.getenv("LIVAI_API_KEY")
@@ -86,7 +117,10 @@ def model_configure(
                     )
             default_model = "gpt-4.1"
             kwargs["base_url"] = base_url
-            kwargs["http_client"] = httpx.AsyncClient(verify=False)
+            kwargs["http_client"] = httpx.AsyncClient(
+                verify=False,
+                transport=LoggingTransport()
+            )
         elif backend == "llamame":
             if not api_key:
                 api_key = os.getenv("LLAMAME_API_KEY")
@@ -98,15 +132,22 @@ def model_configure(
                     )
             default_model = "openai/gpt-oss-120b "
             kwargs["base_url"] = base_url
-            # kwargs["http_client"] = httpx.AsyncClient(verify=False)
+            kwargs["http_client"] = httpx.AsyncClient(
+                verify=False,
+                transport=LoggingTransport()
+            )
         else:
             if not api_key:
                 api_key = os.getenv("GOOGLE_API_KEY")
             default_model = "gemini-flash-latest"
-            if not base_url:
+            if base_url:
                 kwargs["base_url"] = base_url
             kwargs["parallel_tool_calls"] = False
             kwargs["reasoning_effort"] = "high"
+            kwargs["http_client"] = httpx.AsyncClient(
+                verify=False,
+                transport=LoggingTransport()
+            )
         if api_key is None:
             raise ValueError(f"API key must be set for backend {backend}")
     elif backend in ["ollama"]:
@@ -668,11 +709,7 @@ class AutoGenPool(AgentPool):
 
         AutoGenPool.AGENT_COUNT += 1
 
-        model_name = self.model if self.model is not None else "default_model"
-        backend_name = self.backend if self.backend is not None else "default_backend"
-
-        default_name = f"_{backend_name}:{model_name}]_{AutoGenPool.AGENT_COUNT}"
-        default_name = re.sub(r"[^a-zA-Z0-9_]", "_", default_name)
+        default_name = self.create_agent_name()
         agent_name = default_name if agent_name is None else agent_name
 
         if agent_name in self.agent_list:
@@ -714,6 +751,20 @@ class AutoGenPool(AgentPool):
         """
         assert name in self.agent_dict, f"Agent with name {name} does not exist."
         return self.agent_dict[name]
+
+    def create_agent_name(self, prefix: Optional[str] = None, suffix: Optional[str] = None):
+        model_name = self.model if self.model is not None else "default_model"
+        backend_name = self.backend if self.backend is not None else "default_backend"
+
+        default_name = f"[{backend_name}:{model_name}]_{AutoGenPool.AGENT_COUNT}"
+        default_name = re.sub(r"[^a-zA-Z0-9_]", "_", default_name)
+
+        if prefix:
+            default_name = f"{prefix}{default_name}"
+        if suffix:
+            default_name = f"{default_name}{suffix}"
+
+        return default_name
 
 
 class AutoGenClient(Client):
