@@ -709,11 +709,7 @@ class AutoGenPool(AgentPool):
 
         AutoGenPool.AGENT_COUNT += 1
 
-        model_name = self.model if self.model is not None else "default_model"
-        backend_name = self.backend if self.backend is not None else "default_backend"
-
-        default_name = f"_{backend_name}:{model_name}]_{AutoGenPool.AGENT_COUNT}"
-        default_name = re.sub(r"[^a-zA-Z0-9_]", "_", default_name)
+        default_name = self.create_agent_name()
         agent_name = default_name if agent_name is None else agent_name
 
         if agent_name in self.agent_list:
@@ -755,6 +751,20 @@ class AutoGenPool(AgentPool):
         """
         assert name in self.agent_dict, f"Agent with name {name} does not exist."
         return self.agent_dict[name]
+
+    def create_agent_name(self, prefix: Optional[str] = None, suffix: Optional[str] = None):
+        model_name = self.model if self.model is not None else "default_model"
+        backend_name = self.backend if self.backend is not None else "default_backend"
+
+        default_name = f"[{backend_name}:{model_name}]_{AutoGenPool.AGENT_COUNT}"
+        default_name = re.sub(r"[^a-zA-Z0-9_]", "_", default_name)
+
+        if prefix:
+            default_name = f"{prefix}{default_name}"
+        if suffix:
+            default_name = f"{default_name}{suffix}"
+
+        return default_name
 
 
 class AutoGenClient(Client):
