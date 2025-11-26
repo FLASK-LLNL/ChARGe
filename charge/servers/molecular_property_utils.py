@@ -221,3 +221,34 @@ def get_molecule_price(smiles):
 
     price = get_chemspace_prices([smiles])
     return price[0]
+
+
+def polymerize_monomer(smiles):
+    """
+    Automatically identify the appropriate polymerization rule for a given monomer and return
+    the corresponding polymer repeat unit in SMILES format.
+
+    Parameters
+    ----------
+    monomer_smiles : str
+        A SMILES string representing the monomer to be polymerized. The function analyzes
+        the structure to determine the most likely polymerization mechanism (e.g., vinyl addition,
+        ring-opening polymerization, condensation, etc.).
+
+    Returns
+    -------
+    string
+        The predicted polymer repeat unit SMILES with wildcard endpoints `*`.
+
+    Examples
+    --------
+    >>> polymerize_monomer_SMILES("CC(=C)C(=O)OC")
+    >>> *CC(*)(C)C(=O)OC
+    """
+    try:
+        from charge.servers.polymerizer import polymerize_auto
+    except Exception as e:
+        logger.warning("Unable to find polymerizer tool. Returning input smiles:")
+        return smiles
+    PSMILES = polymerize_auto(smiles)
+    return PSMILES 
