@@ -93,7 +93,12 @@ def get_density_and_synthesizability(smiles: str) -> tuple[float, float]:
     return density, synthesizability
 
 
-def calculate_property_hf(smiles: str, property: str) -> float:
+PropertyType = Literal[
+    "density", "hof", "alpha", "cv", "gap", 
+    "homo", "lumo", "mu", "r2", "zpve", "lipo"
+]
+
+def chemprop_preds_server(smiles: str, property: PropertyType) -> float:
     """
     Predict molecular properties using high-fidelity pre-trained Chemprop models.
     This function returns property predictions from Chemprop models. It validates the requested property name,
