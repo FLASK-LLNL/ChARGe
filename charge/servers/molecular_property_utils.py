@@ -93,9 +93,9 @@ def get_density_and_synthesizability(smiles: str) -> tuple[float, float]:
     return density, synthesizability
 
 
-def calculate_property(smiles: str, property: str) -> float:
+def calculate_property_hf(smiles: str, property: str) -> float:
     """
-    Predict molecular properties using pre-trained Chemprop models.
+    Predict molecular properties using high-fidelity pre-trained Chemprop models.
     This function returns property predictions from Chemprop models. It validates the requested property name,
     constructs the appropriate model, and returns predictions for the provided SMILES input.
 
@@ -133,10 +133,10 @@ def calculate_property(smiles: str, property: str) -> float:
 
     Examples
     --------
-    >>> calculate_property("CCO", "gap")
+    >>> calculate_property_hf("CCO", "gap")
     6.73
 
-    >>> calculate_property("c1ccccc1", "lipo")
+    >>> calculate_property_hf("c1ccccc1", "lipo")
     2.94
     """
     try:
