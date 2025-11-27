@@ -23,6 +23,7 @@ except (ImportError, ModuleNotFoundError) as e:
 from charge.servers.SMILES_utils import get_synthesizability
 import sys
 import os
+from typing import Literal
 
 
 def get_density(smiles: str) -> float:
@@ -98,7 +99,7 @@ PropertyType = Literal[
     "homo", "lumo", "mu", "r2", "zpve", "lipo"
 ]
 
-def chemprop_preds_server(smiles: str, property: PropertyType) -> float:
+def calculate_property_hf(smiles: str, property: PropertyType) -> float:
     """
     Predict molecular properties using high-fidelity pre-trained Chemprop models.
     This function returns property predictions from Chemprop models. It validates the requested property name,
