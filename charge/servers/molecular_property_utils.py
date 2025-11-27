@@ -179,8 +179,9 @@ def chemprop_preds_server(smiles: str, property: PropertyType) -> float:
         model_path = os.path.join(model_path, "model_0/best.pt")
         return predict_with_chemprop(model_path, [smiles])[0][0]
     else:
-        print("CHEMPROP_BASE_PATH environment variable not set!")
-        sys.exit(2)
+        raise ValueError(
+            f"CHEMPROP_BASE_PATH environment variable not set!"
+        )
 
 
 def get_molecule_price(smiles):
