@@ -139,9 +139,6 @@ def model_configure(
         elif backend == "alcf":
             if not api_key:
                 api_key = os.getenv("ALCF_API_KEY")
-            if not api_key:
-                from inference_auth_token import get_access_token
-                api_key = get_access_token()
             if not base_url:
                 base_url = os.getenv("ALCF_BASE_URL")
                 if base_url is None:
