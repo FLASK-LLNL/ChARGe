@@ -93,7 +93,7 @@ def get_density_and_synthesizability(smiles: str) -> tuple[float, float]:
     return density, synthesizability
 
 
-def chemprop_preds_server(smiles: str, property: str) -> float:
+def calculate_property(smiles: str, property: str) -> float:
     """
     Predict molecular properties using pre-trained Chemprop models.
     This function returns property predictions from Chemprop models. It validates the requested property name,
@@ -133,10 +133,10 @@ def chemprop_preds_server(smiles: str, property: str) -> float:
 
     Examples
     --------
-    >>> chemprop_preds_server("CCO", "gap")
+    >>> calculate_property("CCO", "gap")
     6.73
 
-    >>> chemprop_preds_server("c1ccccc1", "lipo")
+    >>> calculate_property("c1ccccc1", "lipo")
     2.94
     """
     try:
