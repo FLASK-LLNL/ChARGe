@@ -5,6 +5,7 @@
 ## SPDX-License-Identifier: Apache-2.0
 ################################################################################
 
+from concurrent.futures import ThreadPoolExecutor
 from loguru import logger
 
 try:
@@ -30,7 +31,7 @@ from charge.servers import SMILES_utils
 import charge.utils.helper_funcs as hf
 import argparse
 from typing import Optional
-
+import asyncio
 
 mcp = FastMCP(
     "SMILES Diagnosis and retrieval MCP Server",
@@ -85,8 +86,20 @@ def diagnose_smiles(smiles: str) -> str:
 
     diagnose_agent = AGENT_POOL.create_agent(task=task)
 
+    async def _run_async_agent():
+        return await diagnose_agent.run()
+
     try:
-        response = asyncio.run(diagnose_agent.run())
+        # Check if asyncio event loop is already running
+        if asyncio.get_event_loop().is_running():
+
+            # What should we do here?
+            with ThreadPoolExecutor() as pool:
+                future = pool.submit(asyncio.run, _run_async_agent())
+                response = future.result()
+
+        else:
+            response = asyncio.run(_run_async_agent())
         assert response is not None
         assert len(response.messages) > 0  # type: ignore
         assert response.messages[-1] is not None  # type: ignore
