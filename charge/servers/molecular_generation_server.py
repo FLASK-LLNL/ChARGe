@@ -29,8 +29,8 @@ import asyncio
 from charge.servers import SMILES_utils
 import charge.utils.helper_funcs as hf
 import argparse
-from typing import Optional, Literal
-
+from typing import Optional, Literal, Tuple
+from charge.servers.molecular_property_utils import PropertyType
 
 mcp = FastMCP(
     "SMILES Diagnosis and retrieval MCP Server",
@@ -149,7 +149,7 @@ mcp.tool()(SMILES_utils.verify_smiles)
 @mcp.tool()
 def calculate_property(
     smiles: str, property: Literal["density", "synthesizability"]
-) -> tuple[property, float]:
+) -> Tuple[PropertyType, float]:
     """
     Get a molecular property given its SMILES string.
 

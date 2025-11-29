@@ -23,7 +23,7 @@ except (ImportError, ModuleNotFoundError) as e:
 from charge.servers.SMILES_utils import get_synthesizability
 import sys
 import os
-from typing import Literal
+from typing import Literal, Tuple
 
 
 def get_density(smiles: str) -> float:
@@ -68,7 +68,7 @@ def get_density(smiles: str) -> float:
         return 0.0
 
 
-def get_density_and_synthesizability(smiles: str) -> tuple[float, float]:
+def get_density_and_synthesizability(smiles: str) -> Tuple[float, float]:
     """
     Calculate the density and synthesizability of a molecule given its SMILES string.
     Returns a tuple of (density, synthesizability).
@@ -99,7 +99,7 @@ PropertyType = Literal[
     "homo", "lumo", "mu", "r2", "zpve", "lipo"
 ]
 
-def calculate_property_hf(smiles: str, property: PropertyType) -> tuple[property, float]:
+def calculate_property_hf(smiles: str, property: PropertyType) -> Tuple[PropertyType, float]:
     """
     Predict molecular properties using high-fidelity pre-trained Chemprop models.
     This function returns property predictions from Chemprop models. It validates the requested property name,
