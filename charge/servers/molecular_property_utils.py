@@ -99,7 +99,7 @@ PropertyType = Literal[
     "homo", "lumo", "mu", "r2", "zpve", "lipo"
 ]
 
-def calculate_property_hf(smiles: str, property: PropertyType) -> float:
+def calculate_property_hf(smiles: str, property: PropertyType) -> tuple[property, float]:
     """
     Predict molecular properties using high-fidelity pre-trained Chemprop models.
     This function returns property predictions from Chemprop models. It validates the requested property name,
@@ -129,6 +129,8 @@ def calculate_property_hf(smiles: str, property: PropertyType) -> float:
 
     Returns
     -------
+    property : str
+        The property to predict. Must be one of the valid property names listed above.
     float
         A float representing the predicted value for the specified property.
 
@@ -140,10 +142,10 @@ def calculate_property_hf(smiles: str, property: PropertyType) -> float:
     Examples
     --------
     >>> calculate_property_hf("CCO", "gap")
-    6.73
+    gap, 6.73
 
     >>> calculate_property_hf("c1ccccc1", "lipo")
-    2.94
+    lipo, 2.94
     """
     try:
         from charge.servers.get_chemprop2_preds import predict_with_chemprop
@@ -178,7 +180,7 @@ def calculate_property_hf(smiles: str, property: PropertyType) -> float:
     if chemprop_base_path:
         model_path = os.path.join(chemprop_base_path, property)
         model_path = os.path.join(model_path, "model_0/best.pt")
-        return predict_with_chemprop(model_path, [smiles])[0][0]
+        return property, predict_with_chemprop(model_path, [smiles])[0][0]
     else:
         raise ValueError(
             f"CHEMPROP_BASE_PATH environment variable not set!"

@@ -149,7 +149,7 @@ mcp.tool()(SMILES_utils.verify_smiles)
 @mcp.tool()
 def calculate_property(
     smiles: str, property: Literal["density", "synthesizability"]
-) -> float:
+) -> tuple[property, float]:
     """
     Get a molecular property given its SMILES string.
 
@@ -166,11 +166,11 @@ def calculate_property(
     if property == "density":
         density = hf.get_density(smiles)
         logger.info(f"Density for SMILES {smiles}: {density}")
-        return density
+        return property, density
     elif property == "synthesizability":
         synth_score = SMILES_utils.get_synthesizability(smiles)
         logger.info(f"Synthesizability for SMILES {smiles}: {synth_score}")
-        return synth_score
+        return property, synth_score
     else:
         raise ValueError(f"Unknown property: {property}")
 
