@@ -66,12 +66,12 @@ class LoggingTransport(httpx.AsyncHTTPTransport):
                 masked_key = auth_header[:14] + "..." + auth_header[-4:]
                 headers_copy["authorization"] = masked_key
 
-        logger.debug(f"HTTP Request: {request.method} {request.url}")
-        logger.debug(f"Request Headers: {headers_copy}")
+        # logger.debug(f"HTTP Request: {request.method} {request.url}")
+        # logger.debug(f"Request Headers: {headers_copy}")
         try:
             response = await super().handle_async_request(request)
-            logger.debug(f"HTTP Response: {response.status_code}")
-            logger.debug(f"Response Headers: {dict(response.headers)}")
+            # logger.debug(f"HTTP Response: {response.status_code}")
+            # logger.debug(f"Response Headers: {dict(response.headers)}")
             return response
         except Exception as e:
             logger.error(f"HTTP Request Failed: {type(e).__name__}: {e}")
