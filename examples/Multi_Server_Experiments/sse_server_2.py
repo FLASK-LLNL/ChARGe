@@ -21,7 +21,7 @@ NUM_HITS = 1
 
 
 @mcp.tool()
-def known_smiles(smiles: str) -> float:
+def price_smiles(smiles: str) -> float:
     """
     Returns the price of the molecule represented by the SMILES string.
 

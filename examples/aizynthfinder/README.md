@@ -45,6 +45,14 @@ You can then use the ChARGe client to connect to this server and perform operati
 python main.py --backend <backend> --model <model> --server-urls <server_url>/sse
 ```
 
+To use the `vllm` backend, set the following environment variables before running:
+
+```bash
+export VLLM_URL="<url-of-vllm-model>"
+export VLLM_MODEL="<path-to-model-weights>"  # e.g., /usr/workspace/gpt-oss-120b
+export OSS_REASONING="low"                   # Options: ["low", "medium", "high"]
+```
+
 
 ## Tool call output format
 
