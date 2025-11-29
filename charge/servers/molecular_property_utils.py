@@ -61,7 +61,7 @@ def get_density(smiles: str) -> float:
             return 0.0
 
         volume = AllChem.ComputeMolVolume(mol)
-        density = volume / mw
+        density = mw / volume
         logger.info(f"Density for SMILES {smiles}: {density}")
         return density
     except Exception as e:
