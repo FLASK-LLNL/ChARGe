@@ -40,6 +40,8 @@ class MoleculeOutputSchema(BaseModel):
 
     reasoning_summary: str
     smiles_list: List[str]
+    property_name: str
+    property_list: List[float]
 
     @field_validator("smiles_list")
     @classmethod
@@ -54,12 +56,14 @@ class MoleculeOutputSchema(BaseModel):
         return smiles_list
 
     def as_list(self) -> List[str]:
-        return self.smiles_list
+        return zip(self.smiles_list, self.property_list)
 
     def as_dict(self) -> dict:
         return {
             "reasoning_summary": self.reasoning_summary,
             "smiles_list": self.smiles_list,
+            "property_name": self.property_name,
+            "property_list": self.property_list,
         }
 
 
