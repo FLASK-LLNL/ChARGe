@@ -104,6 +104,8 @@ class LMOTask(Task):
         self.verification_prompt = verification_prompt
         self.refinement_prompt = refinement_prompt
         self.max_synth_score = SMILES_utils.get_synthesizability(lead_molecule)
+        # Change this to be the min property value - add a function to get the right value
+        # add a property name as well
         self.min_density = get_density(lead_molecule)
         self.set_structured_output_schema(MoleculeOutputSchema)
 
