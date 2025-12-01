@@ -129,7 +129,7 @@ def calculate_property_hf(smiles: str, property: PropertyType) -> Tuple[Property
 
     Returns
     -------
-    property : str
+    str
         The property to predict. Must be one of the valid property names listed above.
     float
         A float representing the predicted value for the specified property.
