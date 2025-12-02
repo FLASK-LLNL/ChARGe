@@ -40,6 +40,8 @@ class MoleculeOutputSchema(BaseModel):
 
     reasoning_summary: str
     smiles_list: List[str]
+    property_name: str
+    property_list: List[float]
 
     @field_validator("smiles_list")
     @classmethod
@@ -54,12 +56,14 @@ class MoleculeOutputSchema(BaseModel):
         return smiles_list
 
     def as_list(self) -> List[str]:
-        return self.smiles_list
+        return zip(self.smiles_list, self.property_list)
 
     def as_dict(self) -> dict:
         return {
             "reasoning_summary": self.reasoning_summary,
             "smiles_list": self.smiles_list,
+            "property_name": self.property_name,
+            "property_list": self.property_list,
         }
 
 
@@ -100,6 +104,8 @@ class LMOTask(Task):
         self.verification_prompt = verification_prompt
         self.refinement_prompt = refinement_prompt
         self.max_synth_score = SMILES_utils.get_synthesizability(lead_molecule)
+        # Change this to be the min property value - add a function to get the right value
+        # add a property name as well
         self.min_density = get_density(lead_molecule)
         self.set_structured_output_schema(MoleculeOutputSchema)
 

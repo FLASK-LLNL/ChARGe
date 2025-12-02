@@ -23,7 +23,7 @@ except (ImportError, ModuleNotFoundError) as e:
 from charge.servers.SMILES_utils import get_synthesizability
 import sys
 import os
-from typing import Literal
+from typing import Literal, Tuple
 
 
 def get_density(smiles: str) -> float:
@@ -68,7 +68,7 @@ def get_density(smiles: str) -> float:
         return 0.0
 
 
-def get_density_and_synthesizability(smiles: str) -> tuple[float, float]:
+def get_density_and_synthesizability(smiles: str) -> Tuple[float, float]:
     """
     Calculate the density and synthesizability of a molecule given its SMILES string.
     Returns a tuple of (density, synthesizability).
@@ -99,7 +99,7 @@ PropertyType = Literal[
     "homo", "lumo", "mu", "r2", "zpve", "lipo"
 ]
 
-def calculate_property_hf(smiles: str, property: PropertyType) -> float:
+def calculate_property_hf(smiles: str, property: PropertyType) -> Tuple[PropertyType, float]:
     """
     Predict molecular properties using high-fidelity pre-trained Chemprop models.
     This function returns property predictions from Chemprop models. It validates the requested property name,
@@ -129,6 +129,8 @@ def calculate_property_hf(smiles: str, property: PropertyType) -> float:
 
     Returns
     -------
+    str
+        The property to predict. Must be one of the valid property names listed above.
     float
         A float representing the predicted value for the specified property.
 
@@ -140,10 +142,10 @@ def calculate_property_hf(smiles: str, property: PropertyType) -> float:
     Examples
     --------
     >>> calculate_property_hf("CCO", "gap")
-    6.73
+    gap, 6.73
 
     >>> calculate_property_hf("c1ccccc1", "lipo")
-    2.94
+    lipo, 2.94
     """
     try:
         from charge.servers.get_chemprop2_preds import predict_with_chemprop
@@ -178,7 +180,7 @@ def calculate_property_hf(smiles: str, property: PropertyType) -> float:
     if chemprop_base_path:
         model_path = os.path.join(chemprop_base_path, property)
         model_path = os.path.join(model_path, "model_0/best.pt")
-        return predict_with_chemprop(model_path, [smiles])[0][0]
+        return property, predict_with_chemprop(model_path, [smiles])[0][0]
     else:
         raise ValueError(
             f"CHEMPROP_BASE_PATH environment variable not set!"
