@@ -80,13 +80,13 @@ def main(model_dir_fwd: str, model_dir_retro: str, adapter_weights_fwd: str, ada
     if host is None:
         _, host = get_hostname()
 
-    mcp = FastMCP("FLASKv2 Reaction Predictor",
-                  port=port,
-                  website_url=f"{host}",
-    )
-
     # Init MCP server
-    mcp = FastMCP("FLASKv2 Reaction Predictor", host=host, port=port)
+    mcp = FastMCP("FLASKv2 Reaction Predictor",
+                  host=host,
+                  port=port,
+                  sse_path=f"/flaskv2_tools/sse",
+                  message_path=f"/flaskv2_tools/messages/",
+    )
 
     # Make HF models and tokenizer global objects
     global fwd_model, retro_model, tokenizer

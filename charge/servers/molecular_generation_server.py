@@ -34,6 +34,8 @@ from charge.servers.molecular_property_utils import PropertyType
 
 mcp = FastMCP(
     "SMILES Diagnosis and retrieval MCP Server",
+    sse_path=f"/lmo_tools/sse",
+    message_path=f"/lmo_tools/messages/",
 )
 
 
