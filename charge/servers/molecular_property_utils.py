@@ -25,8 +25,13 @@ import sys
 import os
 from typing import Literal, Tuple
 
+PropertyType = Literal[
+    "density", "hof", "alpha", "cv", "gap",
+    "homo", "lumo", "mu", "r2", "zpve", "lipo"
+]
 
-def get_density(smiles: str) -> float:
+# Note that the PropertyType here is unnecessary except to unify the tool interface
+def get_density(smiles: str, property: PropertyType = "density") -> Tuple[PropertyType, float]:
     """
     Calculate the density of a molecule given its SMILES string.
     Density is the molecular weight of the molecule per unit volume.
@@ -63,7 +68,7 @@ def get_density(smiles: str) -> float:
         volume = AllChem.ComputeMolVolume(mol)
         density = mw / volume
         logger.info(f"Density for SMILES {smiles}: {density}")
-        return density
+        return "density", density
     except Exception as e:
         return 0.0
 
@@ -89,15 +94,10 @@ def get_density_and_synthesizability(smiles: str) -> Tuple[float, float]:
         raise ImportError(
             "Please install the rdkit support packages to use this module."
         )
-    density = get_density(smiles)
+    _, density = get_density(smiles)
     synthesizability = get_synthesizability(smiles)
     return density, synthesizability
 
-
-PropertyType = Literal[
-    "density", "hof", "alpha", "cv", "gap", 
-    "homo", "lumo", "mu", "r2", "zpve", "lipo"
-]
 
 def calculate_property_hf(smiles: str, property: PropertyType) -> Tuple[PropertyType, float]:
     """
