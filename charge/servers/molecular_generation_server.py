@@ -159,7 +159,9 @@ def calculate_property(
         smiles (str): The input SMILES string.
         property (str): The property to calculate ("density" or "synthesizability").
     Returns:
-        float: The requested property of the molecule.
+    str:
+        The property to predict. Must be one of the valid property names listed above.
+    float: The requested property of the molecule.
     """
     if not HAS_RDKIT:
         raise ImportError(

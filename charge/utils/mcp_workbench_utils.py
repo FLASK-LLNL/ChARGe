@@ -14,7 +14,7 @@ except ImportError:
 import asyncio
 from typing import Any, Type, Optional, List
 
-def create_servers(paths: List[str], urls: List[str]) -> List[Any]:
+def create_servers(paths: List[str], urls: List[str], timeout: Optional[int] = 60) -> List[Any]:
     """
     Creates MCP servers from the task's server paths.
 
@@ -22,7 +22,6 @@ def create_servers(paths: List[str], urls: List[str]) -> List[Any]:
         List[Any]: List of MCP server parameters.
     """
     mcp_servers = []
-    timeout = 60
     for path in paths:
         mcp_servers.append(
             StdioServerParams(

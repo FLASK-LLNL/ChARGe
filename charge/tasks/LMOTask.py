@@ -151,7 +151,7 @@ class LMOTask(Task):
         )
         results = property_result_msg.result
         if len(results) > 1:
-            property_result = property_result_msg.result[1].content
+            property_result = float(property_result_msg.result[1].content)
         else:
             property_result = 0.0
             raise ValueError(f"{property_result_msg.result[0].content}")
@@ -183,7 +183,7 @@ class LMOTask(Task):
                 f"Synthesizability score too high: {synth_score} > {self.max_synth_score}"
             )
 
-        property_value = await call_mcp_tool_directly(
+        property_result_msg = await call_mcp_tool_directly(
             tool_name = self.property_tool_name,
             arguments = {
                 "smiles": smiles,
@@ -192,6 +192,13 @@ class LMOTask(Task):
             urls = self.server_urls,
             paths = self.server_files,
         )
+
+        results = property_result_msg.result
+        if len(results) > 1:
+            property_value = float(property_result_msg.result[1].content)
+        else:
+            property_value = 0.0
+            raise ValueError(f"{property_result_msg.result[0].content}")
 
         # Check if property meets optimization criteria
         if self.optimize_direction == "greater":
