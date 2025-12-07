@@ -147,7 +147,6 @@ def is_already_known(smiles: str) -> bool:
 mcp.tool()(SMILES_utils.canonicalize_smiles)
 mcp.tool()(SMILES_utils.verify_smiles)
 
-
 @mcp.tool()
 def calculate_property(
     smiles: str, property: Literal["density", "synthesizability"]
@@ -168,7 +167,7 @@ def calculate_property(
             "Please install the rdkit support packages to use this module."
         )
     if property == "density":
-        density = hf.get_density(smiles)
+        _, density = hf.get_density(smiles, property)
         logger.info(f"Density for SMILES {smiles}: {density}")
         return property, density
     elif property == "synthesizability":
