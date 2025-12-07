@@ -46,6 +46,7 @@ from charge.clients.autogen_utils import (
     _POSSIBLE_CONNECTION_ERRORS,
     chargeConnectionError,
 )
+from charge.utils.mcp_workbench_utils import _setup_mcp_workbenches, _close_mcp_workbenches
 from typing import Any, Tuple, Type, Optional, Dict, Union, List, Callable, overload
 from charge.tasks.Task import Task
 from loguru import logger
@@ -258,8 +259,7 @@ class AutoGenAgent(Agent):
         super().__init__(task=task, **kwargs)
         self.max_retries = max_retries
         self.max_tool_calls = max_tool_calls
-        self.no_tools = False
-        self.workbenches = []
+        self.workbenches: List[McpWorkbench] = []
         self.agent_name = agent_name
         self.model_client = model_client
         self.timeout = timeout
@@ -284,33 +284,6 @@ class AutoGenAgent(Agent):
             return memory
         return [ChARGeListMemory()]
 
-    def create_servers(self, paths: List[str], urls: List[str]) -> List[Any]:
-        """
-        Creates MCP servers from the task's server paths.
-
-        Returns:
-            List[Any]: List of MCP server parameters.
-        """
-        mcp_servers = []
-
-        for path in paths:
-            mcp_servers.append(
-                StdioServerParams(
-                    command="python3",
-                    args=[path],
-                    read_timeout_seconds=self.timeout,
-                )
-            )
-        for url in urls:
-            mcp_servers.append(
-                SseServerParams(
-                    url=url,
-                    timeout=self.timeout,
-                    sse_read_timeout=self.timeout,
-                )
-            )
-        return mcp_servers
-
     async def setup_mcp_workbenches(self) -> None:
         """
         Sets up MCP workbenches from the task's server paths.
@@ -318,16 +291,9 @@ class AutoGenAgent(Agent):
         Returns:
             None
         """
-        mcp_files = self.task.server_files
-        mcp_urls = self.task.server_urls
-
-        self.mcps = self.create_servers(mcp_files, mcp_urls)
-
-        if len(self.mcps) == 0:
-            self.no_tools = True
+        self.workbenches = await _setup_mcp_workbenches(self.task.server_files, self.task.server_urls)
+        if len(self.workbenches) == 0:
             return
-        self.workbenches = [McpWorkbench(server) for server in self.mcps]
-
         await asyncio.gather(*[workbench.start() for workbench in self.workbenches])
         await _list_wb_tools(self.workbenches)
 
@@ -338,9 +304,7 @@ class AutoGenAgent(Agent):
         Returns:
             None
         """
-        if self.no_tools:
-            return
-        await asyncio.gather(*[workbench.stop() for workbench in self.workbenches])
+        _close_mcp_workbenches(self.workbenches)
 
     def _create_agent(self, **kwargs) -> Any:
         """

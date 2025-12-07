@@ -6,6 +6,8 @@ import charge.utils.helper_funcs
 from typing import Optional, List
 from pydantic import BaseModel, field_validator
 from charge.servers.log_progress import LOG_PROGRESS_SYSTEM_PROMPT
+from charge.utils.mcp_workbench_utils import call_mcp_tool_directly
+import asyncio
 
 SYSTEM_PROMPT = (
     "You are a world-class medicinal chemist with expertise in drug"
@@ -56,7 +58,7 @@ class MoleculeOutputSchema(BaseModel):
         return smiles_list
 
     def as_list(self) -> List[str]:
-        return zip(self.smiles_list, self.property_list)
+        return list(zip(self.smiles_list, self.property_list))
 
     def as_dict(self) -> dict:
         return {
@@ -81,13 +83,37 @@ class LMOTask(Task):
         system_prompt: Optional[str] = None,
         verification_prompt: Optional[str] = None,
         refinement_prompt: Optional[str] = None,
+        property_tool_name: Optional[str] = None,
+        property_name: str = "density",
+        optimize_direction: str = "greater",
+
         **kwargs,
     ):
+        """
+        Initialize LMOTask with customizable property optimization.
+
+        Args:
+            lead_molecule: SMILES string of the lead molecule
+            user_prompt: Custom user prompt (optional)
+            system_prompt: Custom system prompt (optional)
+            verification_prompt: Custom verification prompt (optional)
+            refinement_prompt: Custom refinement prompt (optional)
+            property_tool_name: Name of MCP tool that takes SMILES string and returns float property value.
+                                Defaults to get_density if None.
+            property_name: Name of the property being optimized (for logging)
+            optimize_direction: "greater" to maximize property, "less" to minimize it
+            **kwargs: Additional arguments passed to Task
+        """
 
         if user_prompt is None:
             user_prompt = USER_PROMPT.format(lead_molecule)
         if system_prompt is None:
             system_prompt = SYSTEM_PROMPT
+
+        # call mcp server directly
+        # Default to density if no property function provided
+        if property_tool_name is None:
+            property_tool_name = "get_density"
 
         super().__init__(
             system_prompt=system_prompt,
@@ -106,14 +132,38 @@ class LMOTask(Task):
         self.max_synth_score = SMILES_utils.get_synthesizability(lead_molecule)
         # Change this to be the min property value - add a function to get the right value
         # add a property name as well
-        self.min_density = get_density(lead_molecule)
+        # Store property function and related attributes
+        self.property_tool_name = property_tool_name
+        self.property_name = property_name
+        self.optimize_direction = optimize_direction
         self.set_structured_output_schema(MoleculeOutputSchema)
 
-    def check_proposal(self, smiles: str) -> bool:
+    async def get_initial_property_value(self) -> bool:
+        # Calculate the reference property value from the lead molecule
+        property_result_msg = await call_mcp_tool_directly(
+            tool_name = self.property_tool_name,
+            arguments = {
+                "smiles": self.lead_molecule,
+                "property": self.property_name,
+            },
+            urls = self.server_urls or [],
+            paths = self.server_files or [],
+        )
+        results = property_result_msg.result
+        if len(results) > 1:
+            property_result = float(property_result_msg.result[1].content)
+        else:
+            property_result = 0.0
+            raise ValueError(f"{property_result_msg.result[0].content}")
+
+        self.reference_property_value = property_result
+
+    async def check_proposal(self, smiles: str) -> bool:
         """
         Check if the proposed SMILES string is valid.
         If it is valid, checks if its synthesizability score is less than or equal to the lead molecule
-        and if its density is greater than or equal to the lead molecule.
+        and if its property value meets the optimization criteria.
+
         Args:
             smiles (str): The proposed SMILES string.
         Returns:
@@ -133,22 +183,47 @@ class LMOTask(Task):
                 f"Synthesizability score too high: {synth_score} > {self.max_synth_score}"
             )
 
-        density = get_density(smiles)
-        if density < self.min_density:
-            raise ValueError(f"Density too low: {density} < {self.min_density}")
+        property_result_msg = await call_mcp_tool_directly(
+            tool_name = self.property_tool_name,
+            arguments = {
+                "smiles": smiles,
+                "property": self.property_name,
+            },
+            urls = self.server_urls,
+            paths = self.server_files,
+        )
+
+        results = property_result_msg.result
+        if len(results) > 1:
+            property_value = float(property_result_msg.result[1].content)
+        else:
+            property_value = 0.0
+            raise ValueError(f"{property_result_msg.result[0].content}")
+
+        # Check if property meets optimization criteria
+        if self.optimize_direction == "greater":
+            if property_value < self.reference_property_value:
+                raise ValueError(
+                    f"{self.property_name} too low: {property_value} < {self.reference_property_value}"
+                )
+        else:  # "less"
+            if property_value > self.reference_property_value:
+                raise ValueError(
+                    f"{self.property_name} too high: {property_value} > {self.reference_property_value}"
+                )
         return True
 
     @charge.verifier
-    def check_final_proposal(self, smiles_list_as_string: str) -> bool:
+    async def check_final_proposal(self, smiles_list_as_string: str) -> bool:
         """
         Check if the proposed SMILES strings are valid and meet the criteria.
         The criteria are:
         1. The SMILES must be valid.
         2. The synthesizability score must be less than or equal to the lead molecule.
-        3. The density must be greater than or equal to the lead molecule.
+        3. The property value must meet the optimization criteria (greater or less than reference).
 
         Args:
-            smiles (str): The proposed  list of SMILES strings.
+            smiles_list_as_string (str): The proposed list of SMILES strings.
         Returns:
             bool: True if the proposal is valid and meets the criteria, False otherwise.
 

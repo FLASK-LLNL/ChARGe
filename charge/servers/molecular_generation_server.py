@@ -147,7 +147,6 @@ def is_already_known(smiles: str) -> bool:
 mcp.tool()(SMILES_utils.canonicalize_smiles)
 mcp.tool()(SMILES_utils.verify_smiles)
 
-
 @mcp.tool()
 def calculate_property(
     smiles: str, property: Literal["density", "synthesizability"]
@@ -159,14 +158,16 @@ def calculate_property(
         smiles (str): The input SMILES string.
         property (str): The property to calculate ("density" or "synthesizability").
     Returns:
-        float: The requested property of the molecule.
+    str:
+        The property to predict. Must be one of the valid property names listed above.
+    float: The requested property of the molecule.
     """
     if not HAS_RDKIT:
         raise ImportError(
             "Please install the rdkit support packages to use this module."
         )
     if property == "density":
-        density = hf.get_density(smiles)
+        _, density = hf.get_density(smiles, property)
         logger.info(f"Density for SMILES {smiles}: {density}")
         return property, density
     elif property == "synthesizability":
