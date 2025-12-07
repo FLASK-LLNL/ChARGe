@@ -85,7 +85,7 @@ async def call_mcp_tool_directly(tool_name: str, arguments: dict, urls: list[str
                 )
                 return result
             else:
-                unused_tools.append(t["name"])
+                unused_tools.append(tool_names)
 
         raise ValueError(f"Tool '{tool_name}' not found in any workbench: {unused_tools}")
 
