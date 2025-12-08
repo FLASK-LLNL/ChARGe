@@ -575,7 +575,7 @@ class AutoGenClient(Client):
             task (Type[Task]): The task class to use.
             path (str, optional): Path to save generated MCP server files. Defaults to ".".
             max_retries (int, optional): Maximum number of retries for failed tasks. Defaults to 3.
-            backend (str, optional): Backend to use: "openai", "gemini", "ollama", "huggingface", "vllm", "liveai" or "livchat". Defaults to "openai".
+            backend (str, optional): Backend to use: "openai", "gemini", "ollama", "liveai" or "livchat". Defaults to "openai".
             model (str, optional): Model name to use. Defaults to "gpt-4".
             model_client (Optional[ChatCompletionClient], optional): Pre-initialized model client. If provided, `backend`, `model`, and `api_key` are ignored. Defaults to None.
             api_key (Optional[str], optional): API key for the model. Defaults to None.
@@ -663,7 +663,7 @@ class AutoGenClient(Client):
                     answer_invalid = True
                     break
             except Exception as e:
-                logger.error(f"Error during verification with {method.__name__}: {e}")
+                print(f"Error during verification with {method.__name__}: {e}")
                 answer_invalid = True
                 break
         return answer_invalid
@@ -689,7 +689,7 @@ class AutoGenClient(Client):
             new_user_prompt = (
                 "The previous response was invalid. Please try again.\n\n" + task
             )
-            # logger.info("Retrying with new prompt...")
+            # print("Retrying with new prompt...")
             result = await agent.run(task=new_user_prompt)
             if isinstance(result.messages[-1], TextMessage):
                 answer_invalid = self.check_invalid_response(
