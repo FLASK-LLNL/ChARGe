@@ -128,7 +128,7 @@ def create_autogen_model_client(
         )
     elif backend == "huggingface":
         # Extract HuggingFace-specific kwargs
-        model_path = os.getenv("LOCAL_MODEL_PATH", "/p/vast1/flask/models/gpt-oss-20b")
+        model_path = os.getenv("LOCAL_MODEL_PATH", "./models/gpt-oss-20b")
         device = model_kwargs.pop("device", "auto")
         torch_dtype = model_kwargs.pop("torch_dtype", "auto")
         quantization = None #model_kwargs.pop("quantization", "4bit")
