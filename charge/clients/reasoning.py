@@ -1,3 +1,10 @@
+################################################################################
+## Copyright 2025 Lawrence Livermore National Security, LLC. and Binghamton University.
+## See the top-level LICENSE file for details.
+##
+## SPDX-License-Identifier: Apache-2.0
+ ################################################################################
+
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 from autogen_core.models import CreateResult, RequestUsage
 import json
