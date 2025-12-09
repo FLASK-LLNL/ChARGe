@@ -114,6 +114,8 @@ class Client:
                 "gemini",
                 "livai",
                 "livchat",
+                "huggingface",
+                "vllm",
             ],
             help="Backend to use for the orchestrator client",
         )

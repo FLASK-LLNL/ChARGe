@@ -30,6 +30,8 @@ import os
 import warnings
 from charge.clients.AgentPool import AgentPool, Agent
 from charge.clients.Client import Client
+from charge.clients.huggingface_client import HuggingFaceLocalClient
+from charge.clients.vllm_client import VLLMClient
 from charge.clients.autogen_utils import (
     POSSIBLE_CONNECTION_ERRORS,
     ChARGeListMemory,
@@ -159,6 +161,11 @@ def model_configure(
             raise ValueError(f"API key must be set for backend {backend}")
     elif backend in ["ollama"]:
         default_model = "gpt-oss:latest"
+    elif backend in ["huggingface"]:
+        default_model = "gpt-oss"  # Must be provided via model path
+    elif backend in ["vllm"]:
+        kwargs["reasoning_effort"] = os.getenv("OSS_REASONING", "medium")
+        default_model = "gpt-oss"  # Default vLLM model name
 
     if not model:
         model = default_model
@@ -176,13 +183,16 @@ def create_autogen_model_client(
     Creates an AutoGen model client based on the specified backend and model.
 
     Args:
-        backend (str): The backend to use: "openai", "gemini", "ollama", "liveai" or "livchat".
+        backend (str): The backend to use: "openai", "gemini", "ollama", "huggingface", "vllm", "liveai" or "livchat".
         model (str): The model name to use.
         api_key (Optional[str], optional): API key for the model. Defaults to None.
         model_kwargs (Optional[dict], optional): Additional keyword arguments for the model client. Defaults to None.
     Returns:
         Union[AsyncOpenAI, ChatCompletionClient]: The created model client.
     """
+    if model_kwargs is None:
+        model_kwargs = {}
+    
     model_info = ModelInfo(
         vision=False,
         function_calling=True,
@@ -197,6 +207,74 @@ def create_autogen_model_client(
             model=model,
             model_info=model_info,
         )
+    elif backend == "huggingface":
+        # Extract HuggingFace-specific kwargs
+        model_path = os.getenv("LOCAL_MODEL_PATH", "./models/gpt-oss-20b")
+        device = model_kwargs.pop("device", "auto")
+        torch_dtype = model_kwargs.pop("torch_dtype", "auto")
+        quantization = None #model_kwargs.pop("quantization", "4bit")
+        
+        model_client = HuggingFaceLocalClient(
+            model_path=model_path,
+            model_info=model_info,
+            device=device,
+            torch_dtype=torch_dtype,
+            quantization=quantization,
+            **model_kwargs,
+        )
+    elif backend == "vllm":
+        # Extract vLLM-specific kwargs
+        vllm_url = model_kwargs.pop("vllm_url", os.getenv("VLLM_URL", "http://localhost:8000/v1"))
+        vllm_model = model_kwargs.pop("vllm_model", os.getenv("VLLM_MODEL", model))
+
+        # Set reasoning effort level
+        reasoning_effort = model_kwargs.pop("reasoning_effort", "medium")
+        assert reasoning_effort in ["low", "medium", "high"]
+
+        # Increase max_tokens for high (to avoid all tokens used on reasoning)
+        max_tokens = 8192
+        if reasoning_effort=="high": 
+            max_tokens = 16000
+        
+        logger.info(f"\n  ==> GPT-OSS reasoning effort: {reasoning_effort}")
+
+        vllm_model_info = ModelInfo(
+            vision=False,
+            function_calling=True,
+            json_output=False,
+            family=ModelFamily.UNKNOWN,
+            structured_output=False,
+        )
+        
+        reasoning_client = False # True to help with debugging
+        if reasoning_client:
+            from charge.clients.reasoning import ReasoningCaptureClient
+            
+            model_client = ReasoningCaptureClient(
+                model=vllm_model,
+                api_key="EMPTY",
+                base_url=vllm_url,
+                model_info=vllm_model_info,
+                parallel_tool_calls=False,
+                extra_body={
+                    "reasoning_effort": reasoning_effort,
+                    "max_tokens": max_tokens,
+                    },
+            )
+        else:
+            from autogen_ext.models.openai import OpenAIChatCompletionClient
+            # Use OpenAIChatCompletionClient
+            model_client = OpenAIChatCompletionClient(
+                model=vllm_model,
+                api_key="EMPTY",
+                base_url=vllm_url,
+                model_info=vllm_model_info,
+                parallel_tool_calls=False, # False for gpt-oss
+                extra_body={
+                    "reasoning_effort": reasoning_effort,
+                    "max_tokens": max_tokens,
+                    },
+            )
     else:
         if api_key is None:
             if backend == "gemini":
@@ -531,7 +609,7 @@ class AutoGenAgent(Agent):
                         else output_callback
                     ),
                 )
-                print("\n" + "-" * 45)
+                logger.info("\n" + "-" * 45)
                 _input = (
                     input_callback()
                     if input_callback is not None
@@ -602,7 +680,7 @@ class AutoGenPool(AgentPool):
     Args:
         model_client (Union[AsyncOpenAI, ChatCompletionClient]): The model client to use.
         model (str): The model name to use.
-        backend (str, optional): Backend to use: "openai", "gemini", "ollama", "liveai" or "livchat". Defaults to "openai".
+        backend (str, optional): Backend to use: "openai", "gemini", "ollama", "huggingface", "vllm", "liveai" or "livchat". Defaults to "openai".
     """
 
     AGENT_COUNT = 0
