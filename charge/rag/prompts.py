@@ -1,13 +1,23 @@
 from dataclasses import dataclass
 
+from pydantic import BaseModel, field_validator, model_validator, Field
 
-class ReactionDataPrompt:
-    def __init__(self, forward : bool) -> None:
+
+class ReactionDataPrompt(BaseModel):
+    sections: dict[str, str] = Field(default_factory=dict)
+    forward: bool
+
+    @model_validator(mode='after')
+    def initialize_sections(self) -> None:
         """
         Args:
             forward (bool): whether the prompt is for forward synthesis context
         """
-        self.sections = dict()
+        self._initialize_sections()
+        return self
+
+    def _initialize_sections(self):
+        forward = self.forward
         self.sections['role'] = 'You are an expert chemist.'
         self.sections['task'] = 'Forward synthesis prediction' if forward else 'Retrosynthesis prediction'
         self.sections['instruction'] = ''.join([
@@ -39,8 +49,8 @@ class ReactionDataPrompt:
 
 
 class ReactionDataPrompt_ExpertOnly(ReactionDataPrompt):
-    def __init__(self, forward: bool) -> None:
-        super().__init__(forward=forward)
+    def _initialize_sections(self) -> None:
+        super()._initialize_sections()
         self.sections['instruction'] = ''.join([
             "Given the input data in [INPUT DATA], a predicted output is provided in [EXPERT PREDICTION], ",
             "which is based on an expert chemical reaction model. ",
@@ -50,8 +60,8 @@ class ReactionDataPrompt_ExpertOnly(ReactionDataPrompt):
 
 
 class ReactionDataPrompt_CopyExpert(ReactionDataPrompt):
-    def __init__(self, forward: bool) -> None:
-        super().__init__(forward=forward)
+    def _initialize_sections(self) -> None:
+        super()._initialize_sections()
         self.sections['instruction'] = ''.join([
             "Given the input data in [INPUT DATA], a list of predicted outputs is provided in [EXPERT PREDICTION], ",
             "which is based on an expert chemical reaction model. ",
@@ -60,8 +70,8 @@ class ReactionDataPrompt_CopyExpert(ReactionDataPrompt):
 
 
 class ReactionDataPrompt_RAG(ReactionDataPrompt):
-    def __init__(self, forward: bool) -> None:
-        super().__init__(forward=forward)
+    def _initialize_sections(self) -> None:
+        super()._initialize_sections()
         self.sections['instruction'] = ''.join([
             "You are given a data table in [DATA TABLE]. In this table, each row/line consists of two columns: \n",
             "(1) reaction data input,\n",
@@ -74,8 +84,9 @@ class ReactionDataPrompt_RAG(ReactionDataPrompt):
 
 
 class ReactionDataPrompt_RAGv2(ReactionDataPrompt):
-    def __init__(self, forward: bool) -> None:
-        super().__init__(forward=forward)
+    def _initialize_sections(self) -> None:
+        super()._initialize_sections()
+        forward = self.forward
         input_role = 'reactants' if forward else 'products'
         output_role = 'products' if forward else 'reactants'
         self.sections['instruction'] = ''.join([
@@ -96,8 +107,8 @@ class ReactionDataPrompt_RAGv2(ReactionDataPrompt):
 
 
 class ReactionDataPrompt_RAGv3(ReactionDataPrompt):
-    def __init__(self, forward: bool) -> None:
-        super().__init__(forward=forward)
+    def _initialize_sections(self) -> None:
+        super()._initialize_sections()
         self.sections['instruction'] = ''.join([
             "You are given a data table in [DATA TABLE]. In this table, each row/line consists of three columns: \n",
             "(1) reaction data input,\n",
@@ -119,9 +130,8 @@ class ReactionDataPrompt_RAGv4(ReactionDataPrompt):
       - Including that definition directly within the instruction text
       - Maintaining backward compatibility with previous output formats
     """
-    def __init__(self, forward: bool) -> None:
-        super().__init__(forward=forward)
-
+    def _initialize_sections(self) -> None:
+        super()._initialize_sections()
         neighbor_distance_definition = (
             "The Neighbor Distance is a non-negative value representing the distance between this row's input "
             "and the target row's input (the row with '???'). Smaller distances indicate greater similarity, "
