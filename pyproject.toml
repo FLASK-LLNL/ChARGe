@@ -18,6 +18,8 @@ dependencies = [
     "pydantic>=2.10.7",
     "click",
     "rdkit>=2025.3.6",
+    "pre-commit",
+    "black",
 ]
 
 # [tool.setuptools]
