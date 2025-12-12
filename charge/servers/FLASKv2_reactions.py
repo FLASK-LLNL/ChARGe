@@ -25,6 +25,8 @@ except (ImportError, ModuleNotFoundError) as e:
 
 from charge.servers.server_utils import update_mcp_network, get_hostname
 
+REAGENT_KEYS = ['reactants', 'agents', 'solvents', 'catalysts', 'atmospheres']
+PRODUCT_KEYS = ['products']
 
 def format_rxn_prompt(data: dict, forward: bool) -> dict:
     required_keys = [
