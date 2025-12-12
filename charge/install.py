@@ -142,6 +142,11 @@ def main(no_extras, no_main, editable, git_tag, extras, dry_run):
                    (f" with [{extras}] extras" if extras else "")
         })
 
+        commands.append({
+            "cmd": "pre-commit install",
+            "desc": f"Installing pre-commit hooks",
+        })
+
     # Optional package groups
     if 'chemprice' in extras  or 'all' in extras:
         commands.extend(install_packages_from_group("chemprice"))
