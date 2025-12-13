@@ -6,11 +6,12 @@ from .rag_tokenizers import SmilesTokenizer
 
 
 class SmilesEmbedder:
-    def __init__(self,
+    def __init__(
+        self,
         model_path: str,
         tokenizer: SmilesTokenizer,
         max_len: int | None = None,
-        device: torch.device | int | None = None
+        device: torch.device | int | None = None,
     ) -> None:
         """
         Args:
@@ -36,9 +37,12 @@ class SmilesEmbedder:
             padding_value=pad_id,
         )
         if self.max_len is not None:
-            padded_ids = padded_ids[:, :self.max_len]
-        attn_mask = (padded_ids != pad_id)
-        return {'input_ids': padded_ids.to(self.device), 'attention_mask': attn_mask.long().to(self.device)}
+            padded_ids = padded_ids[:, : self.max_len]
+        attn_mask = padded_ids != pad_id
+        return {
+            "input_ids": padded_ids.to(self.device),
+            "attention_mask": attn_mask.long().to(self.device),
+        }
 
     def embed_smiles(self, smiles: list[str]) -> ndarray:
         """
@@ -47,10 +51,12 @@ class SmilesEmbedder:
         Returns:
             Embedding vectors of shape ``[B, d]``.
         """
-        assert isinstance(smiles, list), 'Input argument `smiles` must be of type list[str].'
-        
+        assert isinstance(
+            smiles, list
+        ), "Input argument `smiles` must be of type list[str]."
+
         ragged_ids = self.tokenizer(smiles)
         batch = self.pad_input_ids(ragged_ids)
         with torch.inference_mode():
-            emb = self.model(batch['input_ids'], batch['attention_mask'])
+            emb = self.model(batch["input_ids"], batch["attention_mask"])
         return emb.cpu().numpy().astype(np.float32)

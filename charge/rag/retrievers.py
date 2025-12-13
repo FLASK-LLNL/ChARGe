@@ -6,7 +6,9 @@ from typing import Any
 
 
 class FaissDataRetriever:
-    def __init__(self, data_path: str, emb_path: str, data_format: str = 'json') -> None:
+    def __init__(
+        self, data_path: str, emb_path: str, data_format: str = "json"
+    ) -> None:
         """
         Args:
             data_path (str): path to data file for retrieval. Must be iterable (e.g., a list)
@@ -16,10 +18,10 @@ class FaissDataRetriever:
         self.data_path = data_path
         self.emb_path = emb_path
         self.data_format = data_format
-        
+
         # Load the data file into an iterable
         match data_format:
-            case 'json':
+            case "json":
                 self.data = self._load_json(data_path)
             case _:
                 raise NotImplementedError
@@ -33,11 +35,13 @@ class FaissDataRetriever:
         self.faiss_index.add(emb)
 
     def _load_json(self, filename: str) -> list[dict]:
-        with open(filename, 'r') as f:
+        with open(filename, "r") as f:
             data = [json.loads(line) for line in f]
         return data
 
-    def search_similar(self, query: ndarray, k: int) -> tuple[list[list[float]], list[list[int]], list[list[Any]]]:
+    def search_similar(
+        self, query: ndarray, k: int
+    ) -> tuple[list[list[float]], list[list[int]], list[list[Any]]]:
         D, I = self.faiss_index.search(query, k)
         similar = []
         for row in I:

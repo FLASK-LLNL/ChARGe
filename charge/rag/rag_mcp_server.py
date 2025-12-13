@@ -9,9 +9,15 @@ import itertools
 datasets.disable_caching()
 
 try:
-    from transformers import AutoTokenizer, AutoModelForCausalLM, LlamaForCausalLM, PreTrainedTokenizer
+    from transformers import (
+        AutoTokenizer,
+        AutoModelForCausalLM,
+        LlamaForCausalLM,
+        PreTrainedTokenizer,
+    )
     import torch
     from trl import apply_chat_template
+
     HAS_FLASKV2 = True
 except (ImportError, ModuleNotFoundError) as e:
     HAS_FLASKV2 = False
@@ -23,9 +29,14 @@ except (ImportError, ModuleNotFoundError) as e:
 from charge.rag import SmilesEmbedder, FaissDataRetriever
 from charge.rag.rag_tokenizers import ChemformerTokenizer
 from charge.rag.prompts import ReactionDataPrompt
-from charge.servers.FLASKv2_reactions import format_rxn_prompt, PRODUCT_KEYS, REAGENT_KEYS
+from charge.servers.FLASKv2_reactions import (
+    format_rxn_prompt,
+    PRODUCT_KEYS,
+    REAGENT_KEYS,
+)
 
 import logging
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
@@ -57,7 +68,7 @@ def search_similar_reactions(data: dict, forward: bool, k_r: int) -> dict:
     Returns:
         dict: The updated reaction data dictionary with new fields populated.
     """
-    input_role = 'reactants' if forward else 'products'
+    input_role = "reactants" if forward else "products"
     return search_similar_reactions_by_role(data, input_role, k_r)
 
 
@@ -81,20 +92,28 @@ def search_similar_reactions_by_role(data: dict, role: str, k_r: int) -> dict:
     Returns:
         dict: The updated reaction data dictionary with new fields populated.
     """
-    assert role in ['reactants', 'products'], f"role must be one of 'reactants' or 'products', but got {role}"
+    assert role in [
+        "reactants",
+        "products",
+    ], f"role must be one of 'reactants' or 'products', but got {role}"
     input_role = role
-    logger.info(f'data is {data}')
-    assert isinstance(data[input_role], list) and isinstance(data[input_role][0], list), \
-        "This data processing function must be called in batched mode, e.g., using `dataset.map(..., batched=True)`."
+    logger.info(f"data is {data}")
+    assert isinstance(data[input_role], list) and isinstance(
+        data[input_role][0], list
+    ), "This data processing function must be called in batched mode, e.g., using `dataset.map(..., batched=True)`."
     num_reactions = len(data[input_role])
-    query_smiles = ['.'.join(data[input_role][i]) for i in range(num_reactions)]
+    query_smiles = [".".join(data[input_role][i]) for i in range(num_reactions)]
     query_emb = embedder.embed_smiles(query_smiles)
     similar_dist, similar_idx, similar = retriever.search_similar(query_emb, k=k_r)
-    data['similar'] = similar  # list of list of dicts. Each list has k_r dicts, each dict is a similar reaction.
+    data["similar"] = (
+        similar  # list of list of dicts. Each list has k_r dicts, each dict is a similar reaction.
+    )
     return data
 
 
-def predict_reaction_internal(molecules: dict[str, list[str]], forward: bool) -> list[str]:
+def predict_reaction_internal(
+    molecules: dict[str, list[str]], forward: bool
+) -> list[str]:
     """
 
     Args:
@@ -112,13 +131,17 @@ def predict_reaction_internal(molecules: dict[str, list[str]], forward: bool) ->
             "Please install the [flask] optional packages to use this module."
         )
     if isinstance(molecules, list):
-        logger.info(f'molecules should be a rxn dict of list of SMILES, not a list of smiles. Converting to a rxn dict')
-        molecules = {'reactants': molecules} if forward else {'products': molecules}
+        logger.info(
+            f"molecules should be a rxn dict of list of SMILES, not a list of smiles. Converting to a rxn dict"
+        )
+        molecules = {"reactants": molecules} if forward else {"products": molecules}
     model = forward_expert_model if forward else retro_expert_model
     with torch.inference_mode():
         prompt = format_rxn_prompt(molecules, forward=forward)
         prompt = apply_chat_template(prompt, tokenizer=tokenizer)
-        inputs = tokenizer(prompt["prompt"], return_tensors="pt", padding="longest").to('cuda')
+        inputs = tokenizer(prompt["prompt"], return_tensors="pt", padding="longest").to(
+            "cuda"
+        )
         prompt_length = inputs["input_ids"].size(1)
         outputs = model.generate(
             **inputs,
@@ -130,13 +153,19 @@ def predict_reaction_internal(molecules: dict[str, list[str]], forward: bool) ->
             eos_token_id=tokenizer.eos_token_id,
             use_cache=True,  # enable KV cache
         )
-        processed_outputs = [tokenizer.decode(out[prompt_length:], skip_special_tokens=True) for out in outputs]
+        processed_outputs = [
+            tokenizer.decode(out[prompt_length:], skip_special_tokens=True)
+            for out in outputs
+        ]
     logger.debug(f'Model input: {prompt["prompt"]}')
     processed_outs = "\n".join(processed_outputs)
-    logger.debug(f'Model output: {processed_outs}')
+    logger.debug(f"Model output: {processed_outs}")
     return processed_outputs
 
-def predict_reactions_internal(reaction_halves: list[dict[str, list[str]]], forward: bool) -> list[list[str]]:
+
+def predict_reactions_internal(
+    reaction_halves: list[dict[str, list[str]]], forward: bool
+) -> list[list[str]]:
     """
     Predict multiple reactions
 
@@ -155,17 +184,22 @@ def predict_reactions_internal(reaction_halves: list[dict[str, list[str]]], forw
             "Please install the [flask] optional packages to use this module."
         )
     if isinstance(reaction_halves[0], list):
-        logger.info(f'Reaction halves should be a list of rxn dicts, not a list of rxn dicts of list of SMILES. '
-                    f'Converting to a list of rxn dicts')
-        reaction_halves = [{'reactants': half} if forward else {'products': half} for half in reaction_halves]
+        logger.info(
+            f"Reaction halves should be a list of rxn dicts, not a list of rxn dicts of list of SMILES. "
+            f"Converting to a list of rxn dicts"
+        )
+        reaction_halves = [
+            {"reactants": half} if forward else {"products": half}
+            for half in reaction_halves
+        ]
     model = forward_expert_model if forward else retro_expert_model
     with torch.inference_mode():
         prompts = []
         for half in reaction_halves:
             format_rxn_prompt(half, forward=forward)
-            prompts.append(apply_chat_template(half, tokenizer=tokenizer)['prompt'])
+            prompts.append(apply_chat_template(half, tokenizer=tokenizer)["prompt"])
 
-        inputs = tokenizer(prompts, return_tensors="pt", padding="longest").to('cuda')
+        inputs = tokenizer(prompts, return_tensors="pt", padding="longest").to("cuda")
         prompt_length = inputs["input_ids"].size(1)
         n_beams = 3
         outputs = model.generate(
@@ -181,14 +215,20 @@ def predict_reactions_internal(reaction_halves: list[dict[str, list[str]]], forw
     processed_outputs = []
     for i in range(0, len(outputs), n_beams):
         processed_outputs.append(
-            [tokenizer.decode(out[prompt_length:], skip_special_tokens=True) for out in outputs[i:i+n_beams]])
-    logger.debug(f'Model input: {prompts}')
-    processed_outs = "\n".join([item for sublist in processed_outputs for item in sublist])
-    logger.debug(f'Model output: {processed_outs}')
+            [
+                tokenizer.decode(out[prompt_length:], skip_special_tokens=True)
+                for out in outputs[i : i + n_beams]
+            ]
+        )
+    logger.debug(f"Model input: {prompts}")
+    processed_outs = "\n".join(
+        [item for sublist in processed_outputs for item in sublist]
+    )
+    logger.debug(f"Model output: {processed_outs}")
     return processed_outputs
 
 
-#todo  #should i add any other combo tool call? that returns both?
+# todo  #should i add any other combo tool call? that returns both?
 def add_expert_predictions_on_similar_data(data: dict) -> dict:
     """
     Adds "expert predictions on similar data" to the reaction data dictionary. Will be a list of the same length as
@@ -197,10 +237,11 @@ def add_expert_predictions_on_similar_data(data: dict) -> dict:
         data (dict): reaction data that contains information about similar reactions.
             A data retriever must be used beforehand to populate `data['similar']` and `data['similar idx']`.
     """
-    expert_predictions = predict_reactions_internal(data['similar'], forward=True)
+    expert_predictions = predict_reactions_internal(data["similar"], forward=True)
     # Taking only the top-1 expert prediction per similar reaction
-    data['expert predictions on similar data'] = expert_predictions
+    data["expert predictions on similar data"] = expert_predictions
     return data
+
 
 @mcp.tool()
 def get_related_reaction_info(data: dict, forward=True, k_r: int = 3) -> dict:
@@ -225,53 +266,93 @@ def get_related_reaction_info(data: dict, forward=True, k_r: int = 3) -> dict:
     for key in to_delete:
         del data[key]
 
-    search_similar_reactions(data, forward=data['forward'], k_r=k_r)
+    search_similar_reactions(data, forward=data["forward"], k_r=k_r)
     add_expert_predictions_on_similar_data(data)
 
-    data['expert_prediction'] = predict_reaction_internal(molecules=data, forward=forward)
-    sim_expert_preds = data['expert predictions on similar data']
-    assert len(sim_expert_preds) == len(data['similar']), f"Expected {len(data['similar'])} expert predictions, but got {len(sim_expert_preds)}"
+    data["expert_prediction"] = predict_reaction_internal(
+        molecules=data, forward=forward
+    )
+    sim_expert_preds = data["expert predictions on similar data"]
+    assert len(sim_expert_preds) == len(
+        data["similar"]
+    ), f"Expected {len(data['similar'])} expert predictions, but got {len(sim_expert_preds)}"
     for i, sim_pred in enumerate(sim_expert_preds):
-        data['similar'][i]['expert_prediction'] = sim_pred
-    del data['expert predictions on similar data']
+        data["similar"][i]["expert_prediction"] = sim_pred
+    del data["expert predictions on similar data"]
     return data
 
 
-embedder : SmilesEmbedder = None
-retriever : FaissDataRetriever = None
+embedder: SmilesEmbedder = None
+retriever: FaissDataRetriever = None
 forward_expert_model = None
 retro_expert_model = None
 tokenizer = None
+
 
 def main():
     global embedder, retriever, forward_expert_model, retro_expert_model, tokenizer
     # CLI arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--database-path', type=str, help='Path to database file (JSON) for similarity search')
-    parser.add_argument('--forward-embedding-path', type=str, help='Path to embedding file (NPY) corresponding to similarity search')
-    parser.add_argument('--retro-embedding-path', type=str, help='Path to embedding file (NPY) corresponding to similarity search')
-    parser.add_argument('--all-mols-database-path', type=str, help='Path to database file (txt) of one SMILES per line for similarity search')
-    parser.add_argument('--all-mols-embedding-path', type=str, help='Path to embedding file (NPY) corresponding to similarity search')
-    parser.add_argument('--forward-expert-model-path', type=str, help='Path to forward expert model')
-    parser.add_argument('--retro-expert-model-path', type=str, help='Path to retro expert model')
+    parser.add_argument(
+        "--database-path",
+        type=str,
+        help="Path to database file (JSON) for similarity search",
+    )
+    parser.add_argument(
+        "--forward-embedding-path",
+        type=str,
+        help="Path to embedding file (NPY) corresponding to similarity search",
+    )
+    parser.add_argument(
+        "--retro-embedding-path",
+        type=str,
+        help="Path to embedding file (NPY) corresponding to similarity search",
+    )
+    parser.add_argument(
+        "--all-mols-database-path",
+        type=str,
+        help="Path to database file (txt) of one SMILES per line for similarity search",
+    )
+    parser.add_argument(
+        "--all-mols-embedding-path",
+        type=str,
+        help="Path to embedding file (NPY) corresponding to similarity search",
+    )
+    parser.add_argument(
+        "--forward-expert-model-path", type=str, help="Path to forward expert model"
+    )
+    parser.add_argument(
+        "--retro-expert-model-path", type=str, help="Path to retro expert model"
+    )
     # parser.add_argument('--k_e', type=int, help='Number of expert predictions (per input data) to show in prompt')
-    parser.add_argument('--k_r', type=int, help='Number of similar reactions (per input data) to retrieve', default=3)
-    parser.add_argument('--retrosynthesis', action='store_true', help='Whether the context is retrosynthesis. Otherwise it is forward synthesis.')
+    parser.add_argument(
+        "--k_r",
+        type=int,
+        help="Number of similar reactions (per input data) to retrieve",
+        default=3,
+    )
+    parser.add_argument(
+        "--retrosynthesis",
+        action="store_true",
+        help="Whether the context is retrosynthesis. Otherwise it is forward synthesis.",
+    )
     rag_version_group = parser.add_mutually_exclusive_group()
-    rag_version_group.add_argument('--rag-version', type=int, help='RAG version')
+    rag_version_group.add_argument("--rag-version", type=int, help="RAG version")
     args = parser.parse_args()
     for k, v in vars(args).items():
-        print(f'{k} = {v}', flush=True)
+        print(f"{k} = {v}", flush=True)
 
     expert_predictions = None
 
     # Generate prompt
-    forward = (not args.retrosynthesis)
+    forward = not args.retrosynthesis
 
     # Init RAG components
     embedder = SmilesEmbedder(
-        model_path='/p/vast1/flask/team/tim/models/chemformer/chemformer_encoder.ts',
-        tokenizer=ChemformerTokenizer(vocab_path='/p/vast1/flask/team/tim/models/chemformer/bart_vocab.json')
+        model_path="/p/vast1/flask/team/tim/models/chemformer/chemformer_encoder.ts",
+        tokenizer=ChemformerTokenizer(
+            vocab_path="/p/vast1/flask/team/tim/models/chemformer/bart_vocab.json"
+        ),
     )
     forward_retriever = FaissDataRetriever(
         data_path=args.database_path,
@@ -283,22 +364,26 @@ def main():
     )
     retriever = forward_retriever if forward else retro_retriever
 
-    tokenizer = AutoTokenizer.from_pretrained(args.forward_expert_model_path or args.retro_expert_model_path, padding_side="left")
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.forward_expert_model_path or args.retro_expert_model_path,
+        padding_side="left",
+    )
     tokenizer.add_special_tokens({"pad_token": "<|finetune_right_pad_id|>"})
     if args.forward_expert_model_path is not None:
         forward_expert_model = AutoModelForCausalLM.from_pretrained(
             args.forward_expert_model_path,
-            device_map='cuda',
+            device_map="cuda",
             torch_dtype=torch.bfloat16,
         )
     if args.retro_expert_model_path is not None:
         retro_expert_model = AutoModelForCausalLM.from_pretrained(
             args.retro_expert_model_path,
-            device_map='cuda',
+            device_map="cuda",
             torch_dtype=torch.bfloat16,
         )
 
     if forward_expert_model is not None:
+
         @mcp.tool()
         def get_expert_forward_synthesis_predictions(reactants: list[str]) -> list[str]:
             """
@@ -310,12 +395,14 @@ def main():
             Returns:
                 list[str]: A list of product predictions, each of which is  json string listing the predicted product molecule(s) in SMILES.
             """
-            logger.debug('Calling `predict_reaction_products`')
-            logger.debug(f'Input reactions: {reactants}')
+            logger.debug("Calling `predict_reaction_products`")
+            logger.debug(f"Input reactions: {reactants}")
             res = predict_reaction_internal(molecules=reactants, forward=True)
-            logger.debug(f'Output predictions: {res}')
+            logger.debug(f"Output predictions: {res}")
             return res
+
     if retro_expert_model is not None:
+
         @mcp.tool()
         def get_expert_retro_synthesis_predictions(products: list[str]) -> list[str]:
             """
@@ -327,17 +414,18 @@ def main():
                 list[str]: a list of predictions, each of which is a json string listing the predicted reactant molecule(s) in SMILES,
                     as well as potential (re)agents and solvents used in the reaction.
             """
-            logger.debug('Calling `predict_reaction_reactants`')
+            logger.debug("Calling `predict_reaction_reactants`")
             return predict_reaction_internal(molecules=products, forward=False)
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-    #mcp.run(transport="streamable-http")
-    mcp.run(transport="sse", )
+    # mcp.run(transport="streamable-http")
+    mcp.run(
+        transport="sse",
+    )
     from charge.rag.prompts import ReactionDataPrompt_RAG
+
     # reaction_prompt = ReactionDataPrompt_RAG(forward=True)
     # res = generate_ragv1_reaction_prompt({'reactants': [["CCC"]]}, forward=True , reaction_prompt=reaction_prompt, k_r=3)
     # print(res)
-    
