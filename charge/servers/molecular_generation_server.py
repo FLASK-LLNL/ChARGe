@@ -147,6 +147,7 @@ def is_already_known(smiles: str) -> bool:
 mcp.tool()(SMILES_utils.canonicalize_smiles)
 mcp.tool()(SMILES_utils.verify_smiles)
 
+
 @mcp.tool()
 def calculate_property(
     smiles: str, property: Literal["density", "synthesizability"]

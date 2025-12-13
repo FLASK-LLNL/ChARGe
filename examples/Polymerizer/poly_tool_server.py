@@ -8,11 +8,14 @@ from mcp.server.fastmcp import Context
 # import your existing module (the one we’ve been building)
 import polymer_rules as pr
 
-mcp = FastMCP("Polymerizer", json_response=True, 
-              #description=(
-    #"Expose monomer→polymer repeat transforms via MCP tools. "
-    #"Tools: polymerize_explicit, polymerize_auto, suggest_rules."
+mcp = FastMCP(
+    "Polymerizer",
+    json_response=True,
+    # description=(
+    # "Expose monomer→polymer repeat transforms via MCP tools. "
+    # "Tools: polymerize_explicit, polymerize_auto, suggest_rules."
 )
+
 
 # ----- Structured outputs for nicer tool schemas -----
 class Suggestion(TypedDict):
@@ -20,12 +23,15 @@ class Suggestion(TypedDict):
     confidence: float
     reason: str
 
+
 class PolymerizeResult(TypedDict):
     repeat_smiles: str
     strategy: str
     rationale: str
 
+
 # ----- Tools -----
+
 
 @mcp.tool()
 def polymerize_explicit(
@@ -41,7 +47,7 @@ def polymerize_explicit(
         "rop_lactam",
         "cond_omega_amino_acid",
         "alkyne",
-        "polyacetylene",   # optional pretty-printer for C#C
+        "polyacetylene",  # optional pretty-printer for C#C
     ],
     bigsmiles_wrap: bool = False,
 ) -> str:
@@ -60,7 +66,10 @@ def suggest_rules(monomer_smiles: str, top_k: int = 5) -> List[Suggestion]:
     This does NOT perform any transformation.
     """
     ranked = pr.suggest_polymerization_rules(monomer_smiles)
-    out = [{"strategy": s.strategy, "confidence": float(s.confidence), "reason": s.reason} for s in ranked[:top_k]]
+    out = [
+        {"strategy": s.strategy, "confidence": float(s.confidence), "reason": s.reason}
+        for s in ranked[:top_k]
+    ]
     return out
 
 
@@ -83,6 +92,7 @@ def polymerize_auto(
     )
     rep_out = pr.wrap_bigsmiles_like(rep) if bigsmiles_wrap else rep
     return {"repeat_smiles": rep_out, "strategy": strat, "rationale": why}
+
 
 # ----- Run the server -----
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ To run the multi-server application, you need to start SSE server on a different
 ```bash
 python3 sse_server_1.py --port 8000 --host http://127.0.0.1
 ```
-and 
+and
 ```bash
 python3 sse_server_2.py --port 8001 --host http://127.0.0.1
 ```
@@ -21,5 +21,3 @@ python3 main.py --server-urls <sse_server_1_url> <sse_server_2_url> --backend <b
 ```
 
 The `--server-urls` argument can take multiple server URLs (space-separated) that the client will connect to. Each URL must end with `/sse`.
-
-

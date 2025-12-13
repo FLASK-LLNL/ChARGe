@@ -86,7 +86,6 @@ class LMOTask(Task):
         property_tool_name: Optional[str] = None,
         property_name: str = "density",
         optimize_direction: str = "greater",
-
         **kwargs,
     ):
         """
@@ -141,13 +140,13 @@ class LMOTask(Task):
     async def get_initial_property_value(self) -> bool:
         # Calculate the reference property value from the lead molecule
         property_result_msg = await call_mcp_tool_directly(
-            tool_name = self.property_tool_name,
-            arguments = {
+            tool_name=self.property_tool_name,
+            arguments={
                 "smiles": self.lead_molecule,
                 "property": self.property_name,
             },
-            urls = self.server_urls or [],
-            paths = self.server_files or [],
+            urls=self.server_urls or [],
+            paths=self.server_files or [],
         )
         results = property_result_msg.result
         if len(results) > 1:
@@ -184,13 +183,13 @@ class LMOTask(Task):
             )
 
         property_result_msg = await call_mcp_tool_directly(
-            tool_name = self.property_tool_name,
-            arguments = {
+            tool_name=self.property_tool_name,
+            arguments={
                 "smiles": smiles,
                 "property": self.property_name,
             },
-            urls = self.server_urls,
-            paths = self.server_files,
+            urls=self.server_urls,
+            paths=self.server_files,
         )
 
         results = property_result_msg.result

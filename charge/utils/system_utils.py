@@ -6,6 +6,7 @@ import json
 import warnings
 import requests
 
+
 def normalize_string(s: str) -> str:
     s = s.lower()
     s = re.sub(r"[\s\-]+", "_", s)
@@ -48,6 +49,7 @@ def read_from_file(self, file_path: str, key: str) -> str:
         return _prompt_from_json_file(file_path, key)
     else:
         raise ValueError("Only .txt and .json files are supported")
+
 
 def check_url_exists(url: str) -> bool:
     if not url.startswith("http://") and not url.startswith("https://"):
@@ -112,5 +114,3 @@ def check_server_paths(server_paths: Optional[Union[str, list]]) -> list:
         if CHARGE_RAISE_ON_MISSING_SERVER:
             raise ValueError("One or more server paths do not exist.")
     return valid_paths
-
-

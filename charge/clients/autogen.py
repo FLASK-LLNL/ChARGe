@@ -41,7 +41,10 @@ from charge.clients.autogen_utils import (
     cli_chat_callback,
     chargeConnectionError,
 )
-from charge.utils.mcp_workbench_utils import _setup_mcp_workbenches, _close_mcp_workbenches
+from charge.utils.mcp_workbench_utils import (
+    _setup_mcp_workbenches,
+    _close_mcp_workbenches,
+)
 from typing import Any, Tuple, Optional, Dict, Union, List, Callable, overload
 from charge.tasks.Task import Task
 from loguru import logger
@@ -192,7 +195,7 @@ def create_autogen_model_client(
     """
     if model_kwargs is None:
         model_kwargs = {}
-    
+
     model_info = ModelInfo(
         vision=False,
         function_calling=True,
@@ -212,8 +215,8 @@ def create_autogen_model_client(
         model_path = os.getenv("LOCAL_MODEL_PATH", "./models/gpt-oss-20b")
         device = model_kwargs.pop("device", "auto")
         torch_dtype = model_kwargs.pop("torch_dtype", "auto")
-        quantization = None #model_kwargs.pop("quantization", "4bit")
-        
+        quantization = None  # model_kwargs.pop("quantization", "4bit")
+
         model_client = HuggingFaceLocalClient(
             model_path=model_path,
             model_info=model_info,
@@ -224,7 +227,9 @@ def create_autogen_model_client(
         )
     elif backend == "vllm":
         # Extract vLLM-specific kwargs
-        vllm_url = model_kwargs.pop("vllm_url", os.getenv("VLLM_URL", "http://localhost:8000/v1"))
+        vllm_url = model_kwargs.pop(
+            "vllm_url", os.getenv("VLLM_URL", "http://localhost:8000/v1")
+        )
         vllm_model = model_kwargs.pop("vllm_model", os.getenv("VLLM_MODEL", model))
 
         # Set reasoning effort level
@@ -233,9 +238,9 @@ def create_autogen_model_client(
 
         # Increase max_tokens for high (to avoid all tokens used on reasoning)
         max_tokens = 8192
-        if reasoning_effort=="high": 
+        if reasoning_effort == "high":
             max_tokens = 16000
-        
+
         logger.info(f"\n  ==> GPT-OSS reasoning effort: {reasoning_effort}")
 
         vllm_model_info = ModelInfo(
@@ -245,11 +250,11 @@ def create_autogen_model_client(
             family=ModelFamily.UNKNOWN,
             structured_output=False,
         )
-        
-        reasoning_client = False # True to help with debugging
+
+        reasoning_client = False  # True to help with debugging
         if reasoning_client:
             from charge.clients.reasoning import ReasoningCaptureClient
-            
+
             model_client = ReasoningCaptureClient(
                 model=vllm_model,
                 api_key="EMPTY",
@@ -259,21 +264,22 @@ def create_autogen_model_client(
                 extra_body={
                     "reasoning_effort": reasoning_effort,
                     "max_tokens": max_tokens,
-                    },
+                },
             )
         else:
             from autogen_ext.models.openai import OpenAIChatCompletionClient
+
             # Use OpenAIChatCompletionClient
             model_client = OpenAIChatCompletionClient(
                 model=vllm_model,
                 api_key="EMPTY",
                 base_url=vllm_url,
                 model_info=vllm_model_info,
-                parallel_tool_calls=False, # False for gpt-oss
+                parallel_tool_calls=False,  # False for gpt-oss
                 extra_body={
                     "reasoning_effort": reasoning_effort,
                     "max_tokens": max_tokens,
-                    },
+                },
             )
     else:
         if api_key is None:
@@ -361,7 +367,9 @@ class AutoGenAgent(Agent):
         Returns:
             None
         """
-        self.workbenches = await _setup_mcp_workbenches(self.task.server_files, self.task.server_urls)
+        self.workbenches = await _setup_mcp_workbenches(
+            self.task.server_files, self.task.server_urls
+        )
         if len(self.workbenches) == 0:
             return
         await asyncio.gather(*[workbench.start() for workbench in self.workbenches])

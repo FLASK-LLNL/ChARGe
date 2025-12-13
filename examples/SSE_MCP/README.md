@@ -13,7 +13,7 @@ python server.py
 This will start an SSE MCP server locally. Note the address and port where the server is running (by default, it will be `http://127.0.0.1:8000`).
 
 ### Client Usage
-You can then use the ChARGe client to connect to this server and perform operations. 
+You can then use the ChARGe client to connect to this server and perform operations.
 Run the following script to see how to use the client with the SSE MCP server:
 
 ```bash

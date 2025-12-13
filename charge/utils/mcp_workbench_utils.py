@@ -14,7 +14,10 @@ except ImportError:
 import asyncio
 from typing import Any, Type, Optional, List
 
-def create_servers(paths: List[str], urls: List[str], timeout: Optional[int] = 60) -> List[Any]:
+
+def create_servers(
+    paths: List[str], urls: List[str], timeout: Optional[int] = 60
+) -> List[Any]:
     """
     Creates MCP servers from the task's server paths.
 
@@ -40,14 +43,17 @@ def create_servers(paths: List[str], urls: List[str], timeout: Optional[int] = 6
         )
     return mcp_servers
 
-async def _setup_mcp_workbenches(paths: List[str], urls: List[str]) -> List[McpWorkbench]:
+
+async def _setup_mcp_workbenches(
+    paths: List[str], urls: List[str]
+) -> List[McpWorkbench]:
     """
     Sets up MCP workbenches from the task's server paths.
 
     Returns:
         None
     """
-    mcps = create_servers(paths,urls)
+    mcps = create_servers(paths, urls)
 
     if len(mcps) == 0:
         return []
@@ -55,6 +61,7 @@ async def _setup_mcp_workbenches(paths: List[str], urls: List[str]) -> List[McpW
 
     await asyncio.gather(*[workbench.start() for workbench in workbenches])
     return workbenches
+
 
 async def _close_mcp_workbenches(workbenches: List[McpWorkbench]) -> None:
     """
@@ -67,7 +74,10 @@ async def _close_mcp_workbenches(workbenches: List[McpWorkbench]) -> None:
         return
     await asyncio.gather(*[workbench.stop() for workbench in workbenches])
 
-async def call_mcp_tool_directly(tool_name: str, arguments: dict, urls: list[str] = [], paths: list[str] = []):
+
+async def call_mcp_tool_directly(
+    tool_name: str, arguments: dict, urls: list[str] = [], paths: list[str] = []
+):
     """Call a tool directly from an available server URLs and paths."""
     workbenches = await _setup_mcp_workbenches(paths, urls)
 
@@ -79,15 +89,14 @@ async def call_mcp_tool_directly(tool_name: str, arguments: dict, urls: list[str
             tool_names = [t["name"] for t in tools]
 
             if tool_name in tool_names:
-                result = await workbench.call_tool(
-                    name=tool_name,
-                    arguments=arguments
-                )
+                result = await workbench.call_tool(name=tool_name, arguments=arguments)
                 return result
             else:
                 unused_tools.append(tool_names)
 
-        raise ValueError(f"Tool '{tool_name}' not found in any workbench: {unused_tools}")
+        raise ValueError(
+            f"Tool '{tool_name}' not found in any workbench: {unused_tools}"
+        )
 
     finally:
         await _close_mcp_workbenches(workbenches)

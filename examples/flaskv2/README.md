@@ -52,18 +52,17 @@ export OSS_REASONING="low"                   # Options: ["low", "medium", "high"
 
 Overall retrosynthetic plan to make caffeine (CN1C=NC2=C1C(=O)N(C(=O)N2C)C)
 
-Step 1. N-Methylation of theobromine to give caffeine  
- Theobromine (3,7-dimethylxanthine; SMILES: CN1C=NC2=C1C(=O)N(C(=O)N2)C)  
-  + MeI (or Me2SO4) + strong base (NaH, NaOH, K2CO3) → caffeine  
+Step 1. N-Methylation of theobromine to give caffeine
+ Theobromine (3,7-dimethylxanthine; SMILES: CN1C=NC2=C1C(=O)N(C(=O)N2)C)
+  + MeI (or Me2SO4) + strong base (NaH, NaOH, K2CO3) → caffeine
  (Reaction indicated by tool outputs #1 and #3: “CI” = CH3I plus theobromine.)
 
-Step 2. Preparation of theobromine from xanthine (if needed)  
- Xanthine + MeI (1 equiv) + base → 7-methylxanthine  
- 7-Methylxanthine + MeI (1 equiv) + base → theobromine  
+Step 2. Preparation of theobromine from xanthine (if needed)
+ Xanthine + MeI (1 equiv) + base → 7-methylxanthine
+ 7-Methylxanthine + MeI (1 equiv) + base → theobromine
 
-Commercially, xanthine itself can be obtained from uric acid by decarboxylation, or it can be built de novo from dimethylurea and malonic acid (Traube synthesis).  
+Commercially, xanthine itself can be obtained from uric acid by decarboxylation, or it can be built de novo from dimethylurea and malonic acid (Traube synthesis).
 
-Summary route:  
+Summary route:
 Uric acid → (decarboxylation) xanthine → (2 × MeI, base) theobromine → (MeI, base) caffeine.
 ```
-
