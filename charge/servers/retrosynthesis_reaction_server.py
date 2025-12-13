@@ -40,6 +40,7 @@ if __name__ == "__main__":
 
     if exp_type == "template":
         from charge.servers.SMARTS_reactions import SMARTS_mcp
+
         SMARTS_mcp.tool()(log_progress)
 
         SMARTS_mcp.run(

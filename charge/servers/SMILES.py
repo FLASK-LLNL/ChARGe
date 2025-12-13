@@ -12,6 +12,7 @@ try:
     from rdkit import Chem
     from rdkit.Chem import AllChem, Descriptors
     from rdkit.Contrib.SA_Score import sascorer
+
     HAS_SMILES = True
 except (ImportError, ModuleNotFoundError) as e:
     HAS_SMILES = False

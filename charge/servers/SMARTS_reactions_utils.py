@@ -7,9 +7,11 @@
 
 from loguru import logger
 from mcp.server.fastmcp import FastMCP
+
 try:
     from rdkit import Chem
     from rdkit.Chem import AllChem, rdChemReactions
+
     HAS_SMARTS = True
 except (ImportError, ModuleNotFoundError) as e:
     HAS_SMARTS = False
@@ -19,6 +21,7 @@ except (ImportError, ModuleNotFoundError) as e:
     )
 
 from typing import Tuple
+
 
 def verify_reaction_SMARTS(smarts: str) -> Tuple[bool, str]:
     """
@@ -34,7 +37,9 @@ def verify_reaction_SMARTS(smarts: str) -> Tuple[bool, str]:
             str: Error message if the SMARTS reaction is valid.
     """
     if not HAS_SMARTS:
-        raise ImportError("Please install the rdkit support packages to use this module.")
+        raise ImportError(
+            "Please install the rdkit support packages to use this module."
+        )
     try:
         logger.info(f"Verifying SMARTS: {smarts}")
         rxn = AllChem.ReactionFromSmarts(smarts)
@@ -59,6 +64,7 @@ def verify_reaction_SMARTS(smarts: str) -> Tuple[bool, str]:
         logger.error(f"Invalid SMARTS string: {e}")
         return False, f"Invalid Syntax for SMARTS string. The error is: {e}"
 
+
 def verify_reaction(
     smarts: str, reactants: list[str], products: list[str]
 ) -> Tuple[bool, str]:
@@ -79,7 +85,9 @@ def verify_reaction(
             str: Error message if the SMARTS reaction is valid.
     """
     if not HAS_SMARTS:
-        raise ImportError("Please install the rdkit support packages to use this module.")
+        raise ImportError(
+            "Please install the rdkit support packages to use this module."
+        )
     try:
         logger.info(
             f"Verifying reaction with SMARTS: {smarts}, Reactants: {reactants}, Products: {products}"
@@ -131,4 +139,3 @@ def verify_reaction(
     except Exception as e:
         logger.error(f"Error verifying reaction: {e}")
         return False, f"Error verifying reaction: {e}"
-    

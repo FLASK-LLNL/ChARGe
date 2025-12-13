@@ -11,10 +11,9 @@ import argparse
 import atexit
 import readline
 
+
 class Client:
-    def __init__(
-        self, task: Task, path: str = ".", max_retries: int = 3
-    ):
+    def __init__(self, task: Task, path: str = ".", max_retries: int = 3):
         self.task = task
         self.path = path
         self.max_retries = max_retries
@@ -96,7 +95,9 @@ class Client:
         raise NotImplementedError("Subclasses must implement this method.")
 
     @staticmethod
-    def add_std_parser_arguments(parser: argparse.ArgumentParser, defaults: Optional[Dict[str, str]] = None):
+    def add_std_parser_arguments(
+        parser: argparse.ArgumentParser, defaults: Optional[Dict[str, str]] = None
+    ):
         defaults = defaults or {}
         parser.add_argument(
             "--model",

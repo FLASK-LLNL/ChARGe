@@ -3,83 +3,86 @@
 ## See the top-level LICENSE file for details.
 ##
 ## SPDX-License-Identifier: Apache-2.0
- ################################################################################
+################################################################################
 
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 from autogen_core.models import CreateResult, RequestUsage
 import json
 from loguru import logger
 
+
 class ReasoningCaptureClient(OpenAIChatCompletionClient):
     """Wrapper that captures reasoning from raw API responses"""
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.reasoning_history = []
-    
+
     async def create(self, messages, **kwargs):
         """Intercept the raw API call to capture reasoning_content"""
-        
-        logger.info("\n" + "="*80 + "\n")
+
+        logger.info("\n" + "=" * 80 + "\n")
         logger.info("ReasoningCaptureClient.create() called\n")
         logger.info(f"kwargs keys: {kwargs.keys()}\n")
-        
+
         # The model is passed in the request, extract it from kwargs if present
         # OR get it from the parent class's stored configuration
-        model_name = kwargs.get('model')
+        model_name = kwargs.get("model")
         if not model_name:
             # Try to access parent's model info
-            if hasattr(self, '_model_info'):
+            if hasattr(self, "_model_info"):
                 logger.info(f"Found _model_info\n")
             # Just call parent - it knows how to handle it
             logger.info("Calling parent's create method\n")
-            
+
             # Call parent but we need to intercept the actual HTTP response
             # The problem is the parent converts it already
             # So we need a different approach - let's override at HTTP level
-            
+
         # Actually, let's just call parent and extract from the result
         response = await super().create(messages, **kwargs)
-        
+
         logger.info(f"Got response, type: {type(response)}\n")
         logger.info(f"Response has thought: {hasattr(response, 'thought')}\n")
-        if hasattr(response, 'thought'):
+        if hasattr(response, "thought"):
             logger.info(f"Thought value: {response.thought}\n")
             if response.thought:
                 self.reasoning_history.append(response.thought)
                 logger.info("[CAPTURED REASONING]\n")
                 logger.info(f"{response.thought}\n")
-        
-        logger.info("="*80 + "\n\n")
-        
+
+        logger.info("=" * 80 + "\n\n")
+
         return response
-    
+
     def get_reasoning_history(self):
         """Get all captured reasoning"""
         return self.reasoning_history
-    
+
     def clear_reasoning_history(self):
         """Clear reasoning history"""
         self.reasoning_history = []
+
 
 import logging
 import json
 import sys
 from autogen_agentchat.messages import ThoughtEvent
 
+
 class ReasoningCapture(logging.Handler):
     """Custom log handler to capture reasoning from autogen_core.events"""
-    
+
     def __init__(self):
         super().__init__()
         self.reasoning_history = []
-    
+
     def emit(self, record):
         """Called for each log message"""
         if record.name == "autogen_core.events":
             try:
                 log_data = json.loads(record.getMessage())
-                
+
                 if log_data.get("type") == "LLMCall" and "response" in log_data:
                     response = log_data["response"]
                     if "choices" in response:
@@ -88,47 +91,51 @@ class ReasoningCapture(logging.Handler):
                             reasoning = message.get("reasoning_content")
                             if reasoning:
                                 self.reasoning_history.append(reasoning)
-                                logger.info(f"\n[CAPTURED INTERMEDIATE REASONING]\n{reasoning}\n\n")
+                                logger.info(
+                                    f"\n[CAPTURED INTERMEDIATE REASONING]\n{reasoning}\n\n"
+                                )
             except (json.JSONDecodeError, KeyError):
                 pass
-    
+
     def get_reasoning_history(self):
         return self.reasoning_history
-    
+
     def clear_reasoning_history(self):
         self.reasoning_history = []
-    
+
     def inject_into_result(self, result):
         """Inject captured reasoning as ThoughtEvents into the result messages"""
-        if not hasattr(result, 'messages'):
+        if not hasattr(result, "messages"):
             return result
-        
+
         # Find existing ThoughtEvents to see the pattern
-        existing_thoughts = [msg for msg in result.messages if hasattr(msg, 'type') and msg.type == 'ThoughtEvent']
-        
+        existing_thoughts = [
+            msg
+            for msg in result.messages
+            if hasattr(msg, "type") and msg.type == "ThoughtEvent"
+        ]
+
         # If we captured more reasoning than what's in the result, add them
         if len(self.reasoning_history) > len(existing_thoughts):
             # We need to insert ThoughtEvents between the tool calls
             # This is tricky because we need to figure out where to insert them
-            
+
             # Simpler approach: append all missing reasoning at the end before final message
             new_messages = list(result.messages[:-1])  # All except last
-            
+
             # Add ThoughtEvents for each captured reasoning
-            for reasoning in self.reasoning_history[len(existing_thoughts):]:
+            for reasoning in self.reasoning_history[len(existing_thoughts) :]:
                 thought_event = type(result.messages[0])(
-                    source='Assistant',
-                    content=reasoning,
-                    type='ThoughtEvent'
+                    source="Assistant", content=reasoning, type="ThoughtEvent"
                 )
                 new_messages.append(thought_event)
-            
+
             # Add the final message back
             new_messages.append(result.messages[-1])
-            
+
             # Replace messages
             result.messages = new_messages
-        
+
         return result
 
 

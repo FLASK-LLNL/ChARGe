@@ -11,6 +11,7 @@ from loguru import logger
 try:
     from rdkit import Chem
     from rdkit.Chem import AllChem, rdChemReactions
+
     HAS_SMARTS = True
 except (ImportError, ModuleNotFoundError) as e:
     HAS_SMARTS = False

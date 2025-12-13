@@ -26,12 +26,14 @@ import os
 from typing import Literal, Tuple
 
 PropertyType = Literal[
-    "density", "hof", "alpha", "cv", "gap",
-    "homo", "lumo", "mu", "r2", "zpve", "lipo"
+    "density", "hof", "alpha", "cv", "gap", "homo", "lumo", "mu", "r2", "zpve", "lipo"
 ]
 
+
 # Note that the PropertyType here is unnecessary except to unify the tool interface
-def get_density(smiles: str, property: PropertyType = "density") -> Tuple[PropertyType, float]:
+def get_density(
+    smiles: str, property: PropertyType = "density"
+) -> Tuple[PropertyType, float]:
     """
     Calculate the density of a molecule given its SMILES string.
     Density is the molecular weight of the molecule per unit volume.
@@ -99,7 +101,9 @@ def get_density_and_synthesizability(smiles: str) -> Tuple[float, float]:
     return density, synthesizability
 
 
-def calculate_property_hf(smiles: str, property: PropertyType) -> Tuple[PropertyType, float]:
+def calculate_property_hf(
+    smiles: str, property: PropertyType
+) -> Tuple[PropertyType, float]:
     """
     Predict molecular properties using high-fidelity pre-trained Chemprop models.
     This function returns property predictions from Chemprop models. It validates the requested property name,
@@ -182,9 +186,7 @@ def calculate_property_hf(smiles: str, property: PropertyType) -> Tuple[Property
         model_path = os.path.join(model_path, "model_0/best.pt")
         return property, predict_with_chemprop(model_path, [smiles])[0][0]
     else:
-        raise ValueError(
-            f"CHEMPROP_BASE_PATH environment variable not set!"
-        )
+        raise ValueError(f"CHEMPROP_BASE_PATH environment variable not set!")
 
 
 def get_molecule_price(smiles):
@@ -251,4 +253,4 @@ def polymerize_monomer(smiles):
         logger.warning("Unable to find polymerizer tool. Returning input smiles:")
         return smiles
     PSMILES = polymerize_auto(smiles)
-    return PSMILES 
+    return PSMILES
