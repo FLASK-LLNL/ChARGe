@@ -2,8 +2,9 @@ import argparse
 import asyncio
 import time
 from charge.tasks.LMOTask import LMOTask as LeadMoleculeOptimization
-import os
+from charge.tasks.LMOTask import MoleculeOutputSchema
 from charge.clients.Client import Client
+from charge.clients.autogen import AutoGenPool
 import charge.utils.helper_funcs as helper_funcs
 from loguru import logger
 
@@ -48,30 +49,12 @@ if __name__ == "__main__":
     for url in server_urls:
         assert url.endswith("/sse"), f"Server URL {url} must end with /sse"
 
-    if args.client == "gemini":
-        from charge.clients.gemini import GeminiClient
-
-        client_key = os.getenv("GOOGLE_API_KEY")
-        assert client_key is not None, "GOOGLE_API_KEY must be set in environment"
-        runner = GeminiClient(task=mytask, api_key=client_key)
-    elif args.client == "autogen":
-        from charge.clients.autogen import AutoGenClient
-
-        (model, backend, API_KEY, kwargs) = AutoGenClient.configure(
-            args.model, args.backend
-        )
-
-        runner = AutoGenClient(
-            task=mytask,
-            model=model,
-            backend=backend,
-            api_key=API_KEY,
-            model_kwargs=kwargs,
-            server_path=server_path,
-            server_url=server_urls,
-        )
-
     mol_file_path = args.json_file
+
+    agent_pool = AutoGenPool(model=args.model, backend=args.backend)
+    runner = agent_pool.create_agent(
+        task=mytask, server_urls=server_urls, server_path=server_path
+    )
 
     lead_molecule_smiles = args.lead_molecule
     logger.info(f"Starting task with lead molecule: {lead_molecule_smiles}")
@@ -103,6 +86,8 @@ if __name__ == "__main__":
                 logger.info("Reached maximum iterations. Ending task.")
                 break
             results = asyncio.run(runner.run())
+            results = MoleculeOutputSchema.model_validate_json(results)
+
             results = results.as_list()  # Convert to list of strings
             logger.info(f"New molecules generated: {results}")
             processed_mol = helper_funcs.post_process_smiles(
@@ -120,19 +105,18 @@ if __name__ == "__main__":
                 )
                 logger.info(f"New molecule added: {canonical_smiles}")
 
+                mytask = LeadMoleculeOptimization(
+                    lead_molecule=canonical_smiles,
+                    server_path=server_path,
+                    server_urls=server_urls,
+                )
+
                 node_id += 1
             else:
                 logger.info(f"Duplicate molecule found: {canonical_smiles}")
 
             logger.info(f"Total unique molecules so far: {new_molecules}")
-
-            # TODO: Update the prompt with the new lead molecule or maybe the
-            # the best performing molecule.
-
-            # reset the runner for the next iteration
-            runner.reset()
-
-            time.sleep(2)  # To avoid rate limiting
+            runner = agent_pool.create_agent(task=mytask)
 
             if len(new_molecules) >= 5:  # Collect 5 new molecules then stop
                 break
@@ -142,7 +126,7 @@ if __name__ == "__main__":
         except Exception as e:
             logger.error(f"An error occurred: {e}")
             logger.info("Restarting the task...")
-            runner.reset()
+            runner = agent_pool.create_agent(task=mytask)
             continue
 
     logger.info(f"Task completed. Results: {new_molecules}")

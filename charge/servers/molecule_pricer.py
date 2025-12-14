@@ -1,7 +1,9 @@
 from loguru import logger
+
 try:
     import chemprice
     from chemprice import PriceCollector
+
     HAS_CHEMPRICE = True
 except (ImportError, ModuleNotFoundError) as e:
     HAS_CHEMPRICE = False
@@ -11,8 +13,8 @@ except (ImportError, ModuleNotFoundError) as e:
     )
 import os, sys
 
-def get_chemspace_prices(SMILES_list,best_only=True):
-    
+
+def get_chemspace_prices(SMILES_list, best_only=True):
     """
     Retrieve vendor pricing from ChemSpace for one or more molecules specified by SMILES.
 
@@ -51,27 +53,30 @@ def get_chemspace_prices(SMILES_list,best_only=True):
     >>> get_chemspace_prices(["CCO","CO","CCC"], best_only=True)
     [0.1056, 9.57, nan]
 
-    """    
+    """
 
     if not HAS_CHEMPRICE:
-        raise ImportError("Please install the chemprice support packages to use this module.")
+        raise ImportError(
+            "Please install the chemprice support packages to use this module."
+        )
 
     pc = PriceCollector()
     chemspace_api_key = os.getenv("CHEMSPACE_API_KEY")
-    if(chemspace_api_key):
+    if chemspace_api_key:
         pc.setChemSpaceApiKey(chemspace_api_key)
     else:
-        print('CHEMPROP_API_KEY environment variable not set!')
+        print("CHEMPROP_API_KEY environment variable not set!")
         sys.exit(2)
     print(pc.check())
     all_prices = pc.collect(SMILES_list)
-    if(best_only):
-        best_price=pc.selectBest(all_prices)
-        return(best_price["USD/g"].astype(float).tolist())
+    if best_only:
+        best_price = pc.selectBest(all_prices)
+        return best_price["USD/g"].astype(float).tolist()
     else:
-        return(all_prices)
+        return all_prices
 
-def main(smiles_list,price_source='Chemspace'):
+
+def main(smiles_list, price_source="Chemspace"):
     """
     Main function that retrieves prices for a list of SMILES strings. Default to Chemspace because it doesn't have API limits. Keep this function to add future price_sources (Molport).
 
@@ -80,11 +85,14 @@ def main(smiles_list,price_source='Chemspace'):
     """
 
     if not HAS_CHEMPRICE:
-        raise ImportError("Please install the chemprice support packages to use this module.")
-    if(price_source=='Chemspace'):
-        prices=get_chemspace_prices(smiles_list)
-    print("Retrieved Prices from "+price_source+":")
+        raise ImportError(
+            "Please install the chemprice support packages to use this module."
+        )
+    if price_source == "Chemspace":
+        prices = get_chemspace_prices(smiles_list)
+    print("Retrieved Prices from " + price_source + ":")
     print(prices)
+
 
 if __name__ == "__main__":
     # Example usage

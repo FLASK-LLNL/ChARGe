@@ -13,7 +13,7 @@ python server.py
 This will start an SSE MCP server locally. Note the address and port where the server is running (by default, it will be `http://127.0.0.1:8000`).
 
 ### Client Usage
-You can then use the ChARGe client to connect to this server and perform operations. 
+You can then use the ChARGe client to connect to this server and perform operations.
 Run the following script to see how to use the client with the SSE MCP server:
 
 ```bash
@@ -21,3 +21,11 @@ python main.py --backend <backend> --model <model> --server-url <server_url>/sse
 ```
 
 **Note:** The `--server-url` should point to the address where your SSE MCP server is running, appended with `/sse`.
+
+To use the `vllm` backend, set the following environment variables before running:
+
+```bash
+export VLLM_URL="<url-of-vllm-model>"
+export VLLM_MODEL="<path-to-model-weights>"  # e.g., /usr/workspace/gpt-oss-120b
+export OSS_REASONING="low"                   # Options: ["low", "medium", "high"]
+```

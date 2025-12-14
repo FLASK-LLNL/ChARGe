@@ -9,6 +9,7 @@ try:
     from lightning import pytorch as pl
     from chemprop import data, models, featurizers
     from chemprop.models import MPNN
+
     HAS_CHEMPROP = True
 except (ImportError, ModuleNotFoundError) as e:
     HAS_CHEMPROP = False
@@ -19,6 +20,7 @@ except (ImportError, ModuleNotFoundError) as e:
 from typing import List
 import numpy as np
 import os, sys
+
 
 def predict_with_chemprop(
     checkpoint_path: str,
@@ -47,11 +49,13 @@ def predict_with_chemprop(
         Predictions: for each input SMILES, a list of output values (one per task).
     """
     if not HAS_CHEMPROP:
-        raise ImportError("Please install the chemprop support packages to use this module.")
+        raise ImportError(
+            "Please install the chemprop support packages to use this module."
+        )
 
     # Load model
-    mpnn=MPNN.load_from_file(checkpoint_path)
-    #model = model.to(device)
+    mpnn = MPNN.load_from_file(checkpoint_path)
+    # model = model.to(device)
     mpnn.eval()
 
     # 2) Build datapoints -> dataset -> dataloader
@@ -62,7 +66,9 @@ def predict_with_chemprop(
 
     # 3) Predict with Lightning Trainer
     with torch.inference_mode():
-        trainer = pl.Trainer(logger=None, enable_progress_bar=False, accelerator=device, devices=1)
+        trainer = pl.Trainer(
+            logger=None, enable_progress_bar=False, accelerator=device, devices=1
+        )
         preds_batches = trainer.predict(mpnn, loader)
 
     preds = np.concatenate(preds_batches, axis=0).tolist()
@@ -71,19 +77,27 @@ def predict_with_chemprop(
 
 @click.command()
 @click.option("--model-dir", envvar="CHEMPROP_BASE_PATH", help="Path to chemprop model")
-@click.option("--device", envvar="CHEMPROP_SERVER_DEVICE", default="cpu", help="Device to use for the chemprop server: cpu, cuda")
+@click.option(
+    "--device",
+    envvar="CHEMPROP_SERVER_DEVICE",
+    default="cpu",
+    help="Device to use for the chemprop server: cpu, cuda",
+)
 def main(model_dir: str, device: str):
     if not HAS_CHEMPROP:
-        raise ImportError("Please install the chemprop support packages to use this module.")
+        raise ImportError(
+            "Please install the chemprop support packages to use this module."
+        )
 
-    chemprop_base_path=model_dir
-    if(chemprop_base_path):
+    chemprop_base_path = model_dir
+    if chemprop_base_path:
         ckpt = os.path.join(chemprop_base_path, "gap/model_0/best.pt")
         smis = ["O=CC12C3CC1CCN23", "CCC", "c1ccccc1O"]
         print(predict_with_chemprop(ckpt, smis, device))
     else:
-        print('CHEMPROP_BASE_PATH environment variable not set!')
+        print("CHEMPROP_BASE_PATH environment variable not set!")
         sys.exit(2)
+
 
 if __name__ == "__main__":
     main()

@@ -9,4 +9,3 @@ from charge.servers.SMILES import SMILES_mcp
 
 if __name__ == "__main__":
     SMILES_mcp.run(transport="sse")
-

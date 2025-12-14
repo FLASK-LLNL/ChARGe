@@ -6,10 +6,12 @@
 ################################################################################
 
 from loguru import logger
+
 try:
     from rdkit import Chem
     from rdkit.Chem import AllChem, Descriptors
     from rdkit.Contrib.SA_Score import sascorer
+
     HAS_RDKIT = True
 except (ImportError, ModuleNotFoundError) as e:
     HAS_RDKIT = False
@@ -24,8 +26,17 @@ from charge.servers.molecule_pricer import get_chemspace_prices
 from charge.servers.nnp_predictor import compute_band_gap
 import sys
 import os
+from typing import Literal, Tuple
 
-def get_density(smiles: str) -> float:
+PropertyType = Literal[
+    "density", "hof", "alpha", "cv", "gap", "homo", "lumo", "mu", "r2", "zpve", "lipo"
+]
+
+
+# Note that the PropertyType here is unnecessary except to unify the tool interface
+def get_density(
+    smiles: str, property: PropertyType = "density"
+) -> Tuple[PropertyType, float]:
     """
     Calculate the density of a molecule given its SMILES string.
     Density is the molecular weight of the molecule per unit volume.
@@ -37,7 +48,9 @@ def get_density(smiles: str) -> float:
         float: Density of the molecule, returns 0.0 if there is an error.
     """
     if not HAS_RDKIT:
-        raise ImportError("Please install the rdkit support packages to use this module.")
+        raise ImportError(
+            "Please install the rdkit support packages to use this module."
+        )
     try:
         # logger.info(f"Calculating density for SMILES: {smiles}")
         mol = Chem.MolFromSmiles(smiles)
@@ -58,14 +71,14 @@ def get_density(smiles: str) -> float:
             return 0.0
 
         volume = AllChem.ComputeMolVolume(mol)
-        density = volume / mw
+        density = mw / volume
         logger.info(f"Density for SMILES {smiles}: {density}")
-        return density
+        return "density", density
     except Exception as e:
         return 0.0
 
 
-def get_density_and_synthesizability(smiles: str) -> tuple[float, float]:
+def get_density_and_synthesizability(smiles: str) -> Tuple[float, float]:
     """
     Calculate the density and synthesizability of a molecule given its SMILES string.
     Returns a tuple of (density, synthesizability).
@@ -83,23 +96,27 @@ def get_density_and_synthesizability(smiles: str) -> tuple[float, float]:
     """
 
     if not HAS_RDKIT:
-        raise ImportError("Please install the rdkit support packages to use this module.")
-    density = get_density(smiles)
+        raise ImportError(
+            "Please install the rdkit support packages to use this module."
+        )
+    _, density = get_density(smiles)
     synthesizability = get_synthesizability(smiles)
     return density, synthesizability
 
-def chemprop_preds_server(smiles: str,property:str) -> float:
-    
+
+def calculate_property_hf(
+    smiles: str, property: PropertyType
+) -> Tuple[PropertyType, float]:
     """
-    Predict molecular properties using pre-trained Chemprop models.
-    This function returns property predictions from Chemprop models. It validates the requested property name,  
+    Predict molecular properties using high-fidelity pre-trained Chemprop models.
+    This function returns property predictions from Chemprop models. It validates the requested property name,
     constructs the appropriate model, and returns predictions for the provided SMILES input.
 
     Valid properties
     ----------------
     ChARGe can request any of the following property names:
-      - density : Predicted density (g/cm³) 
-      - hof     : Heat of formation (kcal/mol) 
+      - density : Predicted density (g/cm³)
+      - hof     : Heat of formation (kcal/mol)
       - alpha   : Polarizability (a0³)
       - cv      : Heat capacity at constant volume (cal/mol·K)
       - gap     : HOMO–LUMO energy gap (Hartree)
@@ -119,6 +136,8 @@ def chemprop_preds_server(smiles: str,property:str) -> float:
 
     Returns
     -------
+    str
+        The property to predict. Must be one of the valid property names listed above.
     float
         A float representing the predicted value for the specified property.
 
@@ -129,28 +148,49 @@ def chemprop_preds_server(smiles: str,property:str) -> float:
 
     Examples
     --------
-    >>> chemprop_preds_server("CCO", "gap")
-    6.73
+    >>> calculate_property_hf("CCO", "gap")
+    gap, 6.73
 
-    >>> chemprop_preds_server("c1ccccc1", "lipo")
-    2.94
+    >>> calculate_property_hf("c1ccccc1", "lipo")
+    lipo, 2.94
     """
+    try:
+        from charge.servers.get_chemprop2_preds import predict_with_chemprop
+    except Exception as e:
+        logger.warning(
+            "Please install the chemprop support packages to use this module."
+        )
+        return 0.0
 
     if not HAS_RDKIT:
-        raise ImportError("Please install the rdkit support packages to use this module.")
-    valid_properties = {'density', 'hof', 'alpha','cv','gap','homo','lumo','mu','r2','zpve','lipo'}
+        raise ImportError(
+            "Please install the rdkit support packages to use this module."
+        )
+    valid_properties = {
+        "density",
+        "hof",
+        "alpha",
+        "cv",
+        "gap",
+        "homo",
+        "lumo",
+        "mu",
+        "r2",
+        "zpve",
+        "lipo",
+    }
     if property not in valid_properties:
         raise ValueError(
             f"Invalid property '{property}'. Must be one of {valid_properties}."
         )
-    chemprop_base_path=os.environ.get("CHEMPROP_BASE_PATH")
-    if(chemprop_base_path):
-        model_path=os.path.join(chemprop_base_path, property)
-        model_path=os.path.join(model_path, 'model_0/best.pt')
-        return(predict_with_chemprop(model_path,[smiles])[0][0])
+    chemprop_base_path = os.environ.get("CHEMPROP_BASE_PATH")
+    if chemprop_base_path:
+        model_path = os.path.join(chemprop_base_path, property)
+        model_path = os.path.join(model_path, "model_0/best.pt")
+        return property, predict_with_chemprop(model_path, [smiles])[0][0]
     else:
-        print('CHEMPROP_BASE_PATH environment variable not set!')
-        sys.exit(2)
+        raise ValueError(f"CHEMPROP_BASE_PATH environment variable not set!")
+
 
 def get_molecule_price(smiles):
     """
@@ -171,11 +211,21 @@ def get_molecule_price(smiles):
     >>> get_molecule_price("CCO")
     0.1056
     """
+    try:
+        from charge.servers.molecule_pricer import get_chemspace_prices
+    except Exception as e:
+        logger.warning(
+            "Please install the chemprice support packages to use this module."
+        )
+        return 0.0
 
     if not HAS_RDKIT:
-        raise ImportError("Please install the rdkit support packages to use this module.")
-    price=get_chemspace_prices([smiles])
-    return(price[0])    
+        raise ImportError(
+            "Please install the rdkit support packages to use this module."
+        )
+    price = get_chemspace_prices([smiles])
+    return price[0]
+
 
 def get_gap(smiles: str) -> float:
     """
@@ -200,3 +250,34 @@ def get_gap(smiles: str) -> float:
     if not HAS_RDKIT:
         raise ImportError("Please install the rdkit support packages to use this module.")
     return compute_band_gap(smiles)
+
+
+def polymerize_monomer(smiles):
+    """
+    Automatically identify the appropriate polymerization rule for a given monomer and return
+    the corresponding polymer repeat unit in SMILES format.
+
+    Parameters
+    ----------
+    monomer_smiles : str
+        A SMILES string representing the monomer to be polymerized. The function analyzes
+        the structure to determine the most likely polymerization mechanism (e.g., vinyl addition,
+        ring-opening polymerization, condensation, etc.).
+
+    Returns
+    -------
+    string
+        The predicted polymer repeat unit SMILES with wildcard endpoints `*`.
+
+    Examples
+    --------
+    >>> polymerize_monomer_SMILES("CC(=C)C(=O)OC")
+    >>> *CC(*)(C)C(=O)OC
+    """
+    try:
+        from charge.servers.polymerizer import polymerize_auto
+    except Exception as e:
+        logger.warning("Unable to find polymerizer tool. Returning input smiles:")
+        return smiles
+    PSMILES = polymerize_auto(smiles)
+    return PSMILES

@@ -62,3 +62,10 @@ class AgentPool:
         Abstract method to get an Agent by name.
         """
         raise NotImplementedError("Method 'get_agent_by_name' is not implemented.")
+
+    def reset(self):
+        """
+        Resets the agent pool by clearing all agents.
+        """
+        self.agent_list = []
+        self.agent_dict = {}

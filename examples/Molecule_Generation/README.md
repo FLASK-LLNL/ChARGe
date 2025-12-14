@@ -2,7 +2,7 @@
 
 This directory contains an task setup for lead molecule generation using ChARGe.
 
-There are two ways we can define the tools used for the task. Either directly in the `LMOTask` class or in a separate file like the `molecular_generation_server.py` file. 
+There are two ways we can define the tools used for the task. Either directly in the `LMOTask` class or in a separate file like the `molecular_generation_server.py` file.
 
 The `LMOTask` also handles the boilerplate prompts that will be used in the task.
 
@@ -23,11 +23,19 @@ python main.py --lead-molecule <lead_molecule> --client <client_type> --backend 
 
 The `--client` argument can be either `autogen` or `gemini`, depending on which client you want to use. Default is `autogen`.
 
-The `--backend` is used for the `autogen` client and can be `ollama`, `livai`, `openai`, `gemini`, or `livchat`. The default is `openai`. This decides which model provider to use for the client. 
+The `--backend` is used for the `autogen` client and can be `ollama`, `livai`, `openai`, `gemini`, `vllm` or `livchat`. The default is `openai`. This decides which model provider to use for the client.
 
 Some providers such as `ollama` and `openai` provide multiple models. You can specify the model using the `--model` argument. The model name should be compatible with the provider.
 
 The `--lead-molecule` argument is used to specify the lead molecule in SMILES format.
+
+To use the `vllm` backend, set the following environment variables before running:
+
+```bash
+export VLLM_URL="<url-of-vllm-model>"
+export VLLM_MODEL="<path-to-model-weights>"  # e.g., /usr/workspace/gpt-oss-120b
+export OSS_REASONING="low"                   # Options: ["low", "medium", "high"]
+```
 
 ## Notes
 - Ensure you have the required dependencies installed, including ChARGe and RDKit.

@@ -11,7 +11,11 @@ from charge.servers.log_progress import log_progress
 import argparse
 import os
 
-template_free_mcp = FastMCP("template_free_reaction_server")
+template_free_mcp = FastMCP(
+    "template_free_reaction_server",
+    sse_path=f"/retro_tools/sse",
+    message_path=f"/retro_tools/messages/",
+)
 
 template_free_mcp.tool()(verify_smiles)
 template_free_mcp.tool()(canonicalize_smiles)
@@ -36,6 +40,7 @@ if __name__ == "__main__":
 
     if exp_type == "template":
         from charge.servers.SMARTS_reactions import SMARTS_mcp
+
         SMARTS_mcp.tool()(log_progress)
 
         SMARTS_mcp.run(

@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Any, List, Union
+from typing import Any, List, Union, Optional
 from charge.tasks.Task import Task
 from charge.clients.AgentPool import Agent, AgentPool
 from charge._utils import maybe_await_async
@@ -8,8 +8,14 @@ import asyncio
 
 class Experiment(object):
     def __init__(
-        self, task: Union[Task, List[Task]], agent_pool: AgentPool, *args, **kwargs
+        self,
+        task: Optional[Union[Task, List[Task]]],
+        agent_pool: AgentPool,
+        *args,
+        **kwargs,
     ):
+        if task is None:
+            task = []
         self.tasks = task if isinstance(task, list) else [task]
         self.finished_tasks = []
 
@@ -18,11 +24,11 @@ class Experiment(object):
         self.kwargs = kwargs
 
     @abstractmethod
-    def create_agent_with_experiment_state(self, task):
+    def create_agent_with_experiment_state(self, task, **kwargs):
         # Create an agent that incorporates the experiment state
 
         # Default implementation is no context is shared across agents
-        return self.agent_pool.create_agent(task=task)
+        return self.agent_pool.create_agent(task=task, **kwargs)
 
     @abstractmethod
     def save_agent_state(self, agent):
@@ -80,10 +86,10 @@ class Experiment(object):
         """
         return self.finished_tasks
 
-    async def run_async(self) -> None:
+    async def run_async(self, **kwargs) -> None:
         while self.tasks:
             current_task = self.tasks.pop(0)
-            agent = self.create_agent_with_experiment_state(task=current_task)
+            agent = self.create_agent_with_experiment_state(task=current_task, **kwargs)
             result = await maybe_await_async(agent.run)
             await maybe_await_async(self.add_to_context, agent, current_task, result)
             self.finished_tasks.append((current_task, result))
@@ -91,3 +97,10 @@ class Experiment(object):
 
     def run(self) -> None:
         asyncio.run(self.run_async())
+
+    def reset(self):
+        """
+        Resets the experiment state.
+        """
+        self.finished_tasks = []
+        self.agent_pool.reset()

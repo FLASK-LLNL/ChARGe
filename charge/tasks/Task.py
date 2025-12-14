@@ -7,6 +7,7 @@ import warnings
 
 from charge.utils.system_utils import read_from_file, check_server_paths
 
+
 class Task(ABC):
 
     def __init__(

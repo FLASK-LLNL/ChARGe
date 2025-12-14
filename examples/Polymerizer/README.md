@@ -21,11 +21,3 @@ python3 main.py --server-urls <sse_server_1_url> <sse_server_2_url> --backend <b
 ```
 
 The `--server-urls` argument can take multiple server URLs (space-separated) that the client will connect to. Each URL must end with `/sse`.
-
-To use the `vllm` backend, set the following environment variables before running:
-
-```bash
-export VLLM_URL="<url-of-vllm-model>"
-export VLLM_MODEL="<path-to-model-weights>"  # e.g., /usr/workspace/gpt-oss-120b
-export OSS_REASONING="low"                   # Options: ["low", "medium", "high"]
-```

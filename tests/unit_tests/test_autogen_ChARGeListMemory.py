@@ -62,3 +62,8 @@ async def test_chARGeListMemory_serialization(autogen_chARGeListMemory_module):
         + "[From Agent: agent_1] Test content 1"
     )
     assert messages[1].content == "\n[From Agent: agent_2] Test content 2"
+
+
+@pytest.mark.asyncio
+async def test_AutoGenAgent_serialization(autogen_chARGeListMemory_module):
+    from charge.clients.autogen import AutoGenPool, AutoGenAgent

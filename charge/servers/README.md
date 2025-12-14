@@ -22,7 +22,7 @@ incompatible with ChARGe.
 pip3 install --no-deps aizynthfinder reaction-utils
 ```
 
-# Using Chemprop tools
+# Using Chemprop tools (calculate_property_hf)
 ## Installation
 1.) Installing the ChARGe package with the [chemprop] or [all] options to use the Chemprop MPNN models.
 
@@ -32,9 +32,9 @@ export CHEMPROP_BASE_PATH=<LC_PATH_TO_CHEMPROP_MODELS>
 ```
 ## Testing Chemprop Installation
 ```python
-from charge.servers.molecular_property_utils import chemprop_preds_server
+from charge.servers.molecular_property_utils import calculate_property_hf
 property='density'
-chemprop_preds_server('COC(=O)COC=O','density')
+calculate_property_hf('COC(=O)COC=O','density')
 ```
 Expected Result:
 ```
@@ -42,7 +42,7 @@ Expected Result:
 ```
 
 ## Usage
-The `property` input variable in `chemprop_preds_server` must be set to one of the below properties.
+The `property` input variable in `calculate_property_hf` must be set to one of the below properties.
 ```
 valid_properties = {'density', 'hof', 'alpha','cv','gap','homo','lumo','mu','r2','zpve','lipo'}
 ```

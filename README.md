@@ -68,7 +68,7 @@ class LeadMoleculeOptimization(Task):
 
     @hypothesis
     def verifySMILES(self, smiles_string: str) -> bool:
-        """ Given a SMILES string, verify if it is valid. 
+        """ Given a SMILES string, verify if it is valid.
             Return True if valid, False otherwise.
             Arguments:
                 smiles_string: A string representing a molecule in SMILES format.
@@ -76,10 +76,10 @@ class LeadMoleculeOptimization(Task):
                 bool: True if the SMILES string is valid, False otherwise.
         """
         return isValidSMILES(smiles_string)
-    
+
     @hypothesis
     def calculateSAScore(self, smiles_string: str) -> float:
-        """ 
+        """
             Given a SMILES string, calculate the synthetic accessibility score (SAScore).
             Arguments:
                 smiles_string: A string representing a molecule in SMILES format.
@@ -87,10 +87,10 @@ class LeadMoleculeOptimization(Task):
                 float: The SAScore of the molecule.
         """
         return calculateSAScore(smiles_string)
-    
+
     @hypothesis
     def calculateDensity(self, smiles_string: str) -> float:
-        """ 
+        """
             Given a SMILES string, calculate the density of the molecule.
             Arguments:
                 smiles_string: A string representing a molecule in SMILES format.
@@ -98,17 +98,17 @@ class LeadMoleculeOptimization(Task):
                 float: The density of the molecule.
         """
         return calculateDensity(smiles_string)
-    
+
     @verification
     def verifyMolecule(self, smiles_string: str) -> bool:
-        """ 
+        """
             Given a SMILES string, verify if the molecule meets the criteria to
             be a solution.
             Arguments:
                 smiles_string: A string representing a molecule in SMILES format.
             Returns:
                 bool: True if the molecule meets the criteria, False otherwise.
-            
+
         """
         density = self.calculateDensity(smiles_string)
         sascore = self.calculateSAScore(smiles_string)

@@ -1,7 +1,7 @@
 from charge.experiments import Experiment
 from charge.clients.AgentPool import Agent, AgentPool
 from charge.tasks.Task import Task
-from typing import List, Union
+from typing import List, Union, Optional
 
 try:
     from autogen_core.memory import MemoryContent, MemoryMimeType
@@ -16,7 +16,11 @@ except ImportError:
 
 class AutoGenExperiment(Experiment):
     def __init__(
-        self, task: Union[Task, List[Task]], agent_pool: AutoGenPool, *args, **kwargs
+        self,
+        task: Optional[Union[Task, List[Task]]],
+        agent_pool: AutoGenPool,
+        *args,
+        **kwargs,
     ):
         super().__init__(task=task, agent_pool=agent_pool, *args, **kwargs)
         # Initialize Autogen specific parameters here
@@ -41,7 +45,9 @@ class AutoGenExperiment(Experiment):
             content=f"Instruction: {instruction}\nResponse: {result}",
             mime_type=MemoryMimeType.TEXT,
         )
-        await self.model_context.add(content)
+
+        name = getattr(agent, "agent_name", "Agent")
+        await self.model_context.add(content, source_agent=name)
 
     async def save_state(self) -> str:
         # Implement saving the state of the Autogen experiment
@@ -56,5 +62,14 @@ class AutoGenExperiment(Experiment):
         self.model_context = ChARGeListMemory()
         self.model_context.load_memory_content(state_json)
 
-    def create_agent_with_experiment_state(self, task):
-        return self.agent_pool.create_agent(task=task, memory=[self.model_context])
+    def create_agent_with_experiment_state(self, task, **kwargs):
+        return self.agent_pool.create_agent(
+            task=task, memory=[self.model_context], **kwargs
+        )
+
+    def reset(self):
+        """
+        Resets the experiment state, including the model context.
+        """
+        super().reset()
+        self.model_context = ChARGeListMemory()

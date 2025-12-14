@@ -15,7 +15,7 @@ pip3 install --no-deps aizynthfinder reaction-utils
 ```
 
 Alternatively, for an independent MCP server, You could have a separate python environment for running AiZynthFinder, because it has its own installation prerequisites that may not be compatible with the ChARGe environment.
-Follow [these steps](https://github.com/MolecularAI/aizynthfinder?tab=readme-ov-file#installation) for AiZynthFinder installation. 
+Follow [these steps](https://github.com/MolecularAI/aizynthfinder?tab=readme-ov-file#installation) for AiZynthFinder installation.
 
 AiZynthFinder requires a config yaml file during
 initialization. Further, this config file contains paths to databases,
@@ -43,6 +43,14 @@ You can then use the ChARGe client to connect to this server and perform operati
 
 ```bash
 python main.py --backend <backend> --model <model> --server-urls <server_url>/sse
+```
+
+To use the `vllm` backend, set the following environment variables before running:
+
+```bash
+export VLLM_URL="<url-of-vllm-model>"
+export VLLM_MODEL="<path-to-model-weights>"  # e.g., /usr/workspace/gpt-oss-120b
+export OSS_REASONING="low"                   # Options: ["low", "medium", "high"]
 ```
 
 
@@ -138,7 +146,7 @@ You can also get global information about the tree search process. This is an ex
 Here is one output example for synthesizing caffeine:
 
 ```
-Here are the distinct retrosynthetic disconnections returned by the tool, expressed as a nested list.  
+Here are the distinct retrosynthetic disconnections returned by the tool, expressed as a nested list.
 Each inner list corresponds to one complete route (here every route is a single-step transformation from commercially available building blocks to the target).
 
 [
@@ -182,49 +190,49 @@ Here is one example for Ritonavir:
 ────────────────────────
 ROUTE A “Acid-chloride peptide coupling”
 
-Key disconnections  
- 1.  C-terminal amide (Ile–Phe junction)  
- 2.  Carbamate to the 2-(hydroxymethyl)thiazolo[5,4-c]pyridine (“Het-CH₂OH”)  
+Key disconnections
+ 1.  C-terminal amide (Ile–Phe junction)
+ 2.  Carbamate to the 2-(hydroxymethyl)thiazolo[5,4-c]pyridine (“Het-CH₂OH”)
  3.  Thiazole acid chloride coupling
 
-Step outline  
-1. *L-Isoleucine*  ─(Boc-protection, MeOH, SOCl₂)→  Boc-Ile-OMe  
-2. Boc-Ile-OMe ─(DMF, (Me)₂NH, EDC)→  Boc-Ile-CONMe₂ (thiazole arm acceptor)  
+Step outline
+1. *L-Isoleucine*  ─(Boc-protection, MeOH, SOCl₂)→  Boc-Ile-OMe
+2. Boc-Ile-OMe ─(DMF, (Me)₂NH, EDC)→  Boc-Ile-CONMe₂ (thiazole arm acceptor)
 
-3. Boc-Ile-CONMe₂  +  *5-isobutyl-2-(dimethylaminomethyl)thiazole*  
-  ─(n-BuLi, then DMF, work-up)→  thiazole-(CH₂)-CONMe₂-Ile (free acid)  
-4. Convert the Ile carboxylate to the acid chloride (oxalyl chloride, DMF).  
+3. Boc-Ile-CONMe₂  +  *5-isobutyl-2-(dimethylaminomethyl)thiazole*
+  ─(n-BuLi, then DMF, work-up)→  thiazole-(CH₂)-CONMe₂-Ile (free acid)
+4. Convert the Ile carboxylate to the acid chloride (oxalyl chloride, DMF).
 
-5. *H₂N-CH(Phe)-CH(OH)-CH₂-CH(Phe)-NH₂*  
-  (prepared from L-Phe via reductive side-chain elaboration shown in Route C)  
-  + acid chloride from step 4 ─(i-Pr₂NEt, –20 °C)→  target central amide.  
+5. *H₂N-CH(Phe)-CH(OH)-CH₂-CH(Phe)-NH₂*
+  (prepared from L-Phe via reductive side-chain elaboration shown in Route C)
+  + acid chloride from step 4 ─(i-Pr₂NEt, –20 °C)→  target central amide.
 
-6. De-protect the N-terminus (TFA) to give the free amine.  
+6. De-protect the N-terminus (TFA) to give the free amine.
 
-7. *Het-CH₂OH*  (2-(hydroxymethyl)thiazolo[5,4-c]pyridine)  
-  → chloroformate (triphosgene, pyridine)  
-  then add the free amine from step 6  → final carbamate → TARGET.  
+7. *Het-CH₂OH*  (2-(hydroxymethyl)thiazolo[5,4-c]pyridine)
+  → chloroformate (triphosgene, pyridine)
+  then add the free amine from step 6  → final carbamate → TARGET.
 
-Overall: three fragment union, all couplings with standard acid-chloride or chloroformate chemistry.  
+Overall: three fragment union, all couplings with standard acid-chloride or chloroformate chemistry.
 Reagents and intermediates are bench-stable; no protecting-group sequence clashes.
 
 ────────────────────────
 ROUTE B “Sequential peptide assembly”
 
-1. Start from *H-Phe-CH₂OH* (reduction of L-phenylalanine methyl ester).  
-2. Couple with Boc-Ile-OH (HATU / DIPEA) to give Boc-Ile-Phe-CH₂OH.  
-3. Remove Boc (TFA) → H-Ile-Phe-CH₂OH (free N-terminus).  
-4. Convert CH₂OH to carbamate with Het-ClCO₂ (chloroformate of Het-CH₂OH).  
-5. Introduce the thiazole fragment exactly as in Route A (acid-chloride coupling of thiazole-CONMe₂-COCl).  
+1. Start from *H-Phe-CH₂OH* (reduction of L-phenylalanine methyl ester).
+2. Couple with Boc-Ile-OH (HATU / DIPEA) to give Boc-Ile-Phe-CH₂OH.
+3. Remove Boc (TFA) → H-Ile-Phe-CH₂OH (free N-terminus).
+4. Convert CH₂OH to carbamate with Het-ClCO₂ (chloroformate of Het-CH₂OH).
+5. Introduce the thiazole fragment exactly as in Route A (acid-chloride coupling of thiazole-CONMe₂-COCl).
 
 Advantage: only one protecting group (Boc) is manipulated; dipeptide prepared first and then decorated.
 
 ────────────────────────
 ROUTE C “Late-stage carbamate then amide”
 
-1. Prepare thiazole acid chloride as in Route A.  
-2. Generate carbamate first:  
-  H-Ile-NH-Phe-CH₂OH  +  Het-ClCO₂   →  Ile-NH-Phe-OCO-Het.  
+1. Prepare thiazole acid chloride as in Route A.
+2. Generate carbamate first:
+  H-Ile-NH-Phe-CH₂OH  +  Het-ClCO₂   →  Ile-NH-Phe-OCO-Het.
 3. Expose the Ile carboxylate (saponify if required), convert to acid chloride, then couple to the phenylalanine α-amine of *H-Phe-CH(OH)-CH₂-Phe-NH₂*.
 
 This sequence delays formation of the congested amide until last, minimising side reactions during carbamate installation.
@@ -232,17 +240,17 @@ This sequence delays formation of the congested amide until last, minimising sid
 ────────────────────────
 Commercial / short-synthesis building blocks
 
-• 5-Isobutyl-2-(dimethylaminomethyl)thiazole  
-• 2-(Hydroxymethyl)thiazolo[5,4-c]pyridine  
-• L-Isoleucine, L-Phenylalanine and their methyl esters  
+• 5-Isobutyl-2-(dimethylaminomethyl)thiazole
+• 2-(Hydroxymethyl)thiazolo[5,4-c]pyridine
+• L-Isoleucine, L-Phenylalanine and their methyl esters
 • Dimethylamine, triphosgene, common peptide-coupling reagents (HATU, EDC, oxalyl chloride, etc.)
 
 ────────────────────────
 Summary
 
-All three routes converge on the same logic:  
-(1) build the thiazole-N,N-dimethylamide fragment,  
-(2) assemble an Ile–Phe dipeptide (or larger peptide) with a free α-amine,  
-(3) couple the fragments via acid chloride, and  
-(4) cap the terminal amine with the heteroaryl chloroformate to furnish the final carbamate.  
+All three routes converge on the same logic:
+(1) build the thiazole-N,N-dimethylamide fragment,
+(2) assemble an Ile–Phe dipeptide (or larger peptide) with a free α-amine,
+(3) couple the fragments via acid chloride, and
+(4) cap the terminal amine with the heteroaryl chloroformate to furnish the final carbamate.
 ```

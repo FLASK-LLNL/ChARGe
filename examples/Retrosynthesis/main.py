@@ -4,8 +4,9 @@ from charge.tasks.RetrosynthesisTask import (
     RetrosynthesisTask,
     TemplateFreeRetrosynthesisTask,
 )
-import os
+
 from charge.clients.Client import Client
+from charge.clients.autogen import AutoGenPool
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--lead-molecule", type=str, default="CC(=O)O[C@H](C)CCN")
@@ -63,40 +64,19 @@ if __name__ == "__main__":
         mytask = RetrosynthesisTask(
             user_prompt=user_prompt,
             system_prompt=args.system_prompt,
+            server_urls=server_urls,
         )
     elif args.exp_type == "template-free":
         mytask = TemplateFreeRetrosynthesisTask(
             user_prompt=user_prompt,
             system_prompt=args.system_prompt,
+            server_urls=server_urls,
         )
     else:
         raise ValueError(f"Unknown task type: {args.exp_type}")
 
-    if args.client == "gemini":
-        from charge.clients.gemini import GeminiClient
+    agent_pool = AutoGenPool(model=args.model, backend=args.backend)
+    runner = agent_pool.create_agent(task=mytask)
+    results = asyncio.run(runner.run())
 
-        client_key = os.getenv("GOOGLE_API_KEY")
-        assert client_key is not None, "GOOGLE_API_KEY must be set in environment"
-        runner = GeminiClient(task=mytask, api_key=client_key)
-    elif args.client == "autogen":
-        from charge.clients.autogen import AutoGenClient
-        from charge.clients.autogen_utils import thoughts_callback
-
-        (model, backend, API_KEY, kwargs) = AutoGenClient.configure(
-            args.model, args.backend
-        )
-
-        runner = AutoGenClient(
-            task=mytask,
-            model=model,
-            backend=backend,
-            api_key=API_KEY,
-            model_kwargs=kwargs,
-            server_path=server_path,
-            server_url=server_urls,
-            thoughts_callback=thoughts_callback,
-        )
-
-        results = asyncio.run(runner.run())
-
-        print(f"Task completed. Results: {results}")
+    print(f"Task completed. Results: {results}")
