@@ -231,20 +231,15 @@ def get_gap(smiles: str) -> float:
     """
     Retrieve HOMO-LUMO band gap for the molecule specified by the SMILES string, smiles.
 
-    Parameters
-    ----------
-    smiles : str
-        A SMILES string for the molecule of interest.
+    Args:
+        smiles: A SMILES string for the molecule of interest.
 
-    Returns
-    -------
-    float
-        Returns float representing the HOMO-LUMO band gap of the given SMILES string.
+    Returns:
+        float: Returns float representing the HOMO-LUMO band gap of the given SMILES string.
 
-    Examples
-    --------
-    >>> get_gap("O=CCOC=O")
-    0.2217
+    Examples:
+        >>> get_gap("O=CCOC=O")
+        0.2217
     """
 
     if not HAS_RDKIT:
