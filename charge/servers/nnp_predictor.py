@@ -1,4 +1,5 @@
 from loguru import logger
+import os
 try:
     from rdkit import Chem
     from rdkit.Chem import AllChem
@@ -67,29 +68,46 @@ def AtomsFromMol(mol):
         positions=positions,
     )
 
-_calcs = {
-    "U0": None,
-    "homo": None,
-    "lumo": None,
-}
+_calcs = dict()
+def initialize_calcs(properties: list[str]) -> None:
+    """
+    Initialize GotenNet calculators for property prediction. If the GOTENNET_BASE_PATH
+    environment variable is set, models will be loaded from {GOTENNET_BASE_PATH}/{property}.ckpt.
+    If GOTENNET_BASE_PATH is not set, models will be loaded from the current directory.
+
+    Args:
+        properties: The properties to load calculators for.
+
+    Raises:
+        FileNotFoundError: If there isn't a valid model checkpoint at the provided path.
+    """
+    base_path = os.getenv("GOTENNET_BASE_PATH", ".")
+    for property in properties:
+        if property not in _calcs or _calcs[property]["base_path"] != base_path:
+            logger.info(f"Initializing GotenNet {property} calculator")
+            try:
+                _calcs[property] = {
+                    "model": GotenNetCalculator(GotenModel.from_pretrained(f"{GOTENNET_BASE_PATH}/{property}.ckpt")),
+                    "base_path": base_path,
+                }
+            except FileNotFoundError:
+                logger.info(f"{property} calculator could not be loaded from {GOTENNET_BASE_PATH}")
+                raise
+
 
 def compute_band_gap(smiles: str) -> float:
     """
     Calculate the HOMO-LUMO gap of a molecule given its SMILES string.
     Returns a float of gap in eV.
+
     Args:
         smiles (str): The input SMILES string.
+
     Returns:
         float: The HOMO-LUMO gap of the molecule, returns NaN if there is an error.
     """
 
-    if _calcs["U0"] is None:
-        logger.info("Initializing GotenNet U0 calculator")
-        _calcs["U0"] = GotenNetCalculator(GotenModel.from_pretrained("QM9_small_U0"))
-        logger.info("Initializing GotenNet homo calculator")
-        _calcs["homo"] = GotenNetCalculator(GotenModel.from_pretrained("QM9_small_homo"))
-        logger.info("Initializing GotenNet lumo calculator")
-        _calcs["lumo"] = GotenNetCalculator(GotenModel.from_pretrained("QM9_small_lumo"))
+    initialize_calcs(["U0", "gap"])
 
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
@@ -112,11 +130,11 @@ def compute_band_gap(smiles: str) -> float:
         # pass
         raise
 
-    gap = _calcs["lumo"].get_potential_energy(atoms) - _calcs["homo"].get_potential_energy(atoms)
+    # GotenNet predictions are improperly normalized for some values, see PyG source for QM9 dataset to see which ones
+    gap = _calcs["gap"].get_potential_energy(atoms) / HAR2EV
     logger.info(f"Gap for SMILES {smiles}: {gap}")
 
-    # GotenNet predictions are improperly normalized for some values, see PyG source for QM9 dataset to see which ones
-    return gap / HAR2EV
+    return gap
 
 def main(smiles: str):
     print(f"{smiles} gap: {compute_band_gap(smiles)}")
