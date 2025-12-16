@@ -53,14 +53,17 @@ def read_from_file(self, file_path: str, key: str) -> str:
 
 def check_url_exists(url: str) -> bool:
     if not url.startswith("http://") and not url.startswith("https://"):
+        warnings.warn(f"URL '{url}' does not start with 'http://' or 'https://'")
         return False
 
     if not url.endswith("/sse"):
+        warnings.warn(f"URL '{url}' does not end with '/sse'")
         return False
 
     try:
         with requests.get(url, stream=True, timeout=5) as response:
             if response.status_code != 200:
+                warnings.warn(f"Error reaching URL '{url}': {response.status_code}")
                 return False
     except requests.RequestException as e:
         warnings.warn(f"Error reaching URL '{url}': {e}")

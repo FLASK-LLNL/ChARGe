@@ -15,7 +15,8 @@ class RetrosynthesisTask(Task):
             "Provide your answer in a clear and concise manner. "
         )
         user_prompt = (
-            "Use available tools to find synthesis routes to make the following product molecules:\n"
+            "Use RAG and other available tools to find synthesis routes to make the following product molecule:\n"
+            # "Find examples of reactions for similar molecules:\n"
             f"{mols}"
         )
         super().__init__(system_prompt=system_prompt, user_prompt=user_prompt, **kwargs)
@@ -33,7 +34,7 @@ class ForwardSynthesisTask(Task):
             "Provide your answer in a clear and concise manner. "
         )
         user_prompt = (
-            "Use available tools to predict forward synthesis from the following reactant molecules:\n"
+            "Use RAG and other available tools to predict forward synthesis from the following reactant molecules:\n"
             f"{mols}"
         )
         super().__init__(system_prompt=system_prompt, user_prompt=user_prompt, **kwargs)
