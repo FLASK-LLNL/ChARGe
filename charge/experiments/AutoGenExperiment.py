@@ -26,6 +26,7 @@ class AutoGenExperiment(Experiment):
         # Initialize Autogen specific parameters here
         # For example:
         self.model_context = ChARGeListMemory()
+        self.agent_pool: AutoGenPool
 
     def save_agent_state(self, agent):
         # Implement saving the state of the Autogen agent
@@ -56,11 +57,11 @@ class AutoGenExperiment(Experiment):
         seralized_memory = self.model_context.serialize_memory_content()
         return seralized_memory
 
-    async def load_state(self, state_json: str):
+    async def load_state(self, state: str):
         # Implement loading the state of the Autogen experiment
 
         self.model_context = ChARGeListMemory()
-        self.model_context.load_memory_content(state_json)
+        self.model_context.load_memory_content(state)
 
     def create_agent_with_experiment_state(self, task, **kwargs):
         return self.agent_pool.create_agent(
