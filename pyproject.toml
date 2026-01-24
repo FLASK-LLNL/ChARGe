@@ -9,8 +9,8 @@ description = "ChARGe: Chemistry-tool for Automated Reasoning and Generation"
 authors = []
 license = {file = "LICENSE"}
 readme = "README.md"
-# The upper limit of <3.12 is due to AiZynthFinder
-requires-python = ">=3.11, <3.12"
+# The upper limit of <3.13 is due to AiZynthFinder
+requires-python = ">=3.11, <3.13"
 dependencies = [
     "mcp>=1.10.0",
     "jsonschema>=4.17.3",
