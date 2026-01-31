@@ -45,6 +45,7 @@ aizynthfinder = ["paretoset", "rdchiral", "wrapt_timeout_decorator", "swifter", 
 chemprop = ["chemprop>=2.2.0", "torch>=2.8.0", "lightning"]
 chemprice = []
 test = ["pytest", "pytest-asyncio", "pytest-mock", "responses", "httpx", "requests-mock"]
+nnp = ["rdkit", "ase", "numpy", "torch", "torch_geometric", "gotennet", "omegadict", "pytorch-lightning", "hydra-core"]
 
 # Define a set of optional packages for use when deploying persistent data services
 pds = ["charge[aizynthfinder,autogen,rdkit,chemprice]"]
