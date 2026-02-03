@@ -15,6 +15,7 @@ template_free_mcp = FastMCP(
     "template_free_reaction_server",
     sse_path=f"/retro_tools/sse",
     message_path=f"/retro_tools/messages/",
+    host="0.0.0.0",
 )
 
 template_free_mcp.tool()(verify_smiles)
