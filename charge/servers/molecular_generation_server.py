@@ -36,6 +36,7 @@ mcp = FastMCP(
     "SMILES Diagnosis and retrieval MCP Server",
     sse_path=f"/lmo_tools/sse",
     message_path=f"/lmo_tools/messages/",
+    host="0.0.0.0",
 )
 
 
