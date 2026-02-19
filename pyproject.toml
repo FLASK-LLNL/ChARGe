@@ -45,7 +45,7 @@ aizynthfinder = ["paretoset", "rdchiral", "wrapt_timeout_decorator", "swifter", 
 chemprop = ["chemprop>=2.2.0", "torch>=2.8.0", "lightning"]
 chemprice = []
 test = ["pytest", "pytest-asyncio", "pytest-mock", "responses", "httpx", "requests-mock"]
-rag = ["datasets", "faiss-cpu", "transformers[torch]"]
+rag = ["autogen-agentchat>=0.7.0", "datasets", "faiss-cpu", "openai>=2.0.0", "transformers[torch]"]
 
 # Define a set of optional packages for use when deploying persistent data services
 pds = ["charge[aizynthfinder,autogen,rdkit,chemprice]"]
