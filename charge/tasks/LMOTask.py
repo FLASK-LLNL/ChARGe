@@ -5,7 +5,7 @@ from charge.servers.molecular_property_utils import get_density
 import charge.utils.helper_funcs
 from typing import Optional, List
 from pydantic import BaseModel, field_validator
-from charge.servers.log_progress import LOG_PROGRESS_SYSTEM_PROMPT
+from charge.utils.log_progress import LOG_PROGRESS_SYSTEM_PROMPT
 from charge.utils.mcp_workbench_utils import call_mcp_tool_directly
 import asyncio
 
