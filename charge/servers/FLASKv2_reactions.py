@@ -1,7 +1,7 @@
 import click
 from loguru import logger
 import json
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 from typing import Optional
 
 try:
@@ -24,6 +24,9 @@ except (ImportError, ModuleNotFoundError) as e:
     )
 
 from charge.servers.server_utils import update_mcp_network, get_hostname
+
+REAGENT_KEYS = ["reactants", "agents", "solvents", "catalysts", "atmospheres"]
+PRODUCT_KEYS = ["products"]
 
 
 def format_rxn_prompt(data: dict, forward: bool) -> dict:
