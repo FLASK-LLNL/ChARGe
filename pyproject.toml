@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "charge"
 version = "0.1.0"
-description = "ChARGe: Chemistry-tool for Automated Reasoning and Generation"
+description = "SARGe: Scientific Automated Reasoning and Generation agentic framework"
+#description = "ChARGe: sCientific Chemistry-tool for Automated Reasoning and Generation"
 authors = []
 license = {file = "LICENSE"}
 readme = "README.md"
-# The upper limit of <3.13 is due to AiZynthFinder
 requires-python = ">=3.11, <3.13"
 dependencies = [
     "mcp>=1.10.0",
@@ -17,7 +17,6 @@ dependencies = [
     "loguru>=0.7.0",
     "pydantic>=2.10.7",
     "click",
-    "rdkit>=2025.3.6",
     "pre-commit",
     "black",
 ]
@@ -30,24 +29,16 @@ where = ["."]
 include = ["charge*"]
 
 # This creates the console script
-[project.scripts]
-charge-install = "charge.install:main"
+# [project.scripts]
+# charge-install = "charge.install:main"
 
 [project.optional-dependencies]
 ollama = ["ollama>=0.5.0"]
 gemini = ["google-genai >=1.19.0"]
 autogen = ["autogen-agentchat>=0.7.0", "autogen-core>=0.7.0", "autogen-ext>=0.7.0", "openai>=2.0.0", "tiktoken>=0.10.0", "autogen-ext[openai]"]
-rdkit = ["rdkit>=2025.3.6"]
-flask = ["transformers", "peft", "trl", "torch>=2.8.0"]
-# This is the manually identified set of necessary tools for AiZynthFinder 4.4.0 to work with a --no-deps install
-# pip3 install --no-deps aizynthfinder reaction-utils
-aizynthfinder = ["paretoset", "rdchiral", "wrapt_timeout_decorator", "swifter", "apted", "scipy", "onnxruntime", "dask[dataframe]>=2025.9.0", "tables", "networkx", "xxhash", "jinja2", " markupsafe"]
-chemprop = ["chemprop>=2.2.0", "torch>=2.8.0", "lightning"]
-chemprice = []
 test = ["pytest", "pytest-asyncio", "pytest-mock", "responses", "httpx", "requests-mock"]
-rag = ["autogen-agentchat>=0.7.0", "datasets", "faiss-cpu", "openai>=2.0.0", "transformers[torch]"]
 
 # Define a set of optional packages for use when deploying persistent data services
-pds = ["charge[aizynthfinder,autogen,rdkit,chemprice]"]
+pds = ["charge[autogen]"]
 
-all = ["charge[ollama,gemini,autogen,rdkit,flask,aizynthfinder,chemprop,chemprice,rag]"]
+all = ["charge[ollama,gemini,autogen]"]

@@ -1,4 +1,4 @@
-# ChARGe
+# ChARGe / SARGe
 **Ch**emical tool **A**ugmented **R**easoning models for **Ge**nerating molecules and reactions
 
 ## Installation
@@ -6,13 +6,11 @@
 To install the package, clone the repository and run:
 ```bash
 pip install -e .
-charge-install --extras all
 ```
 
 Or install directly from GitHub:
 ```bash
 pip install git+https://github.com/FLASK-LLNL/ChARGe.git
-charge-install --git-tag main --extras all
 ```
 
 
