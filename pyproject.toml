@@ -36,9 +36,11 @@ include = ["charge*"]
 ollama = ["ollama>=0.5.0"]
 gemini = ["google-genai >=1.19.0"]
 autogen = ["autogen-agentchat>=0.7.0", "autogen-core>=0.7.0", "autogen-ext>=0.7.0", "openai>=2.0.0", "tiktoken>=0.10.0", "autogen-ext[openai]"]
+# Pin opentelemetry to a known good version
+agentframework = ["agent-framework>=1.0.0rc1", "openai>=2.0.0", "tiktoken>=0.10.0", "opentelemetry-semantic-conventions-ai==0.4.13"]
 test = ["pytest", "pytest-asyncio", "pytest-mock", "responses", "httpx", "requests-mock"]
 
 # Define a set of optional packages for use when deploying persistent data services
 pds = ["charge[autogen]"]
 
-all = ["charge[ollama,gemini,autogen]"]
+all = ["charge[ollama,gemini,autogen,agentframework]"]

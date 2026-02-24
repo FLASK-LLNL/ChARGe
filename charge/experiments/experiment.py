@@ -84,7 +84,9 @@ class Experiment:
 
     def reset(self):
         """
-        Resets the experiment state.
+        Resets the experiment state, clearing both finished and pending tasks.
         """
         self.finished_tasks = []
         self.memory = ListMemory()
+        self.tasks = []
+        self.agent_pool.reset()
