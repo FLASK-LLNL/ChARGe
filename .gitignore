@@ -193,5 +193,7 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+.vscode/
+
 # ChARGE specific
 examples/Multi_Server_Experiments/.charge-chat-client-history

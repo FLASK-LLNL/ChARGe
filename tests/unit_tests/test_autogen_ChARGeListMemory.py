@@ -66,4 +66,4 @@ async def test_chARGeListMemory_serialization(autogen_chARGeListMemory_module):
 
 @pytest.mark.asyncio
 async def test_AutoGenAgent_serialization(autogen_chARGeListMemory_module):
-    from charge.clients.autogen import AutoGenPool, AutoGenAgent
+    from charge.clients.autogen import AutoGenBackend, AutoGenAgent

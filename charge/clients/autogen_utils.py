@@ -31,7 +31,7 @@ except ImportError:
     raise ImportError(
         "Please install the autogen-agentchat package to use this module."
     )
-from charge.clients.Client import Client
+from charge.clients.client import Client
 from typing import Type, Optional, Union, List, Callable
 from loguru import logger
 from pydantic import BaseModel
@@ -63,12 +63,6 @@ except ImportError:
     pass
 
 POSSIBLE_CONNECTION_ERRORS = tuple(_POSSIBLE_CONNECTION_ERRORS)
-
-
-class chargeConnectionError(Exception):
-    """Custom exception for connection errors in ChARGe."""
-
-    pass
 
 
 class ReasoningModelContext(UnboundedChatCompletionContext):

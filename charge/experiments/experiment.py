@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from typing import Any, List, Union, Optional
-from charge.tasks.Task import Task
-from charge.clients.AgentPool import Agent, AgentPool
+from charge.tasks.task import Task
+from charge.clients.agent_factory import Agent, AgentFactory
 from charge._utils import maybe_await_async
 import asyncio
 
@@ -10,7 +10,6 @@ class Experiment(object):
     def __init__(
         self,
         task: Optional[Union[Task, List[Task]]],
-        agent_pool: AgentPool,
         *args,
         **kwargs,
     ):
@@ -19,7 +18,6 @@ class Experiment(object):
         self.tasks = task if isinstance(task, list) else [task]
         self.finished_tasks = []
 
-        self.agent_pool = agent_pool
         self.args = args
         self.kwargs = kwargs
 
@@ -28,7 +26,7 @@ class Experiment(object):
         # Create an agent that incorporates the experiment state
 
         # Default implementation is no context is shared across agents
-        return self.agent_pool.create_agent(task=task, **kwargs)
+        return AgentFactory.create_agent(task=task, **kwargs)
 
     @abstractmethod
     def save_agent_state(self, agent):

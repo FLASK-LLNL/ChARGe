@@ -8,12 +8,14 @@ import os
 class TestOpenAISimpleTask:
     @pytest.fixture(autouse=True)
     def setup_fixture(self):
-        from charge.tasks.Task import Task
-        from charge.clients.autogen import AutoGenPool
-        from charge.experiments.AutoGenExperiment import AutoGenExperiment
+        from charge.tasks.task import Task
+        from charge.clients.autogen import AutoGenBackend
+        from charge.clients.agent_factory import AgentFactory
+        from charge.experiments.experiment import Experiment
         from pydantic import BaseModel
 
-        self.agent_pool = AutoGenPool(model="gpt-5-nano", backend="openai")
+        self.agent_backend = AutoGenBackend(model="gpt-5-nano")
+        AgentFactory.register_backend("autogen", self.agent_backend)
 
         first_task = Task(
             system_prompt="You are a helpful assistant, that is capable of"
@@ -37,9 +39,7 @@ class TestOpenAISimpleTask:
             structured_output_schema=MathExplanationSchema,
         )
 
-        self.experiment = AutoGenExperiment(
-            task=[first_task, second_task], agent_pool=self.agent_pool
-        )
+        self.experiment = Experiment(task=[first_task, second_task])
 
         third_task = Task(
             system_prompt="You are a helpful assistant that can parse JSON from text"

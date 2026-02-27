@@ -8,20 +8,20 @@ import os
 class TestOpenAISimpleTask:
     @pytest.fixture(autouse=True)
     def setup_fixture(self):
-        from charge.clients.autogen import AutoGenPool
+        from charge.clients.autogen import AutoGenBackend
 
-        self.agent_pool = AutoGenPool(model="gpt-5", backend="openai")
+        self.agent_backend = AutoGenBackend(model="gpt-5", backend="openai")
 
     @pytest.mark.asyncio
     async def test_openai_simple_task(self):
-        from charge.tasks.Task import Task
+        from charge.tasks.task import Task
 
         task = Task(
             system_prompt="You are a helpful assistant.",
             user_prompt="What is the capital of France?",
         )
 
-        agent = self.agent_pool.create_agent(task=task)
+        agent = self.agent_backend.create_agent(task=task)
 
         response = await agent.run()
         print("Response from Agent:", response)
@@ -29,14 +29,14 @@ class TestOpenAISimpleTask:
 
     @pytest.mark.asyncio
     async def test_openai_math_task(self):
-        from charge.tasks.Task import Task
+        from charge.tasks.task import Task
 
         task = Task(
             system_prompt="You are a helpful assistant.",
             user_prompt="What is 15 multiplied by 12?",
         )
 
-        agent = self.agent_pool.create_agent(task=task)
+        agent = self.agent_backend.create_agent(task=task)
 
         response = await agent.run()
         print("Response from Agent:", response)
@@ -44,7 +44,7 @@ class TestOpenAISimpleTask:
 
     @pytest.mark.asyncio
     async def test_openai_structured_output_task(self):
-        from charge.tasks.Task import Task
+        from charge.tasks.task import Task
         from pydantic import BaseModel
         import re
 
@@ -57,7 +57,7 @@ class TestOpenAISimpleTask:
             structured_output_schema=MathAnswerSchema,
         )
 
-        agent = self.agent_pool.create_agent(task=task)
+        agent = self.agent_backend.create_agent(task=task)
 
         response = await agent.run()
         print("Response from Agent:", response)

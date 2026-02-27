@@ -17,6 +17,7 @@ try:
     from autogen_ext.tools.mcp import StdioServerParams, McpWorkbench, SseServerParams
     from autogen_agentchat.messages import TextMessage, StructuredMessage
     from autogen_agentchat.teams import RoundRobinGroupChat
+    from autogen_core.memory import MemoryContent, MemoryMimeType
 
 
 except ImportError:
@@ -28,8 +29,8 @@ import asyncio
 import re
 import os
 import warnings
-from charge.clients.AgentPool import AgentPool, Agent
-from charge.clients.Client import Client
+from charge.clients.agent_factory import AgentBackend, AgentFactory, Agent
+from charge.clients.client import Client
 from charge.clients.huggingface_client import HuggingFaceLocalClient
 from charge.clients.vllm_client import VLLMClient
 from charge.clients.autogen_utils import (
@@ -39,14 +40,13 @@ from charge.clients.autogen_utils import (
     generate_agent,
     CustomConsole,
     cli_chat_callback,
-    chargeConnectionError,
 )
 from charge.utils.mcp_workbench_utils import (
     _setup_mcp_workbenches,
     _close_mcp_workbenches,
 )
 from typing import Any, Tuple, Optional, Dict, Union, List, Callable, overload
-from charge.tasks.Task import Task
+from charge.tasks.task import Task
 from loguru import logger
 
 import logging
@@ -320,7 +320,7 @@ class AutoGenAgent(Agent):
 
     def __init__(
         self,
-        task: Task,
+        task: Optional[Task],
         model_client: Union[AsyncOpenAI, ChatCompletionClient],
         agent_name: str,
         model: str,
@@ -367,6 +367,7 @@ class AutoGenAgent(Agent):
         Returns:
             None
         """
+        assert self.task is not None
         self.workbenches = await _setup_mcp_workbenches(
             self.task.server_files, self.task.server_urls
         )
@@ -382,7 +383,7 @@ class AutoGenAgent(Agent):
         Returns:
             None
         """
-        _close_mcp_workbenches(self.workbenches)
+        await _close_mcp_workbenches(self.workbenches)
 
     def _create_agent(self, **kwargs) -> Any:
         """
@@ -391,6 +392,7 @@ class AutoGenAgent(Agent):
         Returns:
             Any: The created AutoGen agent.
         """
+        assert self.task is not None
         return generate_agent(
             self.model_client,
             self.model,
@@ -409,6 +411,7 @@ class AutoGenAgent(Agent):
         Returns:
             str: The prepared task prompt.
         """
+        assert self.task is not None
         user_prompt = self.task.get_user_prompt()
         if self.task.has_structured_output_schema():
             structured_out = self.task.get_structured_output_schema()
@@ -441,7 +444,8 @@ class AutoGenAgent(Agent):
             agent = self._create_structured_output_agent()
             prompt = (
                 "Convert the following output to the required structured format:\n\n"
-                f"{content}"
+                f"{content}\n\n"
+                "If the output is already correctly formatted, return the same output."
             )
             result = await agent.run(task=prompt)
 
@@ -464,6 +468,7 @@ class AutoGenAgent(Agent):
     def _create_structured_output_agent(self) -> Any:
         """Creates an agent for structured output conversion."""
         if self._structured_output_agent is None:
+            assert self.task is not None
             self._structured_output_agent = generate_agent(
                 self.model_client,
                 f"{self.agent_name}_structured_output",
@@ -490,6 +495,7 @@ class AutoGenAgent(Agent):
             OutputValidationError: If all retries fail to produce valid output.
         """
         last_error = None
+        assert self.task is not None
 
         for attempt in range(1, self.max_retries + 1):
             try:
@@ -539,7 +545,7 @@ class AutoGenAgent(Agent):
             except POSSIBLE_CONNECTION_ERRORS as api_err:
                 error_msg = f"Attempt {attempt}: API connection error: {api_err}"
                 logger.error(error_msg)
-                raise chargeConnectionError(error_msg)
+                raise ConnectionError(error_msg)
             except Exception as e:
                 error_msg = f"Attempt {attempt}: Unexpected error: {e}"
                 logger.error(error_msg)
@@ -679,10 +685,45 @@ class AutoGenAgent(Agent):
             "model_kwargs": self.model_kwargs,
         }
 
+    def save_agent_state(self, agent):
+        # Implement saving the state of the Autogen agent
+        pass
 
-class AutoGenPool(AgentPool):
+    async def add_to_context(self, agent: Agent, task: Task, result):
+        # Implement adding the result to the context of the Autogen task
+
+        # This is tricky and should be customized based on the use case
+        # We set the default behavior to add the instruction
+        #  result to the model context
+
+        instruction = task.get_user_prompt()
+        result = str(result)
+
+        content = MemoryContent(
+            content=f"Instruction: {instruction}\nResponse: {result}",
+            mime_type=MemoryMimeType.TEXT,
+        )
+
+        name = getattr(agent, "agent_name", "Agent")
+        await self.model_context.add(content, source_agent=name)
+
+    async def save_state(self) -> str:
+        # Implement saving the state of the Autogen experiment
+
+        # Get the current memory content
+        seralized_memory = self.model_context.serialize_memory_content()
+        return seralized_memory
+
+    async def load_state(self, state: str):
+        # Implement loading the state of the Autogen experiment
+
+        self.model_context = ChARGeListMemory()
+        self.model_context.load_memory_content(state)
+
+
+class AutoGenBackend(AgentBackend):
     """
-    An AutoGen agent pool that creates AutoGen agents.
+    An AutoGen agent factory backend that creates AutoGen agents.
     Setup with a model client, backend, and model to spawn agents.
 
     Args:
@@ -718,8 +759,15 @@ class AutoGenPool(AgentPool):
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         model_kwargs: Optional[dict] = None,
+        **kwargs,
     ):
-        super().__init__()
+        super().__init__(
+            model=model,
+            api_key=api_key,
+            base_url=base_url,
+            model_kwargs=model_kwargs,
+            **kwargs,
+        )
         self.model_client = model_client
 
         if self.model_client is None:
@@ -744,7 +792,7 @@ class AutoGenPool(AgentPool):
 
     def create_agent(
         self,
-        task: Task,
+        task: Optional[Task],
         max_retries: int = 3,
         agent_name: Optional[str] = None,
         **kwargs,
@@ -763,17 +811,10 @@ class AutoGenPool(AgentPool):
             self.model_client is not None
         ), "Model client must be initialized to create an agent."
 
-        AutoGenPool.AGENT_COUNT += 1
+        AutoGenBackend.AGENT_COUNT += 1
 
-        default_name = self.create_agent_name()
+        default_name = f"autogen_agent_{AutoGenBackend.AGENT_COUNT}"
         agent_name = default_name if agent_name is None else agent_name
-
-        if agent_name in self.agent_list:
-            warnings.warn(
-                f"Agent with name {agent_name} already exists. Creating another agent with the same name."
-            )
-        else:
-            self.agent_list.append(agent_name)
 
         agent = AutoGenAgent(
             task=task,
@@ -785,41 +826,4 @@ class AutoGenPool(AgentPool):
             model_kwargs=self.model_kwargs,
             **kwargs,
         )
-        self.agent_dict[agent_name] = agent
         return agent
-
-    def list_all_agents(self) -> list:
-        """Lists all agents in the pool.
-
-        Returns:
-            list: List of agent names.
-        """
-        return self.agent_list
-
-    def get_agent_by_name(self, name: str) -> AutoGenAgent:
-        """Gets an agent by name.
-
-        Args:
-            name (str): The name of the agent.
-
-        Returns:
-            AutoGenAgent: The agent with the given name.
-        """
-        assert name in self.agent_dict, f"Agent with name {name} does not exist."
-        return self.agent_dict[name]
-
-    def create_agent_name(
-        self, prefix: Optional[str] = None, suffix: Optional[str] = None
-    ):
-        model_name = self.model if self.model is not None else "default_model"
-        backend_name = self.backend if self.backend is not None else "default_backend"
-
-        default_name = f"[{backend_name}:{model_name}]_{AutoGenPool.AGENT_COUNT}"
-        default_name = re.sub(r"[^a-zA-Z0-9_]", "_", default_name)
-
-        if prefix:
-            default_name = f"{prefix}{default_name}"
-        if suffix:
-            default_name = f"{default_name}{suffix}"
-
-        return default_name

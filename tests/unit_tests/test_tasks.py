@@ -21,7 +21,7 @@ def test_normalize_string(input_data, expected_output):
 
 
 def test_Task_create_no_tools():
-    from charge.tasks.Task import Task
+    from charge.tasks.task import Task
 
     task = Task(
         system_prompt="System Prompt",
@@ -39,7 +39,7 @@ def test_Task_create_no_tools():
 
 @pytest.fixture
 def task_with_schema():
-    from charge.tasks.Task import Task
+    from charge.tasks.task import Task
     from pydantic import BaseModel
 
     class SampleSchema(BaseModel):
@@ -83,7 +83,7 @@ def test_Task_check_output_formatting_invalid(task_with_schema):
 
 
 def test_Task_no_url_raise_error():
-    from charge.tasks.Task import Task
+    from charge.tasks.task import Task
 
     # When CHARGE_RAISE_ON_MISSING_SERVER is set to True, ValueError should be raised
     pytest.MonkeyPatch().setenv("CHARGE_ERROR_ON_MISSING_SERVER", "1")
@@ -110,7 +110,7 @@ def test_Task_no_url_raise_error():
 
 
 def test_Task_with_valid_and_invalid_urls():
-    from charge.tasks.Task import Task
+    from charge.tasks.task import Task
 
     valid_url = "http://valid_server_url/sse"
     invalid_url = "http://invalid_server_url/sse"
