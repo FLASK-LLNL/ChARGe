@@ -1,4 +1,5 @@
 from charge.tasks.task import Task
+from charge.experiments.memory import Memory
 from abc import abstractmethod
 from typing import Any, Literal, Optional
 
@@ -53,7 +54,12 @@ class AgentBackend:
 
     @abstractmethod
     def create_agent(
-        self, task: Optional[Task], *, agent_name: Optional[str] = None, **kwargs
+        self,
+        task: Optional[Task],
+        *,
+        agent_name: Optional[str] = None,
+        memory: Optional[Memory] = None,
+        **kwargs,
     ) -> Agent:
         raise NotImplementedError
 
@@ -71,13 +77,14 @@ class AgentFactory:
         task: Optional[Task],
         backend: str = DEFAULT_BACKEND,
         agent_name: Optional[str] = None,
+        memory: Optional[Memory] = None,
         **kwargs,
     ):
         """
         Abstract method to create and return an Agent instance.
         """
         return cls.backends[backend.lower()].create_agent(
-            task, agent_name=agent_name, **kwargs
+            task, agent_name=agent_name, memory=memory, **kwargs
         )
 
     @classmethod

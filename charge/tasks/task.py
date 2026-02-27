@@ -196,3 +196,89 @@ class Task(ABC):
                 f"Output formatting check failed with error: {e}. Content: {content}"
             )
             return False
+
+    def to_json(self) -> dict:
+        """
+        Serialize the task to a JSON-compatible dictionary.
+        Returns:
+            dict: JSON-compatible dictionary representation of the task.
+        """
+        # Get the base attributes
+        data = {
+            "class_name": self.__class__.__name__,
+            "module": self.__class__.__module__,
+            "system_prompt": self.system_prompt,
+            "user_prompt": self.user_prompt,
+            "verification_prompt": self.verification_prompt,
+            "refinement_prompt": self.refinement_prompt,
+            "server_urls": self.server_urls,
+            "server_files": self.server_files,
+            "constructor_args": self.constructor_args,
+        }
+
+        # Get any additional attributes that were set via kwargs
+        # Exclude private attributes, methods, and known base attributes
+        base_attrs = {
+            "system_prompt",
+            "user_prompt",
+            "verification_prompt",
+            "refinement_prompt",
+            "server_urls",
+            "server_files",
+            "structured_output_schema",
+            "constructor_args",
+        }
+
+        extra_attrs = {}
+        for key, value in self.__dict__.items():
+            if (
+                not key.startswith("_")
+                and key not in base_attrs
+                and not callable(value)
+            ):
+                # Only include JSON-serializable values
+                try:
+                    import json
+
+                    json.dumps(value)
+                    extra_attrs[key] = value
+                except (TypeError, ValueError):
+                    # Skip non-serializable attributes
+                    pass
+
+        if extra_attrs:
+            data["extra_attrs"] = extra_attrs
+
+        return data
+
+    @classmethod
+    def from_json(cls, data: dict) -> "Task":
+        """
+        Deserialize a task from a JSON-compatible dictionary.
+        Args:
+            data (dict): JSON-compatible dictionary representation of the task.
+        Returns:
+            Task: Reconstructed task instance.
+        """
+        # Extract the base parameters for Task.__init__
+        init_params = {
+            "system_prompt": data.get("system_prompt"),
+            "user_prompt": data.get("user_prompt"),
+            "verification_prompt": data.get("verification_prompt"),
+            "refinement_prompt": data.get("refinement_prompt"),
+            "server_urls": data.get("server_urls"),
+            "server_files": data.get("server_files"),
+        }
+
+        # Add any extra attributes as kwargs
+        extra_attrs = data.get("extra_attrs", {})
+        init_params.update(extra_attrs)
+
+        # Create the instance
+        instance = cls(**init_params)
+
+        # Restore constructor_args if present
+        if "constructor_args" in data:
+            instance.constructor_args = data["constructor_args"]
+
+        return instance

@@ -1,4 +1,4 @@
-from charge.tasks.Task import Task
+from charge.tasks.task import Task
 from typing import Type
 import inspect
 import textwrap

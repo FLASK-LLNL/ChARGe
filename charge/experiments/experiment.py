@@ -1,57 +1,44 @@
-from abc import abstractmethod
 from typing import Any, List, Union, Optional
 from charge.tasks.task import Task
 from charge.clients.agent_factory import Agent, AgentFactory
+from charge.experiments.memory import Memory, ListMemory
 from charge._utils import maybe_await_async
 import asyncio
 
 
-class Experiment(object):
+class Experiment:
     def __init__(
         self,
         task: Optional[Union[Task, List[Task]]],
         *args,
+        memory: Optional[Memory] = None,
         **kwargs,
     ):
         if task is None:
             task = []
         self.tasks = task if isinstance(task, list) else [task]
         self.finished_tasks = []
+        self.memory = memory or ListMemory()
 
         self.args = args
         self.kwargs = kwargs
 
-    @abstractmethod
     def create_agent_with_experiment_state(self, task, **kwargs):
         # Create an agent that incorporates the experiment state
+        # NOTE: Should self.context be passed into the agent?
+        return AgentFactory.create_agent(task=task, memory=self.memory, **kwargs)
 
-        # Default implementation is no context is shared across agents
-        return AgentFactory.create_agent(task=task, **kwargs)
+    def add_to_context(self, agent: Agent, task: Task, result: Any):
+        # Add the result to the context of the experiment
+        self.memory.add_to_context(task, result)
 
-    @abstractmethod
-    def save_agent_state(self, agent):
-        # Save the state of the agent
-        raise NotImplementedError("Subclasses must implement save_agent_state method")
-
-    @abstractmethod
-    def save_agent_state_async(self, agent):
-        # Save the state of the agent
-        raise NotImplementedError("Subclasses must implement save_agent_state method")
-
-    @abstractmethod
-    def add_to_context(self, agent: Agent, task: Task, result):
-        # Add the result to the context of the task
-        raise NotImplementedError("Subclasses must implement add_to_context method")
-
-    @abstractmethod
     def save_state(self):
         # Save the state of the experiment
-        raise NotImplementedError("Subclasses must implement save_state method")
+        return self.memory.to_json()
 
-    @abstractmethod
     def load_state(self, state):
         # Load the state of the experiment
-        raise NotImplementedError("Subclasses must implement load_state method")
+        self.memory = ListMemory.from_json(state)
 
     def num_finished_tasks(self) -> int:
         """Returns the number of finished tasks.
@@ -91,7 +78,6 @@ class Experiment(object):
             result = await maybe_await_async(agent.run)
             await maybe_await_async(self.add_to_context, agent, current_task, result)
             self.finished_tasks.append((current_task, result))
-            self.save_agent_state(agent)
 
     def run(self) -> None:
         asyncio.run(self.run_async())
@@ -101,4 +87,4 @@ class Experiment(object):
         Resets the experiment state.
         """
         self.finished_tasks = []
-        self.agent_pool.reset()
+        self.memory = ListMemory()

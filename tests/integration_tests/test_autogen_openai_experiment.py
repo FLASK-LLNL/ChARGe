@@ -81,11 +81,11 @@ class TestOpenAISimpleTask:
 
         # assert re.search(r'"answer":\s*15', second_task_result)
 
-        self.state = await self.experiment.save_state()
+        self.state = self.experiment.save_state()
 
         print("Serialized State:", self.state)
 
-        await self.experiment.load_state(self.state)
+        self.experiment.load_state(self.state)
 
         self.experiment.add_task(self.third_task)
         assert self.experiment.remaining_tasks() == 1
@@ -108,7 +108,7 @@ class TestOpenAISimpleTask:
 
         assert content == save_file_content
 
-        await self.experiment.load_state(content)
+        self.experiment.load_state(content)
 
         assert self.experiment.remaining_tasks() == 0
 

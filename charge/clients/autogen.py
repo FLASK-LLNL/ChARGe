@@ -46,6 +46,7 @@ from charge.utils.mcp_workbench_utils import (
     _close_mcp_workbenches,
 )
 from typing import Any, Tuple, Optional, Dict, Union, List, Callable, overload
+from charge.experiments.memory import Memory
 from charge.tasks.task import Task
 from loguru import logger
 
@@ -339,7 +340,9 @@ class AutoGenAgent(Agent):
         self.agent_name = agent_name
         self.model_client = model_client
         self.timeout = timeout
-        self.memory = self.setup_memory(memory)
+        self.memory: list[ChARGeListMemory] | ChARGeListMemory = self.setup_memory(
+            memory
+        )
         self.setup_kwargs = kwargs
 
         self.context_history = []
@@ -445,7 +448,8 @@ class AutoGenAgent(Agent):
             prompt = (
                 "Convert the following output to the required structured format:\n\n"
                 f"{content}\n\n"
-                "If the output is already correctly formatted, return the same output."
+                "If the output is already correctly formatted, return the same output. "
+                "Never modify the reasoning_summary field."
             )
             result = await agent.run(task=prompt)
 
@@ -475,7 +479,7 @@ class AutoGenAgent(Agent):
                 "You are an agent that converts model output to a structured format.",
                 [],  # No tools needed
                 max_tool_calls=1,
-                memory=self.memory,
+                # memory=self.memory,
                 output_content_type=self.task.get_structured_output_schema(),
             )
         return self._structured_output_agent
@@ -651,16 +655,16 @@ class AutoGenAgent(Agent):
         """
         self.context_history = history
 
-    def load_memory(self, jston_str: str) -> None:
+    def load_memory(self, json_str: str) -> None:
         """
         Loads memory content into the agent's memory.
         """
         if self.memory is not None:
             if isinstance(self.memory, list):
                 for mem in self.memory:
-                    mem.load_memory_content(jston_str)
+                    mem.load_memory_content(json_str)
             else:
-                self.memory.load_memory_content(jston_str)
+                self.memory.load_memory_content(json_str)
 
     def save_memory(self) -> str:
         """
@@ -685,11 +689,7 @@ class AutoGenAgent(Agent):
             "model_kwargs": self.model_kwargs,
         }
 
-    def save_agent_state(self, agent):
-        # Implement saving the state of the Autogen agent
-        pass
-
-    async def add_to_context(self, agent: Agent, task: Task, result):
+    async def add_to_context(self, task: Task, result: Any):
         # Implement adding the result to the context of the Autogen task
 
         # This is tricky and should be customized based on the use case
@@ -704,21 +704,32 @@ class AutoGenAgent(Agent):
             mime_type=MemoryMimeType.TEXT,
         )
 
-        name = getattr(agent, "agent_name", "Agent")
-        await self.model_context.add(content, source_agent=name)
+        name = self.agent_name or "Agent"
+        if isinstance(self.memory, list):
+            await self.memory[-1].add(content, source_agent=name)
+        else:
+            await self.memory.add(content, source_agent=name)
 
-    async def save_state(self) -> str:
-        # Implement saving the state of the Autogen experiment
+    def add_to_context_sync(self, task: Task, result: Any):
+        # Implement adding the result to the context of the Autogen task
 
-        # Get the current memory content
-        seralized_memory = self.model_context.serialize_memory_content()
-        return seralized_memory
+        # This is tricky and should be customized based on the use case
+        # We set the default behavior to add the instruction
+        #  result to the model context
 
-    async def load_state(self, state: str):
-        # Implement loading the state of the Autogen experiment
+        instruction = task.get_user_prompt()
+        result = str(result)
 
-        self.model_context = ChARGeListMemory()
-        self.model_context.load_memory_content(state)
+        content = MemoryContent(
+            content=f"Instruction: {instruction}\nResponse: {result}",
+            mime_type=MemoryMimeType.TEXT,
+        )
+
+        name = self.agent_name or "Agent"
+        if isinstance(self.memory, list):
+            self.memory[-1].add_sync(content, source_agent=name)
+        else:
+            self.memory.add_sync(content, source_agent=name)
 
 
 class AutoGenBackend(AgentBackend):
@@ -755,7 +766,7 @@ class AutoGenBackend(AgentBackend):
         self,
         model_client: Optional[Union[AsyncOpenAI, ChatCompletionClient]] = None,
         model: Optional[str] = None,
-        backend: Optional[str] = "openai",
+        backend: str = "openai",
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         model_kwargs: Optional[dict] = None,
@@ -766,6 +777,8 @@ class AutoGenBackend(AgentBackend):
             api_key=api_key,
             base_url=base_url,
             model_kwargs=model_kwargs,
+            reasoning_effort=None,
+            backend=backend,
             **kwargs,
         )
         self.model_client = model_client
@@ -795,6 +808,7 @@ class AutoGenBackend(AgentBackend):
         task: Optional[Task],
         max_retries: int = 3,
         agent_name: Optional[str] = None,
+        memory: Optional[Memory] = None,
         **kwargs,
     ):
         """Creates an AutoGen agent for the given task.
@@ -826,4 +840,11 @@ class AutoGenBackend(AgentBackend):
             model_kwargs=self.model_kwargs,
             **kwargs,
         )
+        # Add memory
+        if memory:
+            assert isinstance(agent.memory, list)
+            memory_json = memory.to_list_of_tasks_and_results()
+            for memory_task, memory_result in memory_json:
+                agent.add_to_context_sync(memory_task, memory_result)
+
         return agent

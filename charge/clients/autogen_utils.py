@@ -17,6 +17,7 @@ try:
         AssistantMessage,
         SystemMessage,
     )
+    from autogen_core._cancellation_token import CancellationToken
     from autogen_core.memory._base_memory import (
         MemoryContent,
         MemoryQueryResult,
@@ -85,15 +86,15 @@ class ReasoningModelContext(UnboundedChatCompletionContext):
 
     async def add_message(
         self,
-        assistant_message: AssistantMessage,
+        message: LLMMessage,
     ) -> None:
-        await super().add_message(assistant_message)
+        await super().add_message(message)
 
         if self.custom_callback:
-            self.custom_callback(assistant_message)
+            self.custom_callback(message)
 
         else:
-            self.default_callback(assistant_message)
+            self.default_callback(message)
 
     def default_callback(self, assistant_message: LLMMessage):
         # print("In callback:", assistant_message)
@@ -125,11 +126,10 @@ class ReasoningModelContext(UnboundedChatCompletionContext):
                 else:
                     print(f"Function {result.name} returned: {result.content}")
         else:
-
-            if hasattr(assistant_message, "message"):
-                print("[{source}] Model: ", assistant_message.message.content)
-            elif hasattr(assistant_message, "content"):
-                print("[{source}] Model: ", assistant_message.content)
+            print(
+                "[{source}] Model: ",
+                getattr(assistant_message, "message", assistant_message.content),
+            )
 
 
 def generate_agent(
@@ -274,7 +274,8 @@ class ChARGeListMemory(ListMemory):
 
     async def add(
         self,
-        memory_content: MemoryContent,
+        content: MemoryContent,
+        cancellation_token: Optional[CancellationToken] = None,
         source_agent: Optional[str] = None,
     ) -> None:
         """Add a new memory content to the list.
@@ -284,8 +285,24 @@ class ChARGeListMemory(ListMemory):
             source_agent: The source agent of the memory content.
         """
 
-        self._contents.append(memory_content)
-        self.source_agent.append(source_agent if source_agent is not None else "Agent")
+        self._contents.append(content)
+        self.source_agent.append(source_agent or "Agent")
+
+    def add_sync(
+        self,
+        content: MemoryContent,
+        cancellation_token: Optional[CancellationToken] = None,
+        source_agent: Optional[str] = None,
+    ) -> None:
+        """Add a new memory content to the list.
+
+        Args:
+            memory_content: The memory content to add.
+            source_agent: The source agent of the memory content.
+        """
+
+        self._contents.append(content)
+        self.source_agent.append(source_agent or "Agent")
 
     def serialize_memory_content(self) -> str:
         """Serialize the memory contents to a JSON string.
