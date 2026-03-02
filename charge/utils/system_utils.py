@@ -56,8 +56,8 @@ def check_url_exists(url: str) -> bool:
         warnings.warn(f"URL '{url}' does not start with 'http://' or 'https://'")
         return False
 
-    if not url.endswith("/sse"):
-        warnings.warn(f"URL '{url}' does not end with '/sse'")
+    if not url.endswith("/mcp"):
+        warnings.warn(f"URL '{url}' does not end with '/mcp'")
         return False
 
     try:

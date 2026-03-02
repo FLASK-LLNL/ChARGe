@@ -6,7 +6,11 @@
 ################################################################################
 try:
 
-    from autogen_ext.tools.mcp import StdioServerParams, McpWorkbench, SseServerParams
+    from autogen_ext.tools.mcp import (
+        StdioServerParams,
+        McpWorkbench,
+        StreamableHttpServerParams,
+    )
 except ImportError:
     raise ImportError(
         "Please install the autogen-agentchat package to use this module."
@@ -35,8 +39,9 @@ def create_servers(
         )
     for url in urls:
         mcp_servers.append(
-            SseServerParams(
+            StreamableHttpServerParams(
                 url=url,
+                # headers={"Authorization": "Bearer your-api-key", "Content-Type": "application/json"},
                 timeout=timeout,
                 sse_read_timeout=timeout,
             )
