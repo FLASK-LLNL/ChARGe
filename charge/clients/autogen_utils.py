@@ -27,7 +27,11 @@ try:
     from autogen_agentchat.base import Response, TaskResult
     from openai import AsyncOpenAI
     from autogen_ext.agents.openai import OpenAIAgent
-    from autogen_ext.tools.mcp import McpWorkbench, StdioServerParams, SseServerParams
+    from autogen_ext.tools.mcp import (
+        McpWorkbench,
+        StdioServerParams,
+        StreamableHttpServerParams,
+    )
 except ImportError:
     raise ImportError(
         "Please install the autogen-agentchat package to use this module."
@@ -176,7 +180,7 @@ async def _list_wb_tools(workbenches: List[McpWorkbench]):
     for wb in workbenches:
         tools = await wb.list_tools()
         server_params = wb._server_params
-        if isinstance(server_params, SseServerParams):
+        if isinstance(server_params, StreamableHttpServerParams):
             msg = server_params.url
         elif isinstance(server_params, StdioServerParams):
             msg = " ".join(server_params.args)

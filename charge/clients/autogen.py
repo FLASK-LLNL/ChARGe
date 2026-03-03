@@ -14,7 +14,11 @@ try:
     from openai import AsyncOpenAI
 
     # from autogen_ext.agents.openai import OpenAIAgent
-    from autogen_ext.tools.mcp import StdioServerParams, McpWorkbench, SseServerParams
+    from autogen_ext.tools.mcp import (
+        StdioServerParams,
+        McpWorkbench,
+        StreamableHttpServerParams,
+    )
     from autogen_agentchat.messages import TextMessage, StructuredMessage
     from autogen_agentchat.teams import RoundRobinGroupChat
     from autogen_core.memory import MemoryContent, MemoryMimeType
