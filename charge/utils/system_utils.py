@@ -60,11 +60,32 @@ def check_url_exists(url: str) -> bool:
         warnings.warn(f"URL '{url}' does not end with '/mcp'")
         return False
 
+    headers = {
+        # Streamable/streaming HTTP MCP endpoints commonly require this for content negotiation
+        "Accept": "text/event-stream, application/json",
+        "Cache-Control": "no-cache",
+    }
     try:
-        with requests.get(url, stream=True, timeout=5) as response:
-            if response.status_code != 200:
-                warnings.warn(f"Error reaching URL '{url}': {response.status_code}")
-                return False
+        with requests.get(url, stream=True, timeout=5, headers=headers) as response:
+            # 200 is ideal. 406 still proves the server is reachable (just unhappy with Accept).
+            if response.status_code == 200:
+                return True
+            if response.status_code == 406:
+                warnings.warn(
+                    f"Reached MCP URL '{url}' but got 406 Not Acceptable; "
+                    f"server likely requires streaming Accept headers. Treating as reachable."
+                )
+                return True
+
+            if response.status_code == 400:
+                warnings.warn(
+                    f"Reached MCP URL '{url}' but got 400 Bad Request; "
+                    f"no session context. Treating as reachable."
+                )
+                return True
+
+            warnings.warn(f"Error reaching URL '{url}': {response.status_code}")
+            return False
     except requests.RequestException as e:
         warnings.warn(f"Error reaching URL '{url}': {e}")
         return False
