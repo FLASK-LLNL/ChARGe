@@ -42,7 +42,6 @@ def create_servers(
             StreamableHttpServerParams(
                 url=url,
                 headers={
-                    #                    "Authorization": "Bearer <TOKEN>",
                     "Content-Type": "application/json",
                     "Accept": "text/event-stream, application/json",
                 },
