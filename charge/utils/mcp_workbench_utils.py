@@ -45,7 +45,6 @@ def create_servers(
                     "Content-Type": "application/json",
                     "Accept": "text/event-stream, application/json",
                 },
-                # headers={"Authorization": "Bearer your-api-key", "Content-Type": "application/json"},
                 timeout=timeout,
                 sse_read_timeout=timeout,
             )
