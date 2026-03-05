@@ -56,15 +56,14 @@ def check_url_exists(url: str) -> bool:
         warnings.warn(f"URL '{url}' does not start with 'http://' or 'https://'")
         return False
 
-    if not url.endswith("/mcp"):
-        warnings.warn(f"URL '{url}' does not end with '/mcp'")
-        return False
-
     headers = {
         # Streamable/streaming HTTP MCP endpoints commonly require this for content negotiation
         "Accept": "text/event-stream, application/json",
         "Cache-Control": "no-cache",
     }
+    wh_token = os.getenv("FLASK_WORMHOLE_TOKEN", None)
+    if wh_token:
+        headers["X-Token"] = wh_token
     try:
         with requests.get(url, stream=True, timeout=5, headers=headers) as response:
             # 200 is ideal. 406 still proves the server is reachable (just unhappy with Accept).
