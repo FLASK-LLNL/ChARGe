@@ -6,7 +6,11 @@
 ################################################################################
 try:
 
-    from autogen_ext.tools.mcp import StdioServerParams, McpWorkbench, SseServerParams
+    from autogen_ext.tools.mcp import (
+        StdioServerParams,
+        McpWorkbench,
+        StreamableHttpServerParams,
+    )
 except ImportError:
     raise ImportError(
         "Please install the autogen-agentchat package to use this module."
@@ -35,8 +39,12 @@ def create_servers(
         )
     for url in urls:
         mcp_servers.append(
-            SseServerParams(
+            StreamableHttpServerParams(
                 url=url,
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "text/event-stream, application/json",
+                },
                 timeout=timeout,
                 sse_read_timeout=timeout,
             )
@@ -89,8 +97,17 @@ async def call_mcp_tool_directly(
             tool_names = [t["name"] for t in tools]
 
             if tool_name in tool_names:
-                result = await workbench.call_tool(name=tool_name, arguments=arguments)
-                return result
+                results = await workbench.call_tool(name=tool_name, arguments=arguments)
+                num_results = len(results.result)
+                if num_results == 1:
+                    return results.result[0]
+                elif num_results > 1:
+                    return results.result
+                else:
+                    print(
+                        f"{tool_name} did not return a valid results message {results}"
+                    )
+                    return None
             else:
                 unused_tools.append(tool_names)
 
