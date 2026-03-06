@@ -56,6 +56,10 @@ def check_url_exists(url: str) -> bool:
         warnings.warn(f"URL '{url}' does not start with 'http://' or 'https://'")
         return False
 
+    if not url.endswith("/mcp"):
+        warnings.warn(f"URL '{url}' does not end with '/mcp'")
+        return False
+
     headers = {
         # Streamable/streaming HTTP MCP endpoints commonly require this for content negotiation
         "Accept": "text/event-stream, application/json",
