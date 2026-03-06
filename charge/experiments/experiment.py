@@ -89,4 +89,3 @@ class Experiment:
         self.finished_tasks = []
         self.memory = ListMemory()
         self.tasks = []
-        self.agent_pool.reset()

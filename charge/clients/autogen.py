@@ -46,6 +46,7 @@ from charge.clients.autogen_utils import (
 )
 from charge.clients.openai_base import (
     model_configure,
+    get_api_key_for_backend,
 )
 from charge.utils.mcp_workbench_utils import (
     _setup_mcp_workbenches,
@@ -163,14 +164,16 @@ def create_autogen_model_client(
                 },
             )
     else:
-        if api_key is None:
-            if backend == "gemini":
-                api_key = os.getenv("GOOGLE_API_KEY")
-            else:
-                api_key = os.getenv("OPENAI_API_KEY")
-        assert api_key is not None, (
-            "API key must be provided for OpenAI or Gemini backend"
-        )
+        # OpenAI or OpenAI-compatible endpoints only
+        api_key = get_api_key_for_backend(backend, api_key)
+        # if api_key is None:
+        #     if backend == "gemini":
+        #         api_key = os.getenv("GOOGLE_API_KEY")
+        #     else:
+        #         api_key = os.getenv("OPENAI_API_KEY")
+        assert (
+            api_key is not None
+        ), "API key must be provided for OpenAI or Gemini backend"
 
         # Disabled due to https://github.com/microsoft/autogen/issues/6937
         # if backend in ["openai", "livai", "livchat"]:
@@ -664,12 +667,12 @@ class AutoGenBackend(AgentBackend):
         self.model_client = model_client
 
         if self.model_client is None:
-            assert model is not None, (
-                "Model name must be provided if model_client is not given."
-            )
-            assert backend is not None, (
-                "Backend must be provided if model_client is not given."
-            )
+            assert (
+                model is not None
+            ), "Model name must be provided if model_client is not given."
+            assert (
+                backend is not None
+            ), "Backend must be provided if model_client is not given."
 
             model, backend, api_key, model_kwargs = model_configure(
                 model=model, backend=backend, api_key=api_key, base_url=base_url
@@ -701,9 +704,9 @@ class AutoGenBackend(AgentBackend):
             AutoGenAgent: The created AutoGen agent.
         """
         self.max_retries = max_retries
-        assert self.model_client is not None, (
-            "Model client must be initialized to create an agent."
-        )
+        assert (
+            self.model_client is not None
+        ), "Model client must be initialized to create an agent."
 
         AutoGenBackend.AGENT_COUNT += 1
 

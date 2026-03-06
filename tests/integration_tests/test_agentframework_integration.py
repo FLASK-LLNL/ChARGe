@@ -17,13 +17,17 @@ class TestAgentFrameworkIntegration:
     @pytest.fixture(autouse=True)
     def setup_fixture(self):
         """Set up test fixtures with tasks and agent pool."""
-        from charge.tasks.Task import Task
-        from charge.clients.agentframework import AgentFrameworkPool
-        from charge.experiments.AgentFrameworkExperiment import AgentFrameworkExperiment
+        from charge.tasks.task import Task
+        from charge.clients.agentframework import AgentFrameworkBackend
+        from charge.clients.agent_factory import AgentFactory
+        from charge.experiments.experiment import Experiment
         from pydantic import BaseModel
 
-        # Create agent pool with OpenAI backend
-        self.agent_pool = AgentFrameworkPool(model="gpt-4o-mini", backend="openai")
+        # Create and register agent backend with OpenAI backend
+        self.agent_backend = AgentFrameworkBackend(
+            model="gpt-4o-mini", backend="openai"
+        )
+        AgentFactory.register_backend("agentframework", self.agent_backend)
 
         # First task: Simple arithmetic
         first_task = Task(
@@ -51,9 +55,7 @@ class TestAgentFrameworkIntegration:
         )
 
         # Create experiment with two tasks
-        self.experiment = AgentFrameworkExperiment(
-            task=[first_task, second_task], agent_pool=self.agent_pool
-        )
+        self.experiment = Experiment(task=[first_task, second_task])
 
         # Third task: Use structured output from previous task
         third_task = Task(
@@ -76,14 +78,15 @@ class TestAgentFrameworkIntegration:
     @pytest.mark.asyncio
     async def test_simple_task_execution(self):
         """Test basic task execution with Agent Framework."""
-        from charge.tasks.Task import Task
+        from charge.tasks.task import Task
+        from charge.clients.agent_factory import AgentFactory
 
         task = Task(
             system_prompt="You are a helpful assistant.",
             user_prompt="What is the capital of France? Answer in one word.",
         )
 
-        agent = self.agent_pool.create_agent(task=task)
+        agent = AgentFactory.create_agent(task=task, backend="agentframework")
         result = await agent.run()
 
         print(f"Simple task result: {result}")
@@ -92,7 +95,8 @@ class TestAgentFrameworkIntegration:
     @pytest.mark.asyncio
     async def test_structured_output(self):
         """Test structured output validation with Pydantic schemas."""
-        from charge.tasks.Task import Task
+        from charge.tasks.task import Task
+        from charge.clients.agent_factory import AgentFactory
         from pydantic import BaseModel
 
         class CityInfo(BaseModel):
@@ -105,7 +109,7 @@ class TestAgentFrameworkIntegration:
             structured_output_schema=CityInfo,
         )
 
-        agent = self.agent_pool.create_agent(task=task)
+        agent = AgentFactory.create_agent(task=task, backend="agentframework")
         result = await agent.run()
 
         print(f"Structured output result: {result}")
@@ -122,7 +126,7 @@ class TestAgentFrameworkIntegration:
         import re
 
         # Run the experiment with two tasks
-        await self.experiment.run_async()
+        await self.experiment.run_async(backend="agentframework")
         finished_tasks = self.experiment.get_finished_tasks()
         assert len(finished_tasks) == 2
 
@@ -143,17 +147,17 @@ class TestAgentFrameworkIntegration:
         assert parse_output.answer == 15
 
         # Test state serialization
-        self.state = await self.experiment.save_state()
+        self.state = self.experiment.save_state()
         print("Serialized State:", self.state)
 
         # Test state loading
-        await self.experiment.load_state(self.state)
+        self.experiment.load_state(self.state)
 
         # Add third task and run
         self.experiment.add_task(self.third_task)
         assert self.experiment.remaining_tasks() == 1
 
-        await self.experiment.run_async()
+        await self.experiment.run_async(backend="agentframework")
         finished_tasks = self.experiment.get_finished_tasks()
         assert len(finished_tasks) == 3
 
@@ -172,7 +176,7 @@ class TestAgentFrameworkIntegration:
         assert content == save_file_content
 
         # Reload state (should be back to 2 finished tasks)
-        await self.experiment.load_state(content)
+        self.experiment.load_state(content)
         assert self.experiment.remaining_tasks() == 0
 
         print("Experiment State Loaded Successfully")
@@ -181,7 +185,7 @@ class TestAgentFrameworkIntegration:
         self.experiment.add_task(self.alternate_third_task)
         assert self.experiment.remaining_tasks() == 1
 
-        await self.experiment.run_async()
+        await self.experiment.run_async(backend="agentframework")
         finished_tasks = self.experiment.get_finished_tasks()
 
         third_task, third_task_result = finished_tasks[-1]
@@ -191,7 +195,7 @@ class TestAgentFrameworkIntegration:
     @pytest.mark.asyncio
     async def test_experiment_memory_persistence(self):
         """Test that experiment memory persists across agent creation."""
-        from charge.tasks.Task import Task
+        from charge.tasks.task import Task
 
         task1 = Task(
             system_prompt="You are a helpful assistant.",
@@ -205,13 +209,13 @@ class TestAgentFrameworkIntegration:
 
         # Reuse existing experiment but reset it properly
         experiment = self.experiment
-        experiment.reset()  # Clears finished_tasks, tasks, and model_context
+        experiment.reset()  # Clears finished_tasks, tasks, and memory
 
         # Add the new tasks
         experiment.add_task(task1)
         experiment.add_task(task2)
 
-        await experiment.run_async()
+        await experiment.run_async(backend="agentframework")
         finished_tasks = experiment.get_finished_tasks()
 
         assert len(finished_tasks) == 2
@@ -227,7 +231,8 @@ class TestAgentFrameworkIntegration:
     @pytest.mark.asyncio
     async def test_agent_retry_logic(self):
         """Test that agent retry logic works correctly."""
-        from charge.tasks.Task import Task
+        from charge.tasks.task import Task
+        from charge.clients.agent_factory import AgentFactory
         from pydantic import BaseModel
 
         class NumberSchema(BaseModel):
@@ -240,7 +245,9 @@ class TestAgentFrameworkIntegration:
             structured_output_schema=NumberSchema,
         )
 
-        agent = self.agent_pool.create_agent(task=task, max_retries=3)
+        agent = AgentFactory.create_agent(
+            task=task, backend="agentframework", max_retries=3
+        )
         result = await agent.run()
 
         print(f"Retry test result: {result}")
@@ -249,28 +256,6 @@ class TestAgentFrameworkIntegration:
         assert task.check_output_formatting(result)
         parsed = NumberSchema.model_validate_json(result)
         assert parsed.number == 7
-
-    @pytest.mark.asyncio
-    async def test_conversation_history(self):
-        """Test that conversation history is properly maintained."""
-        # Run experiment
-        await self.experiment.run_async()
-
-        # Get conversation history
-        history = self.experiment.get_conversation_history()
-        source_agents = self.experiment.get_source_agents()
-
-        print(f"Conversation history length: {len(history)}")
-        print(f"Source agents: {source_agents}")
-
-        # Should have entries for each task
-        assert len(history) >= 2
-        assert len(source_agents) >= 2
-
-        # Each history entry should have content
-        for entry in history:
-            assert "content" in entry
-            assert len(entry["content"]) > 0
 
 
 # @pytest.mark.skipif(

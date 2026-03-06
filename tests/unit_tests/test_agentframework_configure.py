@@ -7,6 +7,7 @@ def agentframework_module():
     """Import and return the agentframework module for testing."""
     try:
         import charge.clients.agentframework
+
         return charge.clients.agentframework
     except ImportError:
         pytest.skip("agent-framework package not installed")
@@ -163,102 +164,91 @@ def test_create_client_unsupported_backend(agentframework_module):
 
 
 def test_agentframework_pool_initialization(agentframework_module):
-    """Test AgentFrameworkPool initialization."""
-    from charge.clients.agentframework import AgentFrameworkPool
+    """Test AgentFrameworkBackend initialization."""
+    from charge.clients.agentframework import AgentFrameworkBackend
 
     pytest.MonkeyPatch().setenv("OPENAI_API_KEY", "test_key")
 
     # Test with model and backend
-    pool = AgentFrameworkPool(model="gpt-5", backend="openai")
+    backend = AgentFrameworkBackend(model="gpt-5", backend="openai")
 
-    assert pool.model == "gpt-5"
-    assert pool.backend == "openai"
-    assert pool.chat_client is not None
+    assert backend.model == "gpt-5"
+    assert backend.backend == "openai"
+    assert backend.chat_client is not None
 
 
 def test_agentframework_pool_agent_naming(agentframework_module):
-    """Test agent name generation in pool."""
-    from charge.clients.agentframework import AgentFrameworkPool
+    """Test agent name generation in backend."""
+    from charge.clients.agentframework import AgentFrameworkBackend
+    from charge.tasks.task import Task
 
     pytest.MonkeyPatch().setenv("OPENAI_API_KEY", "test_key")
 
-    pool = AgentFrameworkPool(model="gpt-5", backend="openai")
+    AgentFrameworkBackend.AGENT_COUNT = 0
+    backend = AgentFrameworkBackend(model="gpt-5", backend="openai")
 
-    name = pool.create_agent_name()
+    task = Task(system_prompt="Test", user_prompt="Test")
+    agent1 = backend.create_agent(task=task)
+    agent2 = backend.create_agent(task=task)
 
-    assert "openai" in name
-    assert "gpt" in name
-    # When calling create_agent_name() directly, it uses current counter value
-    assert "_0" in name or "_" in name  # Counter increments when creating actual agents
-
-
-def test_agentframework_pool_custom_prefix_suffix(agentframework_module):
-    """Test agent naming with custom prefix and suffix."""
-    from charge.clients.agentframework import AgentFrameworkPool
-
-    pytest.MonkeyPatch().setenv("OPENAI_API_KEY", "test_key")
-
-    pool = AgentFrameworkPool(model="gpt-5", backend="openai")
-
-    name = pool.create_agent_name(prefix="test_", suffix="_agent")
-
-    assert name.startswith("test_")
-    assert name.endswith("_agent")
+    assert agent1.agent_name == "agentframework_agent_1"
+    assert agent2.agent_name == "agentframework_agent_2"
 
 
 def test_responses_api_client_creation(agentframework_module):
     """Test that Responses API client can be created."""
-    from charge.clients.agentframework import AgentFrameworkPool, RESPONSES_API_AVAILABLE
+    from charge.clients.agentframework import (
+        AgentFrameworkBackend,
+        RESPONSES_API_AVAILABLE,
+    )
 
     if not RESPONSES_API_AVAILABLE:
         pytest.skip("OpenAIResponsesClient not available in this version")
 
     pytest.MonkeyPatch().setenv("OPENAI_API_KEY", "test_key")
 
-    # Create pool with Responses API
-    pool = AgentFrameworkPool(
-        model="gpt-4o",
-        backend="openai",
-        use_responses_api=True
+    # Create backend with Responses API
+    backend = AgentFrameworkBackend(
+        model="gpt-4o", backend="openai", use_responses_api=True
     )
 
-    assert pool.use_responses_api is True
-    assert pool.chat_client is not None
+    assert backend.use_responses_api is True
+    assert backend.chat_client is not None
 
 
 def test_responses_api_without_flag_raises_error(agentframework_module):
     """Test that getting hosted tools without Responses API raises error."""
-    from charge.clients.agentframework import AgentFrameworkPool
+    from charge.clients.agentframework import AgentFrameworkBackend
 
     pytest.MonkeyPatch().setenv("OPENAI_API_KEY", "test_key")
 
-    # Create pool without Responses API
-    pool = AgentFrameworkPool(model="gpt-4o", backend="openai")
+    # Create backend without Responses API
+    backend = AgentFrameworkBackend(model="gpt-4o", backend="openai")
 
     # Should raise error when trying to get hosted tools
-    with pytest.raises(ValueError, match="Hosted tools are only available with Responses API"):
-        pool.get_hosted_tools()
+    with pytest.raises(
+        ValueError, match="Hosted tools are only available with Responses API"
+    ):
+        backend.get_hosted_tools()
 
 
 def test_agentframework_pool_create_agent_naming(agentframework_module):
     """Test that agent counter increments when creating actual agents."""
-    from charge.clients.agentframework import AgentFrameworkPool
-    from charge.tasks.Task import Task
+    from charge.clients.agentframework import AgentFrameworkBackend
+    from charge.tasks.task import Task
 
     pytest.MonkeyPatch().setenv("OPENAI_API_KEY", "test_key")
 
-    pool = AgentFrameworkPool(model="gpt-5", backend="openai")
+    AgentFrameworkBackend.AGENT_COUNT = 0
+    backend = AgentFrameworkBackend(model="gpt-5", backend="openai")
 
     # Create a simple task
-    task = Task(
-        system_prompt="Test prompt",
-        user_prompt="Test user prompt"
-    )
+    task = Task(system_prompt="Test prompt", user_prompt="Test user prompt")
 
     # Create first agent
-    agent1 = pool.create_agent(task=task)
-    assert "_1" in agent1.agent_name  # First agent should have _1
+    agent1 = backend.create_agent(task=task)
+    assert "_1" in agent1.agent_name
 
     # Create second agent
-    agent2 = pool.create_agent(task=task)
-    assert "_2" in agent2.agent_name  # Second agent should have _2
+    agent2 = backend.create_agent(task=task)
+    assert "_2" in agent2.agent_name
