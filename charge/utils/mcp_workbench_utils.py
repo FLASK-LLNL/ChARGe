@@ -48,7 +48,6 @@ def create_servers(
     if wh_token:
         headers["X-Token"] = wh_token
     for url in urls:
-
         mcp_servers.append(
             StreamableHttpServerParams(
                 url=url,
