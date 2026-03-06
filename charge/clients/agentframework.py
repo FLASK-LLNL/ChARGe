@@ -7,12 +7,16 @@
 try:
     from agent_framework import Agent as AFAgent, AgentSession
     from agent_framework.openai import OpenAIChatClient
+
     try:
         from agent_framework.openai import OpenAIResponsesClient
+
         RESPONSES_API_AVAILABLE = True
     except ImportError:
         RESPONSES_API_AVAILABLE = False
-        logger.warning("OpenAIResponsesClient not available in this version of agent-framework")
+        logger.warning(
+            "OpenAIResponsesClient not available in this version of agent-framework"
+        )
 except ImportError:
     raise ImportError(
         "Please install the agent-framework package to use this module. "
@@ -34,15 +38,11 @@ from charge.clients.agentframework_utils import (
 )
 from charge.clients.openai_base import (
     model_configure,
-    LoggingTransport,
-    create_http_client,
 )
-from typing import Any, Tuple, Optional, Dict, Union, List, Callable, overload
+from typing import Any, Optional, Dict, Union, List, overload
 from charge.tasks.Task import Task
 from loguru import logger
 
-import logging
-import httpx
 import json
 
 
@@ -422,13 +422,15 @@ class AgentFrameworkAgent(Agent):
             # If we have memory from previous tasks, prepend it to the prompt
             if self.memory and isinstance(self.memory, list):
                 for mem in self.memory:
-                    if hasattr(mem, 'get_messages') and hasattr(mem, 'get_source_agents'):
+                    if hasattr(mem, "get_messages") and hasattr(
+                        mem, "get_source_agents"
+                    ):
                         messages = mem.get_messages()
                         sources = mem.get_source_agents()
                         if messages:
                             context_str = "\n\n=== Previous conversation context ===\n"
                             for msg, source in zip(messages, sources):
-                                content = msg.get('content', '')
+                                content = msg.get("content", "")
                                 context_str += f"\n{content}\n"
                             context_str += "=== End of previous context ===\n\n"
                             user_prompt = context_str + user_prompt
@@ -598,7 +600,7 @@ class AgentFrameworkPool(AgentPool):
                 "Create the pool with use_responses_api=True"
             )
 
-        if not hasattr(self.chat_client, 'get_code_interpreter_tool'):
+        if not hasattr(self.chat_client, "get_code_interpreter_tool"):
             raise AttributeError(
                 "Client does not support hosted tools. Ensure you're using OpenAIResponsesClient."
             )
@@ -607,7 +609,7 @@ class AgentFrameworkPool(AgentPool):
 
         # Try to get available hosted tools
         try:
-            if hasattr(self.chat_client, 'get_code_interpreter_tool'):
+            if hasattr(self.chat_client, "get_code_interpreter_tool"):
                 code_tool = self.chat_client.get_code_interpreter_tool()
                 tools.append(code_tool)
                 logger.info("Added code_interpreter hosted tool")
@@ -615,7 +617,7 @@ class AgentFrameworkPool(AgentPool):
             logger.debug(f"code_interpreter tool not available: {e}")
 
         try:
-            if hasattr(self.chat_client, 'get_file_search_tool'):
+            if hasattr(self.chat_client, "get_file_search_tool"):
                 file_tool = self.chat_client.get_file_search_tool()
                 tools.append(file_tool)
                 logger.info("Added file_search hosted tool")
