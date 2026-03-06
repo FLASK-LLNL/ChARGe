@@ -16,6 +16,7 @@ except ImportError:
         "Please install the autogen-agentchat package to use this module."
     )
 import asyncio
+import os
 from typing import Any, Type, Optional, List
 
 
@@ -37,14 +38,20 @@ def create_servers(
                 read_timeout_seconds=timeout,
             )
         )
+    headers = {
+        # Streamable/streaming HTTP MCP endpoints commonly require this for content negotiation
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream, application/json",
+        "Cache-Control": "no-cache",
+    }
+    wh_token = os.getenv("FLASK_WORMHOLE_TOKEN", None)
+    if wh_token:
+        headers["X-Token"] = wh_token
     for url in urls:
         mcp_servers.append(
             StreamableHttpServerParams(
                 url=url,
-                headers={
-                    "Content-Type": "application/json",
-                    "Accept": "text/event-stream, application/json",
-                },
+                headers=headers,
                 timeout=timeout,
                 sse_read_timeout=timeout,
             )

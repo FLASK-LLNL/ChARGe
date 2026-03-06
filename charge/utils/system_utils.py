@@ -65,6 +65,9 @@ def check_url_exists(url: str) -> bool:
         "Accept": "text/event-stream, application/json",
         "Cache-Control": "no-cache",
     }
+    wh_token = os.getenv("FLASK_WORMHOLE_TOKEN", None)
+    if wh_token:
+        headers["X-Token"] = wh_token
     try:
         with requests.get(url, stream=True, timeout=5, headers=headers) as response:
             # 200 is ideal. 406 still proves the server is reachable (just unhappy with Accept).
