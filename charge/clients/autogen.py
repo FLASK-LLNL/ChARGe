@@ -5,7 +5,6 @@
 ## SPDX-License-Identifier: Apache-2.0
 ################################################################################
 try:
-
     from autogen_core.models import (
         ModelFamily,
         ChatCompletionClient,
@@ -45,6 +44,10 @@ from charge.clients.autogen_utils import (
     CustomConsole,
     cli_chat_callback,
 )
+from charge.clients.openai_base import (
+    model_configure,
+    get_api_key_for_backend,
+)
 from charge.utils.mcp_workbench_utils import (
     _setup_mcp_workbenches,
     _close_mcp_workbenches,
@@ -53,132 +56,6 @@ from typing import Any, Tuple, Optional, Dict, Union, List, Callable, overload
 from charge.experiments.memory import Memory
 from charge.tasks.task import Task
 from loguru import logger
-
-import logging
-import httpx
-
-
-# Configure httpx logging for network-level debugging
-class LoggingTransport(httpx.AsyncHTTPTransport):
-    """Custom transport that logs all HTTP requests and responses."""
-
-    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-        # Log request details (mask API key)
-        headers_copy = dict(request.headers)
-        if "authorization" in headers_copy:
-            auth_header = headers_copy["authorization"]
-            if auth_header.startswith("Bearer "):
-                masked_key = auth_header[:14] + "..." + auth_header[-4:]
-                headers_copy["authorization"] = masked_key
-
-        # logger.debug(f"HTTP Request: {request.method} {request.url}")
-        # logger.debug(f"Request Headers: {headers_copy}")
-        try:
-            response = await super().handle_async_request(request)
-            # logger.debug(f"HTTP Response: {response.status_code}")
-            # logger.debug(f"Response Headers: {dict(response.headers)}")
-            return response
-        except Exception as e:
-            logger.error(f"HTTP Request Failed: {type(e).__name__}: {e}")
-            raise
-
-
-def model_configure(
-    backend: str,
-    model: Optional[str] = None,
-    api_key: Optional[str] = None,
-    base_url: Optional[str] = None,
-) -> Tuple[str, str, Optional[str], Dict[str, str]]:
-    """
-    Raises:
-        ValueError: If API key does not exist and is needed.
-
-    """
-
-    kwargs = {}
-    default_model = None
-    if backend in ["openai", "gemini", "livai", "livchat", "llamame", "alcf"]:
-        if backend == "openai":
-            if not api_key:
-                api_key = os.getenv("OPENAI_API_KEY")
-            if base_url:
-                kwargs["base_url"] = base_url
-            default_model = "gpt-5"
-            # kwargs["parallel_tool_calls"] = False
-            kwargs["reasoning_effort"] = "high"
-            kwargs["http_client"] = httpx.AsyncClient(
-                verify=False, transport=LoggingTransport()
-            )
-            logger.warning(
-                f"BVE I am here in the openai backend with the kwargs {kwargs}"
-            )
-        elif backend == "livai" or backend == "livchat":
-            if not api_key:
-                api_key = os.getenv("LIVAI_API_KEY")
-            if not base_url:
-                base_url = os.getenv("LIVAI_BASE_URL")
-                if base_url is None:
-                    raise ValueError(
-                        f"LivAI Base URL must be set in environment variable for backend {backend}"
-                    )
-            default_model = "gpt-4.1"
-            kwargs["base_url"] = base_url
-            kwargs["http_client"] = httpx.AsyncClient(
-                verify=False, transport=LoggingTransport()
-            )
-        elif backend == "llamame":
-            if not api_key:
-                api_key = os.getenv("LLAMAME_API_KEY")
-            if not base_url:
-                base_url = os.getenv("LLAMAME_BASE_URL")
-                if base_url is None:
-                    raise ValueError(
-                        f"LLamaMe Base URL must be set in environment variable for backend {backend}"
-                    )
-            default_model = "openai/gpt-oss-120b "
-            kwargs["base_url"] = base_url
-            kwargs["http_client"] = httpx.AsyncClient(
-                verify=False, transport=LoggingTransport()
-            )
-        elif backend == "alcf":
-            if not api_key:
-                api_key = os.getenv("ALCF_API_KEY")
-            if not base_url:
-                base_url = os.getenv("ALCF_BASE_URL")
-                if base_url is None:
-                    raise ValueError(
-                        f"ALCF Base URL must be set in environment variable for backend {backend}"
-                    )
-            default_model = "openai/gpt-oss-120b "
-            kwargs["base_url"] = base_url
-            kwargs["http_client"] = httpx.AsyncClient(
-                verify=False, transport=LoggingTransport()
-            )
-        else:
-            if not api_key:
-                api_key = os.getenv("GOOGLE_API_KEY")
-            default_model = "gemini-flash-latest"
-            if base_url:
-                kwargs["base_url"] = base_url
-            kwargs["parallel_tool_calls"] = False
-            kwargs["reasoning_effort"] = "high"
-            kwargs["http_client"] = httpx.AsyncClient(
-                verify=False, transport=LoggingTransport()
-            )
-        if api_key is None:
-            raise ValueError(f"API key must be set for backend {backend}")
-    elif backend in ["ollama"]:
-        default_model = "gpt-oss:latest"
-    elif backend in ["huggingface"]:
-        default_model = "gpt-oss"  # Must be provided via model path
-    elif backend in ["vllm"]:
-        kwargs["reasoning_effort"] = os.getenv("OSS_REASONING", "medium")
-        default_model = "gpt-oss"  # Default vLLM model name
-
-    if not model:
-        model = default_model
-    assert model is not None, "Model name must be provided."
-    return (model, backend, api_key, kwargs)
 
 
 def create_autogen_model_client(
@@ -287,11 +164,13 @@ def create_autogen_model_client(
                 },
             )
     else:
-        if api_key is None:
-            if backend == "gemini":
-                api_key = os.getenv("GOOGLE_API_KEY")
-            else:
-                api_key = os.getenv("OPENAI_API_KEY")
+        # OpenAI or OpenAI-compatible endpoints only
+        api_key = get_api_key_for_backend(backend, api_key)
+        # if api_key is None:
+        #     if backend == "gemini":
+        #         api_key = os.getenv("GOOGLE_API_KEY")
+        #     else:
+        #         api_key = os.getenv("OPENAI_API_KEY")
         assert (
             api_key is not None
         ), "API key must be provided for OpenAI or Gemini backend"
