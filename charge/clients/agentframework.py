@@ -34,7 +34,6 @@ except ImportError:
 from charge.clients.agent_factory import AgentBackend, Agent
 from charge.clients.agentframework_utils import (
     POSSIBLE_CONNECTION_ERRORS,
-    ChARGeListMemory,
     generate_agent,
     setup_mcp_tools,
     chargeConnectionError,
@@ -43,6 +42,7 @@ from charge.clients.openai_base import (
     model_configure,
     get_api_key_for_backend,
 )
+from charge._utils import maybe_await_async
 from charge.experiments.memory import Memory
 from charge.tasks.task import Task
 
@@ -165,10 +165,8 @@ class AgentFrameworkAgent(Agent):
         self.agent_name = agent_name
         self.chat_client = chat_client
         self.timeout = timeout
-        self.memory: list[ChARGeListMemory] | ChARGeListMemory = self.setup_memory(
-            memory
-        )
-        # self.memory = self.setup_memory(memory)
+        # Experiment memory (task/result pairs) for cross-task context.
+        self.memory: Optional[Memory] = memory
         self.setup_kwargs = kwargs
 
         self.context_history = []
@@ -177,20 +175,69 @@ class AgentFrameworkAgent(Agent):
         self.model_kwargs = model_kwargs if model_kwargs is not None else {}
         self._af_agent: Optional[AFAgent] = None
         self._agent_session: Optional[AgentSession] = None
+        self._session_seeded_from_experiment_memory = False
 
-    def setup_memory(self, memory: Optional[Memory] = None) -> Optional[Memory]:
+    async def _session_add_message(
+        self, session: AgentSession, *, role: str, content: str
+    ) -> None:
         """
-        Sets up the memory for the agent if not already provided.
+        Best-effort adapter to add a chat message to an Agent Framework session.
 
-        Args:
-            memory (Optional[Any], optional): Pre-initialized memory. Defaults to None.
-
-        Returns:
-            Optional[Any]: The memory instance or None.
+        The agent-framework API has evolved; this uses introspection to support
+        common session interfaces without hard pinning to a single version.
         """
-        if memory is not None:
-            return memory
-        return [ChARGeListMemory()]
+        if hasattr(session, "add_message"):
+            add_message = getattr(session, "add_message")
+            try:
+                await maybe_await_async(add_message, {"role": role, "content": content})
+                return
+            except TypeError:
+                pass
+            try:
+                await maybe_await_async(add_message, role=role, content=content)
+                return
+            except TypeError:
+                pass
+            await maybe_await_async(add_message, role, content)
+            return
+
+        if hasattr(session, "messages"):
+            messages = getattr(session, "messages")
+            if isinstance(messages, list):
+                messages.append({"role": role, "content": content})
+                return
+
+        raise TypeError(
+            "Unsupported AgentSession interface: cannot add messages to session."
+        )
+
+    async def _seed_session_from_experiment_memory(self, session: AgentSession) -> None:
+        """
+        Mirror AutoGen cross-task context behavior by seeding the AgentSession
+        with prior task instruction/response pairs from the experiment Memory.
+        """
+        if self._session_seeded_from_experiment_memory:
+            return
+        if self.memory is None:
+            return
+
+        try:
+            items = self.memory.to_list_of_tasks_and_results()
+        except Exception:
+            return
+
+        if not items:
+            return
+
+        for i, (prior_task, prior_result) in enumerate(items):
+            instruction = prior_task.get_user_prompt()
+            prefix = (
+                "Relevant memory content (in chronological order):\n" if i == 0 else ""
+            )
+            content = f"{prefix}Instruction: {instruction}\nResponse: {prior_result}"
+            await self._session_add_message(session, role="assistant", content=content)
+
+        self._session_seeded_from_experiment_memory = True
 
     async def setup_mcp_workbenches(self) -> None:
         """
@@ -266,25 +313,6 @@ class AgentFrameworkAgent(Agent):
                 + f"{keys}\n\n"
             )
         return user_prompt
-
-    def _prepend_experiment_memory(self, user_prompt: str) -> str:
-        if not self.memory:
-            return user_prompt
-
-        try:
-            items = self.memory.to_list_of_tasks_and_results()
-        except Exception:
-            return user_prompt
-
-        if not items:
-            return user_prompt
-
-        context_str = "\n\n=== Previous task context ===\n"
-        for prior_task, prior_result in items:
-            instruction = prior_task.get_user_prompt()
-            context_str += f"\nInstruction: {instruction}\nResponse: {prior_result}\n"
-        context_str += "=== End of previous context ===\n\n"
-        return context_str + user_prompt
 
     async def _execute_with_retries(
         self, agent: AFAgent, user_prompt: str, session: AgentSession
@@ -439,9 +467,11 @@ class AgentFrameworkAgent(Agent):
             if self._agent_session is None:
                 self._agent_session = self._af_agent.create_session()
 
+            # Seed cross-task context into the session from experiment memory.
+            await self._seed_session_from_experiment_memory(self._agent_session)
+
             # Prepare prompt
             user_prompt = self._prepare_task_prompt()
-            user_prompt = self._prepend_experiment_memory(user_prompt)
 
             # Execute with retries
             result = await self._execute_with_retries(

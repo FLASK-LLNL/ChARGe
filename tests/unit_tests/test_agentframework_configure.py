@@ -252,3 +252,111 @@ def test_agentframework_pool_create_agent_naming(agentframework_module):
     # Create second agent
     agent2 = backend.create_agent(task=task)
     assert "_2" in agent2.agent_name
+
+
+@pytest.mark.asyncio
+async def test_agentframework_seeds_session_from_experiment_memory(
+    agentframework_module,
+):
+    """
+    Ensure experiment Memory is incorporated into the AgentSession (cross-task context).
+
+    This mirrors the AutoGen behavior where experiment state becomes agent memory.
+    """
+    from charge.clients.agentframework import AgentFrameworkAgent
+    from charge.experiments.memory import ListMemory
+    from charge.tasks.task import Task
+
+    # Prior task/result that should be injected into the next agent session.
+    prior_task = Task(system_prompt="S1", user_prompt="Do X")
+    memory = ListMemory()
+    memory.add_to_context(prior_task, "Result X")
+
+    # New task for the agent we are about to run.
+    current_task = Task(system_prompt="S2", user_prompt="Do Y")
+
+    agent = AgentFrameworkAgent(
+        task=current_task,
+        chat_client=object(),
+        agent_name="test_agent",
+        model="test_model",
+        memory=memory,
+    )
+
+    class FakeSession:
+        def __init__(self):
+            self.messages = []
+
+    session = FakeSession()
+
+    await agent._seed_session_from_experiment_memory(session)  # type: ignore[arg-type]
+
+    assert len(session.messages) == 1
+    assert session.messages[0]["role"] == "assistant"
+    assert "Instruction: Do X" in session.messages[0]["content"]
+    assert "Response: Result X" in session.messages[0]["content"]
+
+
+@pytest.mark.asyncio
+async def test_agentframework_seeding_is_idempotent(agentframework_module):
+    """Calling session seeding twice should not duplicate memory messages."""
+    from charge.clients.agentframework import AgentFrameworkAgent
+    from charge.experiments.memory import ListMemory
+    from charge.tasks.task import Task
+
+    prior_task = Task(system_prompt="S1", user_prompt="Do X")
+    memory = ListMemory()
+    memory.add_to_context(prior_task, "Result X")
+
+    agent = AgentFrameworkAgent(
+        task=Task(system_prompt="S2", user_prompt="Do Y"),
+        chat_client=object(),
+        agent_name="test_agent",
+        model="test_model",
+        memory=memory,
+    )
+
+    class FakeSession:
+        def __init__(self):
+            self.messages = []
+
+    session = FakeSession()
+
+    await agent._seed_session_from_experiment_memory(session)  # type: ignore[arg-type]
+    await agent._seed_session_from_experiment_memory(session)  # type: ignore[arg-type]
+
+    assert len(session.messages) == 1
+
+
+@pytest.mark.asyncio
+async def test_agentframework_seeds_via_add_message_method(agentframework_module):
+    """If the session exposes add_message, seeding should use it."""
+    from charge.clients.agentframework import AgentFrameworkAgent
+    from charge.experiments.memory import ListMemory
+    from charge.tasks.task import Task
+
+    prior_task = Task(system_prompt="S1", user_prompt="Do X")
+    memory = ListMemory()
+    memory.add_to_context(prior_task, "Result X")
+
+    agent = AgentFrameworkAgent(
+        task=Task(system_prompt="S2", user_prompt="Do Y"),
+        chat_client=object(),
+        agent_name="test_agent",
+        model="test_model",
+        memory=memory,
+    )
+
+    class FakeSession:
+        def __init__(self):
+            self.messages = []
+
+        async def add_message(self, message):
+            self.messages.append(message)
+
+    session = FakeSession()
+
+    await agent._seed_session_from_experiment_memory(session)  # type: ignore[arg-type]
+
+    assert len(session.messages) == 1
+    assert session.messages[0]["role"] == "assistant"
