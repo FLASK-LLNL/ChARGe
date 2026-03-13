@@ -209,7 +209,7 @@ async def list_client_tools(
     return await _list_wb_tools(workbenches)
 
 
-async def CustomConsole(stream, message_callback):
+async def custom_console(stream, message_callback):
     last_processed = None
     async for message in stream:
         last_processed = await message_callback(message)

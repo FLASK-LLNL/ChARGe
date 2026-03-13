@@ -41,7 +41,7 @@ from charge.clients.autogen_utils import (
     ChARGeListMemory,
     _list_wb_tools,
     generate_agent,
-    CustomConsole,
+    custom_console,
     cli_chat_callback,
 )
 from charge.clients.openai_base import (
@@ -502,7 +502,7 @@ class AutoGenAgent(Agent):
 
             while not stop_signal:
                 stream = team.run_stream(task=_input, output_task_messages=False)
-                await CustomConsole(
+                await custom_console(
                     stream,
                     message_callback=(
                         cli_chat_callback
