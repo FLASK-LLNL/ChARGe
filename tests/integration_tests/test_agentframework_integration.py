@@ -16,7 +16,7 @@ class TestAgentFrameworkIntegration:
 
     @pytest.fixture(autouse=True)
     def setup_fixture(self):
-        """Set up test fixtures with tasks and agent pool."""
+        """Set up test fixtures with tasks and agent factory."""
         from charge.tasks.task import Task
         from charge.clients.agentframework import AgentFrameworkBackend
         from charge.clients.agent_factory import AgentFactory

@@ -32,7 +32,12 @@ import asyncio
 import re
 import os
 import warnings
-from charge.clients.agent_factory import AgentBackend, AgentFactory, Agent
+from charge.clients.agent_factory import (
+    AgentBackend,
+    AgentFactory,
+    Agent,
+    ReasoningCallbackType,
+)
 from charge.clients.client import Client
 from charge.clients.huggingface_client import HuggingFaceLocalClient
 from charge.clients.vllm_client import VLLMClient
@@ -444,7 +449,9 @@ class AutoGenAgent(Agent):
             f"Last error: {last_error}"
         )
 
-    async def run(self, **kwargs) -> str:
+    async def run(
+        self, reasoning_callback: ReasoningCallbackType = None, **kwargs
+    ) -> str:
         """
         Runs the agent.
 

@@ -7,36 +7,28 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Optional, Union, List, overload
+from typing import Any, Awaitable, Callable, Optional, Union, List, Literal
 
 from loguru import logger
 
 try:
-    from agent_framework import Agent as AFAgent, AgentSession
-    from agent_framework.openai import OpenAIChatClient
-
-    try:
-        from agent_framework.openai import OpenAIResponsesClient
-
-        RESPONSES_API_AVAILABLE = True
-    except ImportError:
-        RESPONSES_API_AVAILABLE = False
-        OpenAIResponsesClient = None  # type: ignore[assignment]
-        logger.warning(
-            "OpenAIResponsesClient not available in this version of agent-framework"
-        )
+    from agent_framework import Agent as AFAgent, AgentSession, InMemoryHistoryProvider
+    from agent_framework.openai import (
+        OpenAIChatClient,
+        OpenAIResponsesClient,
+        OpenAIResponsesOptions,
+        OpenAIChatOptions,
+    )
 except ImportError:
     raise ImportError(
         "Please install the agent-framework package to use this module. "
         "Install with: pip install 'charge[agentframework]'"
     )
 
-from charge.clients.agent_factory import AgentBackend, Agent
+from charge.clients.agent_factory import AgentBackend, Agent, ReasoningCallbackType
 from charge.clients.agentframework_utils import (
     POSSIBLE_CONNECTION_ERRORS,
-    generate_agent,
     setup_mcp_tools,
-    chargeConnectionError,
 )
 from charge.clients.openai_base import (
     model_configure,
@@ -47,12 +39,12 @@ from charge.experiments.memory import Memory
 from charge.tasks.task import Task
 
 
-def create_agentframework_chat_client(
+def create_agentframework_client(
     backend: str,
     model: str,
     api_key: Optional[str] = None,
     model_kwargs: Optional[dict[str, Any]] = None,
-    use_responses_api: bool = False,
+    use_responses_api: bool = True,
 ) -> Union[OpenAIChatClient, OpenAIResponsesClient]:
     """
     Creates an Agent Framework chat client based on the specified backend and model.
@@ -98,14 +90,8 @@ def create_agentframework_chat_client(
 
         # Check if Responses API is requested
         if use_responses_api:
-            if not RESPONSES_API_AVAILABLE:
-                raise ImportError(
-                    "OpenAIResponsesClient is not available in this version of agent-framework. "
-                    "Update to a newer version or use the standard OpenAIChatClient."
-                )
-
             logger.info("Creating OpenAIResponsesClient with hosted tools support")
-            chat_client = OpenAIResponsesClient(
+            client = OpenAIResponsesClient(
                 model_id=model,
                 api_key=api_key,
                 **model_kwargs if model_kwargs is not None else {},
@@ -113,14 +99,14 @@ def create_agentframework_chat_client(
         else:
             # Standard OpenAI or OpenAI-compatible client
             # Agent Framework reads OPENAI_API_KEY from environment by default
-            chat_client = OpenAIChatClient(
+            client = OpenAIChatClient(
                 model_id=model,
                 api_key=api_key,
                 # Additional kwargs can be passed but Agent Framework has different options
                 **model_kwargs if model_kwargs is not None else {},
             )
 
-    return chat_client
+    return client
 
 
 class AgentFrameworkAgent(Agent):
@@ -132,7 +118,7 @@ class AgentFrameworkAgent(Agent):
 
     Args:
         task (Task): The task to be performed by the agent.
-        chat_client: The Agent Framework chat client.
+        client: The Agent Framework client.
         agent_name (str): Name of the agent.
         model (str): Model name.
         memory (Optional[Any], optional): Memory instance for conversation state. Defaults to None.
@@ -145,99 +131,76 @@ class AgentFrameworkAgent(Agent):
     def __init__(
         self,
         task: Optional[Task],
-        chat_client: Union[OpenAIChatClient, OpenAIResponsesClient],
+        client: Union[OpenAIChatClient, OpenAIResponsesClient],
         agent_name: str,
-        model: str,
+        model: str | None,
         memory: Optional[Memory] = None,
         max_retries: int = 3,
         max_tool_calls: int = 30,
         timeout: int = 60,
         backend: Optional[str] = None,
         model_kwargs: Optional[dict] = None,
+        reasoning_effort: Literal["low", "medium", "high"] = "medium",
+        builtin_tools: Optional[list[Any]] = None,
         **kwargs,
     ) -> None:
         super().__init__(task=task, **kwargs)
-        if self.task is None:
-            raise ValueError("AgentFrameworkAgent requires a task.")
         self.max_retries = max_retries
         self.max_tool_calls = max_tool_calls
         self.workbenches: List[Any] = []  # Will be MCP workbenches
+        self.builtin_tools = builtin_tools or []
+        self.workbenches.extend(self.builtin_tools)
         self.agent_name = agent_name
-        self.chat_client = chat_client
+        self.client = client
         self.timeout = timeout
-        # Experiment memory (task/result pairs) for cross-task context.
-        self.memory: Optional[Memory] = memory
         self.setup_kwargs = kwargs
+        self.reasoning_effort: Literal["low", "medium", "high"] = reasoning_effort
 
-        self.context_history = []
         self.model = model
         self.backend = backend
         self.model_kwargs = model_kwargs if model_kwargs is not None else {}
+
         self._af_agent: Optional[AFAgent] = None
+
         self._agent_session: Optional[AgentSession] = None
         self._session_seeded_from_experiment_memory = False
 
-    async def _session_add_message(
-        self, session: AgentSession, *, role: str, content: str
-    ) -> None:
-        """
-        Best-effort adapter to add a chat message to an Agent Framework session.
-
-        The agent-framework API has evolved; this uses introspection to support
-        common session interfaces without hard pinning to a single version.
-        """
-        if hasattr(session, "add_message"):
-            add_message = getattr(session, "add_message")
-            try:
-                await maybe_await_async(add_message, {"role": role, "content": content})
-                return
-            except TypeError:
-                pass
-            try:
-                await maybe_await_async(add_message, role=role, content=content)
-                return
-            except TypeError:
-                pass
-            await maybe_await_async(add_message, role, content)
-            return
-
-        if hasattr(session, "messages"):
-            messages = getattr(session, "messages")
-            if isinstance(messages, list):
-                messages.append({"role": role, "content": content})
-                return
-
-        raise TypeError(
-            "Unsupported AgentSession interface: cannot add messages to session."
-        )
-
-    async def _seed_session_from_experiment_memory(self, session: AgentSession) -> None:
-        """
-        Mirror AutoGen cross-task context behavior by seeding the AgentSession
-        with prior task instruction/response pairs from the experiment Memory.
-        """
-        if self._session_seeded_from_experiment_memory:
-            return
-        if self.memory is None:
-            return
-
-        try:
-            items = self.memory.to_list_of_tasks_and_results()
-        except Exception:
-            return
-
-        if not items:
-            return
-
-        for i, (prior_task, prior_result) in enumerate(items):
-            instruction = prior_task.get_user_prompt()
-            prefix = (
-                "Relevant memory content (in chronological order):\n" if i == 0 else ""
+    def _create_agent(
+        self,
+        agent_name: str,
+        reasoning_effort: Literal["low", "medium", "high"],
+        instructions: str,
+    ) -> AFAgent:
+        if isinstance(self.client, OpenAIResponsesClient):
+            af_agent = AFAgent[OpenAIResponsesOptions](
+                client=self.client,
+                name=agent_name,
+                instructions=instructions,
+                tools=self.workbenches,
+                default_options={
+                    "reasoning": {
+                        "effort": reasoning_effort,
+                        "summary": "detailed",
+                    },
+                    "include": ["reasoning.encrypted_content"],
+                },
+                context_providers=[
+                    # This provider ensures session.state contains the history
+                    InMemoryHistoryProvider(load_messages=True)
+                ],
             )
-            content = f"{prefix}Instruction: {instruction}\nResponse: {prior_result}"
-            await self._session_add_message(session, role="assistant", content=content)
-
-        self._session_seeded_from_experiment_memory = True
+        else:
+            af_agent = AFAgent[OpenAIChatOptions](
+                client=self.client,
+                name=agent_name,
+                instructions=instructions,
+                tools=self.workbenches,
+                context_providers=[
+                    # This provider ensures session.state contains the history
+                    InMemoryHistoryProvider(load_messages=True)
+                ],
+            )
+        return af_agent
 
     async def setup_mcp_workbenches(self) -> None:
         """
@@ -252,14 +215,14 @@ class AgentFrameworkAgent(Agent):
             return
 
         try:
-            self.workbenches = await setup_mcp_tools(
+            self.workbenches = self.builtin_tools + await setup_mcp_tools(
                 stdio_servers=self.task.server_files,
-                sse_servers=self.task.server_urls,
+                mcp_servers=self.task.server_urls,
             )
             logger.info(f"Set up {len(self.workbenches)} MCP tools")
         except Exception as e:
             logger.error(f"Failed to setup MCP tools: {e}")
-            self.workbenches = []
+            self.workbenches = list(self.builtin_tools)
 
     async def close_workbenches(self) -> None:
         """
@@ -270,26 +233,6 @@ class AgentFrameworkAgent(Agent):
         """
         # TODO: Implement MCP cleanup
         pass
-
-    def _create_agent(self, **kwargs) -> AFAgent:
-        """
-        Creates an Agent Framework agent with the given parameters.
-
-        Returns:
-            AFAgent: The created Agent Framework agent.
-        """
-        # Agent Framework pattern:
-        # agent = Agent(name="...", chat_client=..., instructions="...", tools=[...])
-
-        af_agent = generate_agent(
-            chat_client=self.chat_client,
-            agent_name=self.agent_name,
-            instructions=self.task.get_system_prompt() if self.task is not None else "",
-            tools=self.workbenches,  # MCP tools
-            max_tool_calls=self.max_tool_calls,
-            **kwargs,
-        )
-        return af_agent
 
     def _prepare_task_prompt(self, **kwargs) -> str:
         """
@@ -315,7 +258,11 @@ class AgentFrameworkAgent(Agent):
         return user_prompt
 
     async def _execute_with_retries(
-        self, agent: AFAgent, user_prompt: str, session: AgentSession
+        self,
+        agent: AFAgent,
+        user_prompt: str,
+        session: AgentSession,
+        reasoning_callback: ReasoningCallbackType,
     ) -> str:
         """
         Executes the agent with retry logic and output validation.
@@ -324,6 +271,8 @@ class AgentFrameworkAgent(Agent):
             agent: The agent instance to run.
             user_prompt: The prompt to send to the agent.
             session: The agent session for conversation state.
+            reasoning_callback: An optional function to be called whenever a
+                                reasoning summary is generated.
 
         Returns:
             Valid output content as a string.
@@ -332,16 +281,25 @@ class AgentFrameworkAgent(Agent):
             ValueError: If all retries fail to produce valid output.
         """
         last_error = None
+        assert self.task
 
         for attempt in range(1, self.max_retries + 1):
             try:
                 logger.info(f"Attempt {attempt}/{self.max_retries}")
 
                 # Run agent (Agent Framework returns AgentResponse)
-                result = await agent.run(user_prompt, session=session)
-
-                # Store in context history
-                self.context_history.append(result)
+                stream = await agent.run(user_prompt, session=session, stream=True)
+                async for update in stream:
+                    if (
+                        update.contents
+                        and update.contents[0].raw_representation
+                        and update.contents[0].raw_representation.type
+                        == "response.reasoning_summary_text.done"
+                    ):
+                        # Reasoning text - use callback to transmit back
+                        if reasoning_callback:
+                            await reasoning_callback(update.contents[0].text)
+                result = await stream.get_final_response()
 
                 # Extract content from result
                 proposed_content = ""
@@ -350,7 +308,7 @@ class AgentFrameworkAgent(Agent):
                     if hasattr(last_message, "text"):
                         proposed_content = last_message.text
                     elif hasattr(last_message, "content"):
-                        proposed_content = str(last_message.content)
+                        proposed_content = str(last_message.contents)
                     else:
                         proposed_content = str(last_message)
                 else:
@@ -388,7 +346,7 @@ class AgentFrameworkAgent(Agent):
             except POSSIBLE_CONNECTION_ERRORS as api_err:
                 error_msg = f"Attempt {attempt}: API connection error: {api_err}"
                 logger.error(error_msg)
-                raise chargeConnectionError(error_msg)
+                raise ConnectionError(error_msg)
             except Exception as e:
                 error_msg = f"Attempt {attempt}: Unexpected error: {e}"
                 logger.error(error_msg)
@@ -414,14 +372,15 @@ class AgentFrameworkAgent(Agent):
             ValueError: If conversion fails.
         """
         try:
+            assert self.task
             # Create a simple conversion agent
             structured_out = self.task.get_structured_output_schema()
             assert structured_out is not None
             schema = structured_out.model_json_schema()
 
-            conversion_agent = AFAgent(
-                name=f"{self.agent_name}_structured_output",
-                client=self.chat_client,  # Fixed: parameter is 'client' not 'chat_client'
+            conversion_agent = self._create_agent(
+                f"{self.agent_name}_structured_output",
+                reasoning_effort="low",
                 instructions="You are an agent that converts model output to a structured JSON format.",
             )
 
@@ -444,7 +403,9 @@ class AgentFrameworkAgent(Agent):
             logger.error(f"Failed to convert to structured format: {e}")
             raise ValueError(f"Structured output conversion failed: {e}") from e
 
-    async def run(self, **kwargs) -> str:
+    async def run(
+        self, reasoning_callback: ReasoningCallbackType = None, **kwargs
+    ) -> str:
         """
         Runs the agent.
 
@@ -461,39 +422,29 @@ class AgentFrameworkAgent(Agent):
         try:
             # Create agent
             if self._af_agent is None:
-                self._af_agent = self._create_agent()
+                instructions = (
+                    self.task.get_system_prompt() if self.task is not None else ""
+                )
+                self._af_agent = self._create_agent(
+                    self.agent_name, self.reasoning_effort, instructions=instructions
+                )
 
             # Create or reuse session for stateful conversation
             if self._agent_session is None:
                 self._agent_session = self._af_agent.create_session()
-
-            # Seed cross-task context into the session from experiment memory.
-            await self._seed_session_from_experiment_memory(self._agent_session)
 
             # Prepare prompt
             user_prompt = self._prepare_task_prompt()
 
             # Execute with retries
             result = await self._execute_with_retries(
-                self._af_agent, user_prompt, self._agent_session
+                self._af_agent, user_prompt, self._agent_session, reasoning_callback
             )
 
             return result
 
         finally:
             await self.close_workbenches()
-
-    def get_context_history(self) -> list:
-        """
-        Returns the context history of the agent.
-        """
-        return self.context_history
-
-    def load_context_history(self, history: list) -> None:
-        """
-        Loads the context history into the agent.
-        """
-        self.context_history = history
 
     def get_model_info(self) -> dict[str, Any]:
         """
@@ -505,6 +456,20 @@ class AgentFrameworkAgent(Agent):
             "model_kwargs": self.model_kwargs,
         }
 
+    def load_memory(self, json_str: str) -> None:
+        """
+        Loads memory content into the agent's memory.
+        """
+        self._agent_session = AgentSession.from_dict(json.loads(json_str))
+
+    def save_memory(self) -> str:
+        """
+        Saves the agent's memory content to a JSON string.
+        """
+        if self._agent_session is None:
+            return ""
+        return json.dumps(self._agent_session.to_dict())
+
 
 class AgentFrameworkBackend(AgentBackend):
     """
@@ -512,7 +477,7 @@ class AgentFrameworkBackend(AgentBackend):
     Setup with a model client, backend, and model to spawn agents.
 
     Args:
-        chat_client: Optional pre-configured Agent Framework chat client.
+        client: Optional pre-configured Agent Framework chat client.
         model: Model name/ID.
         backend: Backend name (OpenAI-compatible only).
         api_key: Optional API key.
@@ -523,51 +488,35 @@ class AgentFrameworkBackend(AgentBackend):
 
     AGENT_COUNT = 0
 
-    @overload
     def __init__(
         self,
-        chat_client: OpenAIChatClient,
-    ) -> None: ...
-
-    @overload
-    def __init__(
-        self,
-        *,
-        model: str,
-        backend: str = "openai",
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
-        model_kwargs: Optional[dict] = None,
-        use_responses_api: bool = False,
-    ) -> None: ...
-
-    def __init__(
-        self,
-        chat_client: Optional[OpenAIChatClient] = None,
         model: Optional[str] = None,
         backend: str = "openai",
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         model_kwargs: Optional[dict] = None,
-        use_responses_api: bool = False,
+        use_responses_api: bool = True,
+        reasoning_effort: Literal["low", "medium", "high"] | None = "medium",
+        client: Optional[OpenAIChatClient | OpenAIResponsesClient] = None,
         **kwargs,
     ):
         super().__init__(
             model=model,
             api_key=api_key,
             base_url=base_url,
-            reasoning_effort=None,
+            reasoning_effort=reasoning_effort,
             model_kwargs=model_kwargs,
             backend=backend,
             **kwargs,
         )
-        self.chat_client = chat_client
+        self.client = client
         self.use_responses_api = use_responses_api
+        self.reasoning_effort = reasoning_effort
 
-        if self.chat_client is None:
+        if self.client is None:
             assert (
                 model is not None
-            ), "Model name must be provided if chat_client is not given."
+            ), "Model name must be provided if client is not given."
 
             model, backend, api_key, model_kwargs_configured = model_configure(
                 model=model, backend=backend, api_key=api_key, base_url=base_url
@@ -575,7 +524,7 @@ class AgentFrameworkBackend(AgentBackend):
             if model_kwargs:
                 model_kwargs_configured.update(model_kwargs)
 
-            self.chat_client = create_agentframework_chat_client(
+            self.client = create_agentframework_client(
                 backend=backend,
                 model=model,
                 api_key=api_key,
@@ -587,8 +536,8 @@ class AgentFrameworkBackend(AgentBackend):
         self.backend = backend
         self.model_kwargs = model_kwargs if model_kwargs is not None else {}
 
-        if self.chat_client is None:
-            raise ValueError("Failed to create chat client.")
+        if self.client is None:
+            raise ValueError("Failed to create OpenAI client.")
 
     def create_agent(
         self,
@@ -600,7 +549,7 @@ class AgentFrameworkBackend(AgentBackend):
     ) -> AgentFrameworkAgent:
         self.max_retries = max_retries
         assert (
-            self.chat_client is not None
+            self.client is not None
         ), "Chat client must be initialized to create an agent."
 
         AgentFrameworkBackend.AGENT_COUNT += 1
@@ -609,10 +558,10 @@ class AgentFrameworkBackend(AgentBackend):
 
         agent = AgentFrameworkAgent(
             task=task,
-            chat_client=self.chat_client,
+            client=self.client,
             agent_name=agent_name,
             max_retries=max_retries,
-            model=self.model,  # type: ignore
+            model=self.model,
             backend=self.backend,
             model_kwargs=self.model_kwargs,
             memory=memory,
@@ -632,23 +581,14 @@ class AgentFrameworkBackend(AgentBackend):
                 "Create the backend with use_responses_api=True"
             )
 
-        if not hasattr(self.chat_client, "get_code_interpreter_tool"):
-            raise AttributeError(
-                "Client does not support hosted tools. Ensure you're using OpenAIResponsesClient."
-            )
-
         tools: List[Any] = []
 
-        try:
-            if hasattr(self.chat_client, "get_code_interpreter_tool"):
-                tools.append(self.chat_client.get_code_interpreter_tool())
-        except Exception as e:
-            logger.debug(f"code_interpreter tool not available: {e}")
+        assert isinstance(self.client, OpenAIResponsesClient)
 
         try:
-            if hasattr(self.chat_client, "get_file_search_tool"):
-                tools.append(self.chat_client.get_file_search_tool())
+            if hasattr(self.client, "get_code_interpreter_tool"):
+                tools.append(self.client.get_code_interpreter_tool())
         except Exception as e:
-            logger.debug(f"file_search tool not available: {e}")
+            logger.debug(f"code_interpreter tool not available: {e}")
 
         return tools

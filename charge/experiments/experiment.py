@@ -1,6 +1,6 @@
-from typing import Any, List, Union, Optional
+from typing import Any, Callable, List, Union, Optional
 from charge.tasks.task import Task
-from charge.clients.agent_factory import Agent, AgentFactory
+from charge.clients.agent_factory import Agent, AgentFactory, ReasoningCallbackType
 from charge.experiments.memory import Memory, ListMemory
 from charge._utils import maybe_await_async
 import asyncio
@@ -71,16 +71,18 @@ class Experiment:
         """
         return self.finished_tasks
 
-    async def run_async(self, **kwargs) -> None:
+    async def run_async(
+        self, reasoning_callback: ReasoningCallbackType, **kwargs
+    ) -> None:
         while self.tasks:
             current_task = self.tasks.pop(0)
             agent = self.create_agent_with_experiment_state(task=current_task, **kwargs)
-            result = await maybe_await_async(agent.run)
+            result = await maybe_await_async(agent.run, reasoning_callback)
             await maybe_await_async(self.add_to_context, agent, current_task, result)
             self.finished_tasks.append((current_task, result))
 
-    def run(self) -> None:
-        asyncio.run(self.run_async())
+    def run(self, reasoning_callback: ReasoningCallbackType) -> None:
+        asyncio.run(self.run_async(reasoning_callback))
 
     def reset(self):
         """
