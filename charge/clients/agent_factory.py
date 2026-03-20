@@ -1,12 +1,14 @@
 from charge.tasks.task import Task
 from charge.experiments.memory import Memory
 from abc import abstractmethod
-from typing import Any, Literal, Optional
+from typing import Any, Awaitable, Callable, Literal, Optional, TypeAlias
 
-DEFAULT_BACKEND = "autogen"
+DEFAULT_BACKEND = "agentframework"
 """
 Default backend to use for agent factory
 """
+
+ReasoningCallbackType: TypeAlias = Optional[Callable[[str], Awaitable[None]]]
 
 
 class Agent:
@@ -20,7 +22,7 @@ class Agent:
         self.context_history = []
 
     @abstractmethod
-    def run(self, **kwargs) -> Any:
+    def run(self, reasoning_callback: ReasoningCallbackType = None, **kwargs) -> Any:
         """
         Abstract method to run the Agent's task.
         """
@@ -90,7 +92,7 @@ class AgentFactory:
     @classmethod
     def list_all_backends(cls) -> list[str]:
         """
-        Abstract method to get a list of all Agent backends in the pool.
+        Abstract method to get a list of all Agent backends in the factory.
         """
         return list(cls.backends.keys())
 
