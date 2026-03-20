@@ -112,10 +112,10 @@ def get_default_model_for_backend(backend: str) -> str:
         Default model name for the backend
     """
     default_models = {
-        "openai": "gpt-5",
+        "openai": "gpt-5.4",
         "gemini": "gemini-flash-latest",
-        "livai": "gpt-4.1",
-        "livchat": "gpt-4.1",
+        "livai": "gpt-5.4",
+        "livchat": "gpt-5.4",
         "llamame": "openai/gpt-oss-120b",
         "alcf": "openai/gpt-oss-120b",
         "ollama": "gpt-oss:latest",

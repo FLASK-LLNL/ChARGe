@@ -154,7 +154,7 @@ class AgentFrameworkAgent(Agent):
         self.client = client
         self.timeout = timeout
         self.setup_kwargs = kwargs
-        self.reasoning_effort: Literal["low", "medium", "high"] = reasoning_effort
+        self.reasoning_effort = reasoning_effort
 
         self.model = model
         self.backend = backend
@@ -231,7 +231,7 @@ class AgentFrameworkAgent(Agent):
         Returns:
             None
         """
-        # TODO: Implement MCP cleanup
+        # Nothing to clean
         pass
 
     def _prepare_task_prompt(self, **kwargs) -> str:
@@ -553,7 +553,7 @@ class AgentFrameworkBackend(AgentBackend):
         ), "Chat client must be initialized to create an agent."
 
         AgentFrameworkBackend.AGENT_COUNT += 1
-        default_name = f"agentframework_agent_{AgentFrameworkBackend.AGENT_COUNT}"
+        default_name = f"af_agent_{AgentFrameworkBackend.AGENT_COUNT}"
         agent_name = default_name if agent_name is None else agent_name
 
         agent = AgentFrameworkAgent(
