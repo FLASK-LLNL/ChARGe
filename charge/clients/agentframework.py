@@ -163,7 +163,6 @@ class AgentFrameworkAgent(Agent):
         self._af_agent: Optional[AFAgent] = None
 
         self._agent_session: Optional[AgentSession] = None
-        self._session_seeded_from_experiment_memory = False
 
     def _create_agent(
         self,
