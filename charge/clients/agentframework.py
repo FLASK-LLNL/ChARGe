@@ -496,7 +496,7 @@ class AgentFrameworkBackend(AgentBackend):
         base_url: Optional[str] = None,
         model_kwargs: Optional[dict] = None,
         use_responses_api: bool = True,
-        reasoning_effort: Literal["low", "medium", "high"] | None = "medium",
+        reasoning_effort: Literal["low", "medium", "high"] = "medium",
         client: Optional[OpenAIChatClient | OpenAIResponsesClient] = None,
         **kwargs,
     ):
@@ -565,6 +565,7 @@ class AgentFrameworkBackend(AgentBackend):
             backend=self.backend,
             model_kwargs=self.model_kwargs,
             memory=memory,
+            reasoning_effort=self.reasoning_effort,
             **kwargs,
         )
         return agent
