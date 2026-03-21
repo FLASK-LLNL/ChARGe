@@ -37,7 +37,7 @@ except ImportError:
         "Please install the autogen-agentchat package to use this module."
     )
 from charge.clients.client import Client
-from typing import Type, Optional, Union, List, Callable
+from typing import Any, Type, Optional, Union, List, Callable
 from loguru import logger
 from pydantic import BaseModel
 import json
@@ -145,6 +145,7 @@ def generate_agent(
     name: str = "Assistant",
     callback: Optional[Callable] = None,
     output_content_type: Optional[Type[BaseModel]] = None,
+    builtin_tools: Optional[List[Any]] = None,
     **kwargs,
 ):
     if isinstance(model_client, AsyncOpenAI):
@@ -162,6 +163,7 @@ def generate_agent(
             name=name,
             model_client=model_client,
             system_message=system_prompt,
+            tools=builtin_tools if builtin_tools else None,
             workbench=workbenches if len(workbenches) > 0 else None,
             max_tool_iterations=max_tool_calls,
             reflect_on_tool_use=True,
