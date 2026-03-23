@@ -4,12 +4,15 @@
 ##
 ## SPDX-License-Identifier: Apache-2.0
 ################################################################################
+import inspect
+
 try:
     from autogen_core.models import (
         ModelFamily,
         ChatCompletionClient,
         ModelInfo,
     )
+    from autogen_core.tools import FunctionTool
     from openai import AsyncOpenAI
 
     # from autogen_ext.agents.openai import OpenAIAgent
@@ -61,6 +64,22 @@ from typing import Any, Tuple, Optional, Dict, Union, List, Callable, overload
 from charge.experiments.memory import Memory
 from charge.tasks.task import Task
 from loguru import logger
+
+
+def _describe_builtin_tool(func: Callable[..., Any]) -> str:
+    doc = inspect.getdoc(func)
+    if doc:
+        return doc.splitlines()[0].strip()
+    return f"Run the backend function `{getattr(func, '__name__', 'tool')}`."
+
+
+def _wrap_autogen_builtin_tool(tool_obj: Any) -> Any:
+    if not callable(tool_obj):
+        return tool_obj
+    if isinstance(tool_obj, FunctionTool):
+        return tool_obj
+
+    return FunctionTool(tool_obj, description=_describe_builtin_tool(tool_obj))
 
 
 def create_autogen_model_client(
@@ -219,12 +238,14 @@ class AutoGenAgent(Agent):
         timeout: int = 60,
         backend: Optional[str] = None,
         model_kwargs: Optional[dict] = None,
+        builtin_tools: Optional[list[Any]] = None,
         **kwargs,
     ) -> None:
         super().__init__(task=task, **kwargs)
         self.max_retries = max_retries
         self.max_tool_calls = max_tool_calls
         self.workbenches: List[McpWorkbench] = []
+        self.builtin_tools = builtin_tools or []
         self.agent_name = agent_name
         self.model_client = model_client
         self.timeout = timeout
@@ -238,6 +259,27 @@ class AutoGenAgent(Agent):
         self.backend = backend
         self.model_kwargs = model_kwargs if model_kwargs is not None else {}
         self._structured_output_agent: Optional[Any] = None
+
+    def _resolve_builtin_tools(self) -> list[Any]:
+        task_builtin_tools = (
+            list(getattr(self.task, "builtin_tools", []) or []) if self.task else []
+        )
+
+        resolved_tools: list[Any] = []
+        seen_ids: set[int] = set()
+        for tool_obj in [*self.builtin_tools, *task_builtin_tools]:
+            tool_id = id(tool_obj)
+            if tool_id in seen_ids:
+                continue
+            resolved_tools.append(tool_obj)
+            seen_ids.add(tool_id)
+        return resolved_tools
+
+    def _get_wrapped_builtin_tools(self) -> list[Any]:
+        return [
+            _wrap_autogen_builtin_tool(tool_obj)
+            for tool_obj in self._resolve_builtin_tools()
+        ]
 
     def setup_memory(self, memory: Optional[Any] = None) -> List[ChARGeListMemory]:
         """
@@ -258,7 +300,14 @@ class AutoGenAgent(Agent):
         Returns:
             None
         """
-        assert self.task is not None
+        if self.task is None:
+            self.workbenches = []
+            return
+
+        if not self.task.server_files and not self.task.server_urls:
+            self.workbenches = []
+            return
+
         self.workbenches = await _setup_mcp_workbenches(
             self.task.server_files, self.task.server_urls
         )
@@ -292,6 +341,7 @@ class AutoGenAgent(Agent):
             max_tool_calls=self.max_tool_calls,
             name=self.agent_name,
             memory=self.memory,
+            builtin_tools=self._get_wrapped_builtin_tools(),
             **self.setup_kwargs,
         )
 
@@ -369,6 +419,7 @@ class AutoGenAgent(Agent):
                 max_tool_calls=1,
                 # memory=self.memory,
                 output_content_type=self.task.get_structured_output_schema(),
+                builtin_tools=[],
             )
         return self._structured_output_agent
 

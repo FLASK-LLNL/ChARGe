@@ -6,13 +6,19 @@
 ################################################################################
 from __future__ import annotations
 
+import inspect
 import json
 from typing import Any, Awaitable, Callable, Optional, Union, List, Literal
 
 from loguru import logger
 
 try:
-    from agent_framework import Agent as AFAgent, AgentSession, InMemoryHistoryProvider
+    from agent_framework import (
+        Agent as AFAgent,
+        AgentSession,
+        InMemoryHistoryProvider,
+        tool as agentframework_tool,
+    )
     from agent_framework.openai import (
         OpenAIChatClient,
         OpenAIResponsesClient,
@@ -37,6 +43,26 @@ from charge.clients.openai_base import (
 from charge._utils import maybe_await_async
 from charge.experiments.memory import Memory
 from charge.tasks.task import Task
+
+
+def _describe_builtin_tool(func: Callable[..., Any]) -> str:
+    doc = inspect.getdoc(func)
+    if doc:
+        return doc.splitlines()[0].strip()
+    return f"Run the backend function `{getattr(func, '__name__', 'tool')}`."
+
+
+def _wrap_agentframework_builtin_tool(tool_obj: Any) -> Any:
+    if not callable(tool_obj):
+        return tool_obj
+    if getattr(tool_obj, "_charge_agentframework_wrapped", False):
+        return tool_obj
+
+    wrapped_tool = agentframework_tool(description=_describe_builtin_tool(tool_obj))(
+        tool_obj
+    )
+    setattr(wrapped_tool, "_charge_agentframework_wrapped", True)
+    return wrapped_tool
 
 
 def create_agentframework_client(
@@ -142,6 +168,7 @@ class AgentFrameworkAgent(Agent):
         model_kwargs: Optional[dict] = None,
         reasoning_effort: Literal["low", "medium", "high"] = "medium",
         builtin_tools: Optional[list[Any]] = None,
+        callback: Optional[Any] = None,
         **kwargs,
     ) -> None:
         super().__init__(task=task, **kwargs)
@@ -149,20 +176,52 @@ class AgentFrameworkAgent(Agent):
         self.max_tool_calls = max_tool_calls
         self.workbenches: List[Any] = []  # Will be MCP workbenches
         self.builtin_tools = builtin_tools or []
-        self.workbenches.extend(self.builtin_tools)
         self.agent_name = agent_name
         self.client = client
         self.timeout = timeout
         self.setup_kwargs = kwargs
         self.reasoning_effort = reasoning_effort
+        self.callback = callback
 
         self.model = model
         self.backend = backend
         self.model_kwargs = model_kwargs if model_kwargs is not None else {}
 
         self._af_agent: Optional[AFAgent] = None
+        self._agent_signature: Optional[tuple[Any, ...]] = None
 
         self._agent_session: Optional[AgentSession] = None
+
+    def _resolve_builtin_tools(self) -> list[Any]:
+        task_builtin_tools = (
+            list(getattr(self.task, "builtin_tools", []) or []) if self.task else []
+        )
+
+        resolved_tools: list[Any] = []
+        seen_ids: set[int] = set()
+        for tool_obj in [*self.builtin_tools, *task_builtin_tools]:
+            tool_id = id(tool_obj)
+            if tool_id in seen_ids:
+                continue
+            resolved_tools.append(tool_obj)
+            seen_ids.add(tool_id)
+        return resolved_tools
+
+    def _get_wrapped_builtin_tools(self) -> list[Any]:
+        return [
+            _wrap_agentframework_builtin_tool(tool_obj)
+            for tool_obj in self._resolve_builtin_tools()
+        ]
+
+    def _get_agent_signature(self) -> tuple[Any, ...]:
+        builtin_tool_names = tuple(
+            getattr(tool_obj, "__name__", repr(tool_obj))
+            for tool_obj in self._resolve_builtin_tools()
+        )
+        server_files = tuple(self.task.server_files or []) if self.task else ()
+        server_urls = tuple(self.task.server_urls or []) if self.task else ()
+        instructions = self.task.get_system_prompt() if self.task is not None else ""
+        return instructions, server_files, server_urls, builtin_tool_names
 
     def _create_agent(
         self,
@@ -209,19 +268,24 @@ class AgentFrameworkAgent(Agent):
             None
         """
         # Agent Framework uses MCPStdioTool, MCPStreamableHTTPTool, MCPWebsocketTool
-        assert self.task is not None
+        builtin_tools = self._get_wrapped_builtin_tools()
+        if self.task is None:
+            self.workbenches = builtin_tools
+            return
+
         if not self.task.server_files and not self.task.server_urls:
+            self.workbenches = builtin_tools
             return
 
         try:
-            self.workbenches = self.builtin_tools + await setup_mcp_tools(
+            self.workbenches = builtin_tools + await setup_mcp_tools(
                 stdio_servers=self.task.server_files,
                 mcp_servers=self.task.server_urls,
             )
             logger.info(f"Set up {len(self.workbenches)} MCP tools")
         except Exception as e:
             logger.error(f"Failed to setup MCP tools: {e}")
-            self.workbenches = list(self.builtin_tools)
+            self.workbenches = list(builtin_tools)
 
     async def close_workbenches(self) -> None:
         """
@@ -288,16 +352,79 @@ class AgentFrameworkAgent(Agent):
 
                 # Run agent (Agent Framework returns AgentResponse)
                 stream = await agent.run(user_prompt, session=session, stream=True)
+                tool_call_names: dict[str, str] = {}
                 async for update in stream:
+                    if not update.contents:
+                        continue
+
                     if (
-                        update.contents
-                        and update.contents[0].raw_representation
+                        update.contents[0].raw_representation
                         and update.contents[0].raw_representation.type
                         == "response.reasoning_summary_text.done"
                     ):
                         # Reasoning text - use callback to transmit back
                         if reasoning_callback:
                             await reasoning_callback(update.contents[0].text)
+
+                    for content in update.contents:
+                        content_type = content.type
+                        # if "delta" in content.raw_representation.type:
+                        #     continue
+                        if content_type == "function_call":
+                            call_id = content.call_id
+                            tool_name = content.name
+                            if call_id and tool_name:
+                                tool_call_names[call_id] = tool_name
+                            if self.callback is not None and tool_name and call_id:
+                                if hasattr(self.callback, "on_tool_call"):
+                                    await maybe_await_async(
+                                        self.callback.on_tool_call,
+                                        tool_name,
+                                        content.arguments,
+                                        source=self.agent_name,
+                                        call_id=call_id,
+                                    )
+                        elif content_type == "mcp_server_tool_call":
+                            call_id = content.call_id
+                            tool_name = content.tool_name
+                            if call_id and tool_name:
+                                tool_call_names[call_id] = tool_name
+                            if self.callback is not None and tool_name and call_id:
+                                if hasattr(self.callback, "on_tool_call"):
+                                    await maybe_await_async(
+                                        self.callback.on_tool_call,
+                                        tool_name,
+                                        content.arguments,
+                                        source=self.agent_name,
+                                        call_id=call_id,
+                                    )
+                        elif content_type == "function_result":
+                            call_id = content.call_id
+                            tool_name = tool_call_names.get(call_id or "", "tool")
+                            if self.callback is not None and hasattr(
+                                self.callback, "on_tool_result"
+                            ):
+                                await maybe_await_async(
+                                    self.callback.on_tool_result,
+                                    tool_name,
+                                    content.result,
+                                    is_error=bool(content.exception),
+                                    source=self.agent_name,
+                                    call_id=call_id,
+                                )
+                        elif content_type == "mcp_server_tool_result":
+                            call_id = content.call_id
+                            tool_name = tool_call_names.get(call_id or "", "tool")
+                            if self.callback is not None and hasattr(
+                                self.callback, "on_tool_result"
+                            ):
+                                await maybe_await_async(
+                                    self.callback.on_tool_result,
+                                    tool_name,
+                                    content.output,
+                                    source=self.agent_name,
+                                    call_id=call_id,
+                                )
                 result = await stream.get_final_response()
 
                 # Extract content from result
@@ -420,13 +547,15 @@ class AgentFrameworkAgent(Agent):
 
         try:
             # Create agent
-            if self._af_agent is None:
+            agent_signature = self._get_agent_signature()
+            if self._af_agent is None or self._agent_signature != agent_signature:
                 instructions = (
                     self.task.get_system_prompt() if self.task is not None else ""
                 )
                 self._af_agent = self._create_agent(
                     self.agent_name, self.reasoning_effort, instructions=instructions
                 )
+                self._agent_signature = agent_signature
 
             # Create or reuse session for stateful conversation
             if self._agent_session is None:
