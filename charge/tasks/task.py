@@ -18,6 +18,7 @@ class Task(ABC):
         refinement_prompt: Optional[str] = None,
         server_urls: Optional[Union[str, list]] = None,
         server_files: Optional[Union[str, list]] = None,
+        mcp_server_allowed_tools: Optional[dict[str, list[str]]] = None,
         structured_output_schema: Optional[Type[BaseModel]] = None,
         **kwargs,
     ):
@@ -62,6 +63,9 @@ class Task(ABC):
                                                        for the task.
             server_files (Union[str, list], optional): The MCP server files to use with over STDIO protocl
                                                        for the task.
+            mcp_server_allowed_tools (Optional[dict[str, list[str]]], optional):
+                Optional mapping from MCP server URL to an allowlist of tool names
+                that should be exposed from that server.
             **kwargs: Additional keyword arguments to be stored in the task.
 
         """
@@ -72,7 +76,17 @@ class Task(ABC):
 
         self.server_urls = check_server_paths(server_urls)
         self.server_files = check_server_paths(server_files)
-
+        self.mcp_server_allowed_tools = {
+            str(server_url): list(
+                dict.fromkeys(
+                    str(tool_name)
+                    for tool_name in tool_names
+                    if tool_name is not None and str(tool_name)
+                )
+            )
+            for server_url, tool_names in (mcp_server_allowed_tools or {}).items()
+            if server_url is not None and tool_names is not None
+        }
         self.structured_output_schema = structured_output_schema
 
         for key, value in kwargs.items():
@@ -213,6 +227,7 @@ class Task(ABC):
             "refinement_prompt": self.refinement_prompt,
             "server_urls": self.server_urls,
             "server_files": self.server_files,
+            "mcp_server_allowed_tools": self.mcp_server_allowed_tools,
             "constructor_args": self.constructor_args,
         }
 
@@ -225,6 +240,7 @@ class Task(ABC):
             "refinement_prompt",
             "server_urls",
             "server_files",
+            "mcp_server_allowed_tools",
             "structured_output_schema",
             "constructor_args",
         }
@@ -268,6 +284,7 @@ class Task(ABC):
             "refinement_prompt": data.get("refinement_prompt"),
             "server_urls": data.get("server_urls"),
             "server_files": data.get("server_files"),
+            "mcp_server_allowed_tools": data.get("mcp_server_allowed_tools"),
         }
 
         # Add any extra attributes as kwargs

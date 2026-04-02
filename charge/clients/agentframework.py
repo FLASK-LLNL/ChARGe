@@ -207,8 +207,26 @@ class AgentFrameworkAgent(Agent):
         )
         server_files = tuple(self.task.server_files or []) if self.task else ()
         server_urls = tuple(self.task.server_urls or []) if self.task else ()
+        mcp_server_allowed_tools = (
+            tuple(
+                sorted(
+                    (str(url), tuple(sorted(tool_names)))
+                    for url, tool_names in (
+                        self.task.mcp_server_allowed_tools or {}
+                    ).items()
+                )
+            )
+            if self.task is not None
+            else ()
+        )
         instructions = self.task.get_system_prompt() if self.task is not None else ""
-        return instructions, server_files, server_urls, builtin_tool_names
+        return (
+            instructions,
+            server_files,
+            server_urls,
+            builtin_tool_names,
+            mcp_server_allowed_tools,
+        )
 
     def _create_agent(
         self,
@@ -256,6 +274,7 @@ class AgentFrameworkAgent(Agent):
             self.workbenches = builtin_tools + await setup_mcp_tools(
                 stdio_servers=self.task.server_files,
                 mcp_servers=self.task.server_urls,
+                mcp_server_allowed_tools=self.task.mcp_server_allowed_tools,
             )
             logger.info(f"Set up {len(self.workbenches)} MCP tools")
         except Exception as e:
