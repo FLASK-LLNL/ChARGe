@@ -138,29 +138,27 @@ def test_ollama_not_supported(agentframework_module):
 
 def test_create_openai_chat_client(agentframework_module):
     """Test creating OpenAI chat client."""
-    from charge.clients.agentframework import create_agentframework_chat_client
+    from charge.clients.agentframework import create_agentframework_client
     from agent_framework.openai import OpenAIChatClient
 
     backend = "openai"
     model = "gpt-5"
     api_key = "test_key"
 
-    client = create_agentframework_client(
-        backend=backend, model=model, api_key=api_key, use_responses_api=False
-    )
+    client = create_agentframework_client(backend=backend, model=model, api_key=api_key)
 
     assert isinstance(client, OpenAIChatClient)
 
 
 def test_create_client_unsupported_backend(agentframework_module):
     """Test that creating client with unsupported backend raises error."""
-    from charge.clients.agentframework import create_agentframework_chat_client
+    from charge.clients.agentframework import create_agentframework_client
 
     backend = "ollama"
     model = "llama2"
 
     with pytest.raises(NotImplementedError, match="Ollama support"):
-        create_agentframework_chat_client(backend=backend, model=model)
+        create_agentframework_client(backend=backend, model=model)
 
 
 def test_agentframework_pool_initialization(agentframework_module):
@@ -174,7 +172,7 @@ def test_agentframework_pool_initialization(agentframework_module):
 
     assert backend.model == "gpt-5"
     assert backend.backend == "openai"
-    assert backend.chat_client is not None
+    assert backend.client is not None
 
 
 def test_agentframework_pool_agent_naming(agentframework_module):
@@ -193,27 +191,6 @@ def test_agentframework_pool_agent_naming(agentframework_module):
 
     assert agent1.agent_name == "af_agent_1"
     assert agent2.agent_name == "af_agent_2"
-
-
-def test_responses_api_client_creation(agentframework_module):
-    """Test that Responses API client can be created."""
-    from charge.clients.agentframework import (
-        AgentFrameworkBackend,
-        RESPONSES_API_AVAILABLE,
-    )
-
-    if not RESPONSES_API_AVAILABLE:
-        pytest.skip("OpenAIResponsesClient not available in this version")
-
-    pytest.MonkeyPatch().setenv("OPENAI_API_KEY", "test_key")
-
-    # Create backend with Responses API
-    backend = AgentFrameworkBackend(
-        model="gpt-4o", backend="openai", use_responses_api=True
-    )
-
-    assert backend.use_responses_api is True
-    assert backend.chat_client is not None
 
 
 def test_responses_api_without_flag_raises_error(agentframework_module):
@@ -252,5 +229,3 @@ def test_agentframework_pool_create_agent_naming(agentframework_module):
     # Create second agent
     agent2 = backend.create_agent(task=task)
     assert "_2" in agent2.agent_name
-
-
