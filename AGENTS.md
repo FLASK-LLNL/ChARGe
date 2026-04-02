@@ -76,7 +76,6 @@ Use `AgentFrameworkBackend` when:
 
 - You want Microsoft Agent Framework orchestration
 - You are using OpenAI-compatible endpoints only
-- You want optional OpenAI Responses API support via `use_responses_api=True`
 
 Current support in code:
 
@@ -197,27 +196,6 @@ Current experiment behavior:
 - `Experiment.save_state()` and `load_state(...)` serialize that memory
 - Agent Framework seeds prior task/result pairs into the session from experiment memory
 - AutoGen rehydrates prior task/result pairs into its memory object
-
-## Responses API
-
-`AgentFrameworkBackend` supports `use_responses_api=True` when the installed `agent-framework` version exposes `OpenAIResponsesClient`.
-
-```python
-from charge.clients.agentframework import AgentFrameworkBackend
-
-backend = AgentFrameworkBackend(
-    model="gpt-5",
-    backend="openai",
-    use_responses_api=True,
-)
-
-hosted_tools = backend.get_hosted_tools()
-```
-
-Notes:
-
-- Hosted tools are only available when `use_responses_api=True`
-- `get_hosted_tools()` currently attempts to expose code interpreter and file search when supported by the installed client
 
 ## CLI and Examples
 
