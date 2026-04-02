@@ -118,7 +118,7 @@ def create_agentframework_client(
         if use_responses_api:
             logger.info("Creating OpenAIResponsesClient with hosted tools support")
             client = OpenAIResponsesClient(
-                model_id=model,
+                model=model,
                 api_key=api_key,
                 **model_kwargs if model_kwargs is not None else {},
             )
