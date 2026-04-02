@@ -21,6 +21,8 @@ try:
     )
     from agent_framework.openai import (
         OpenAIChatClient,
+        OpenAIResponsesClient,
+        OpenAIResponsesOptions,
         OpenAIChatOptions,
     )
 except ImportError:
@@ -68,7 +70,8 @@ def create_agentframework_client(
     model: str,
     api_key: Optional[str] = None,
     model_kwargs: Optional[dict[str, Any]] = None,
-) -> OpenAIChatClient:
+    use_responses_api: bool = True,
+) -> Union[OpenAIChatClient, OpenAIResponsesClient]:
     """
     Creates an Agent Framework chat client based on the specified backend and model.
 
@@ -77,9 +80,10 @@ def create_agentframework_client(
         model (str): The model name/ID to use.
         api_key (Optional[str], optional): API key for the model. Defaults to None.
         model_kwargs (Optional[dict], optional): Additional keyword arguments. Defaults to None.
+        use_responses_api (bool, optional): Use OpenAI Responses API for hosted tools. Defaults to True.
 
     Returns:
-        OpenAIChatClient: The created chat client.
+        Union[OpenAIChatClient, OpenAIResponsesClient]: The created chat client.
 
     Raises:
         ValueError: If backend is not supported or configuration is invalid.
@@ -110,14 +114,23 @@ def create_agentframework_client(
             api_key is not None
         ), "API key must be provided for OpenAI or Gemini backend"
 
-        # Standard OpenAI or OpenAI-compatible client
-        # Agent Framework reads OPENAI_API_KEY from environment by default
-        client = OpenAIChatClient(
-            model=model,
-            api_key=api_key,
-            # Additional kwargs can be passed but Agent Framework has different options
-            **model_kwargs if model_kwargs is not None else {},
-        )
+        # Check if Responses API is requested
+        if use_responses_api:
+            logger.info("Creating OpenAIResponsesClient with hosted tools support")
+            client = OpenAIResponsesClient(
+                model_id=model,
+                api_key=api_key,
+                **model_kwargs if model_kwargs is not None else {},
+            )
+        else:
+            # Standard OpenAI or OpenAI-compatible client
+            # Agent Framework reads OPENAI_API_KEY from environment by default
+            client = OpenAIChatClient(
+                model=model,
+                api_key=api_key,
+                # Additional kwargs can be passed but Agent Framework has different options
+                **model_kwargs if model_kwargs is not None else {},
+            )
 
     return client
 
@@ -144,7 +157,7 @@ class AgentFrameworkAgent(Agent):
     def __init__(
         self,
         task: Optional[Task],
-        client: OpenAIChatClient,
+        client: Union[OpenAIChatClient, OpenAIResponsesClient],
         agent_name: str,
         model: str | None,
         memory: Optional[Memory] = None,
@@ -234,23 +247,42 @@ class AgentFrameworkAgent(Agent):
         reasoning_effort: Literal["low", "medium", "high"],
         instructions: str,
     ) -> AFAgent:
-        af_agent = AFAgent[OpenAIChatOptions](
-            client=self.client,
-            name=agent_name,
-            instructions=instructions,
-            tools=self.workbenches,
-            default_options={
-                "reasoning": {
-                    "effort": reasoning_effort,
-                    "summary": "detailed",
+        if isinstance(self.client, OpenAIResponsesClient):
+            af_agent = AFAgent[OpenAIResponsesOptions](
+                client=self.client,
+                name=agent_name,
+                instructions=instructions,
+                tools=self.workbenches,
+                default_options={
+                    "reasoning": {
+                        "effort": reasoning_effort,
+                        "summary": "detailed",
+                    },
+                    "include": ["reasoning.encrypted_content"],
                 },
-                "include": ["reasoning.encrypted_content"],
-            },
-            context_providers=[
-                # This provider ensures session.state contains the history
-                InMemoryHistoryProvider(load_messages=True)
-            ],
-        )
+                context_providers=[
+                    # This provider ensures session.state contains the history
+                    InMemoryHistoryProvider(load_messages=True)
+                ],
+            )
+        else:
+            af_agent = AFAgent[OpenAIChatOptions](
+                client=self.client,
+                name=agent_name,
+                instructions=instructions,
+                tools=self.workbenches,
+                default_options={
+                    "reasoning": {
+                        "effort": reasoning_effort,
+                        "summary": "detailed",
+                    },
+                    "include": ["reasoning.encrypted_content"],
+                },
+                context_providers=[
+                    # This provider ensures session.state contains the history
+                    InMemoryHistoryProvider(load_messages=True)
+                ],
+            )
         return af_agent
 
     async def setup_mcp_workbenches(self) -> None:
@@ -605,7 +637,7 @@ class AgentFrameworkBackend(AgentBackend):
         api_key: Optional API key.
         base_url: Optional base URL for custom endpoints.
         model_kwargs: Additional client kwargs.
-        use_responses_api: (DEPRECATED in AF) Whether to use Responses API.
+        use_responses_api: Whether to use Responses API (hosted tools).
     """
 
     AGENT_COUNT = 0
@@ -619,7 +651,7 @@ class AgentFrameworkBackend(AgentBackend):
         model_kwargs: Optional[dict] = None,
         use_responses_api: bool = True,
         reasoning_effort: Literal["low", "medium", "high"] = "medium",
-        client: Optional[OpenAIChatClient] = None,
+        client: Optional[OpenAIChatClient | OpenAIResponsesClient] = None,
         **kwargs,
     ):
         super().__init__(
@@ -632,6 +664,7 @@ class AgentFrameworkBackend(AgentBackend):
             **kwargs,
         )
         self.client = client
+        self.use_responses_api = use_responses_api
         self.reasoning_effort = reasoning_effort
 
         model, backend, api_key, model_kwargs_configured = model_configure(
@@ -650,6 +683,7 @@ class AgentFrameworkBackend(AgentBackend):
                 model=model,
                 api_key=api_key,
                 model_kwargs=model_kwargs_configured,
+                use_responses_api=use_responses_api,
             )
 
         self.model = model
@@ -694,11 +728,19 @@ class AgentFrameworkBackend(AgentBackend):
 
     def get_hosted_tools(self) -> List[Any]:
         """
-        Get hosted tools from an OpenAI API client.
+        Get hosted tools from an OpenAI Responses API client.
+
+        Hosted tools are only available when `use_responses_api=True`.
         """
+        if not self.use_responses_api:
+            raise ValueError(
+                "Hosted tools are only available with Responses API. "
+                "Create the backend with use_responses_api=True"
+            )
+
         tools: List[Any] = []
 
-        assert isinstance(self.client, OpenAIChatClient)
+        assert isinstance(self.client, (OpenAIChatClient, OpenAIResponsesClient))
 
         try:
             if hasattr(self.client, "get_code_interpreter_tool"):
