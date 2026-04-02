@@ -634,16 +634,16 @@ class AgentFrameworkBackend(AgentBackend):
         self.client = client
         self.reasoning_effort = reasoning_effort
 
+        model, backend, api_key, model_kwargs_configured = model_configure(
+            model=model, backend=backend, api_key=api_key, base_url=base_url
+        )
+        if model_kwargs:
+            model_kwargs_configured.update(model_kwargs)
+
         if self.client is None:
             assert (
                 model is not None
             ), "Model name must be provided if client is not given."
-
-            model, backend, api_key, model_kwargs_configured = model_configure(
-                model=model, backend=backend, api_key=api_key, base_url=base_url
-            )
-            if model_kwargs:
-                model_kwargs_configured.update(model_kwargs)
 
             self.client = create_agentframework_client(
                 backend=backend,
@@ -654,7 +654,9 @@ class AgentFrameworkBackend(AgentBackend):
 
         self.model = model
         self.backend = backend
-        self.model_kwargs = model_kwargs if model_kwargs is not None else {}
+        self.model_kwargs = (
+            model_kwargs_configured if model_kwargs_configured is not None else {}
+        )
 
         if self.client is None:
             raise ValueError("Failed to create OpenAI client.")
