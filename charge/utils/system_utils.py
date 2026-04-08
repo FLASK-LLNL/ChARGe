@@ -51,7 +51,8 @@ def read_from_file(self, file_path: str, key: str) -> str:
         raise ValueError("Only .txt and .json files are supported")
 
 
-def check_url_exists(url: str) -> bool:
+def check_url_exists(url: str, bearer_token: Optional[str] = None) -> bool:
+    # breakpoint()
     if not url.startswith("http://") and not url.startswith("https://"):
         warnings.warn(f"URL '{url}' does not start with 'http://' or 'https://'")
         return False
@@ -65,9 +66,10 @@ def check_url_exists(url: str) -> bool:
         "Accept": "text/event-stream, application/json",
         "Cache-Control": "no-cache",
     }
-    wh_token = os.getenv("FLASK_WORMHOLE_TOKEN", None)
-    if wh_token:
-        headers["X-Token"] = wh_token
+    # wh_token = os.getenv("FLASK_WORMHOLE_TOKEN", None)
+    #    breakpoint()
+    if bearer_token:
+        headers["X-Token"] = bearer_token
     try:
         with requests.get(url, stream=True, timeout=5, headers=headers) as response:
             # 200 is ideal. 406 still proves the server is reachable (just unhappy with Accept).
@@ -96,7 +98,9 @@ def check_url_exists(url: str) -> bool:
     return True
 
 
-def check_server_paths(server_paths: Optional[Union[str, list]]) -> list:
+def check_server_paths(
+    server_paths: Optional[Union[str, list]], bearer_token: Optional[str] = None
+) -> list:
     """
     Gracefully handle errors in server paths provided by user.
     Args:
@@ -108,6 +112,7 @@ def check_server_paths(server_paths: Optional[Union[str, list]]) -> list:
         CHARGE_ERROR_ON_MISSING_SERVER is set to 1.
     """
 
+    # breakpoint()
     if server_paths is None:
         return []
     if not isinstance(server_paths, list) and not isinstance(server_paths, str):
@@ -124,7 +129,7 @@ def check_server_paths(server_paths: Optional[Union[str, list]]) -> list:
     valid_paths = []
     for path in _paths:
         if path.startswith("http://") or path.startswith("https://"):
-            if check_url_exists(path):
+            if check_url_exists(url=path, bearer_token=bearer_token):
                 valid_paths.append(path)
             else:
                 warnings.warn(f"Server URL '{path}' is not reachable.")

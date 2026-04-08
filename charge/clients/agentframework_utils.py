@@ -11,6 +11,7 @@ except ImportError:
 
 from typing import List, Optional, Any, Dict
 from loguru import logger
+import httpx
 
 
 # Error handling
@@ -76,7 +77,8 @@ class MCPWorkbenchAdapter:
         }
         self._tools: List[Any] = []
 
-    async def create_tools(self) -> List[Any]:
+    async def create_tools(self, bearer_token: str) -> List[Any]:
+        #    async def create_tools(self, bearer_token: Optional[str] = None) -> List[Any]:
         """
         Create Agent Framework MCP tools from server configurations.
 
@@ -118,10 +120,20 @@ class MCPWorkbenchAdapter:
                             f"Skipping MCP tool for {url} because its allowlist is empty"
                         )
                         continue
+                    headers = None
+                    if bearer_token:
+                        headers["X-Token"] = bearer_token
+
+                    # Create httpx client with custom headers
+                    #                    http_client = httpx.AsyncClient(headers=headers, timeout=30.0)
+                    # breakpoint()
                     mcp_tool = MCPStreamableHTTPTool(
                         name=f"mcp_http_{url.split('/')[-1]}",
                         url=url,
                         allowed_tools=allowed_tools or None,
+                        # headers={"Authorization": "Bearer token"},
+                        headers=headers,
+                        # http_client=http_client,
                     )
                     tools.append(mcp_tool)
                     if allowed_tools:
@@ -146,9 +158,11 @@ class MCPWorkbenchAdapter:
 
 
 async def setup_mcp_tools(
+    bearer_token: str,
     stdio_servers: Optional[List[str]] = None,
     mcp_servers: Optional[List[str]] = None,
     mcp_server_allowed_tools: Optional[Dict[str, List[str]]] = None,
+    #    bearer_token: Optional[str] = None
 ) -> List[Any]:
     """
     Setup MCP tools for Agent Framework from server configurations.
@@ -166,5 +180,5 @@ async def setup_mcp_tools(
         mcp_servers=mcp_servers,
         mcp_server_allowed_tools=mcp_server_allowed_tools,
     )
-    tools = await adapter.create_tools()
+    tools = await adapter.create_tools(bearer_token=bearer_token)
     return tools

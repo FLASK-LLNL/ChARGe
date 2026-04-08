@@ -12,36 +12,15 @@ and common utilities that can be used by both AutoGen and Agent Framework implem
 """
 
 import os
-import httpx
+
+# import httpx
 from typing import Tuple, Optional, Dict, Any
 from loguru import logger
 
 
-class LoggingTransport(httpx.AsyncHTTPTransport):
-    """
-    Custom HTTP transport that logs all requests and responses.
-
-    Masks API keys in logs for security.
-    """
-
-    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-        # Log request details (mask API key)
-        headers_copy = dict(request.headers)
-        if "authorization" in headers_copy:
-            auth_header = headers_copy["authorization"]
-            if auth_header.startswith("Bearer "):
-                masked_key = auth_header[:14] + "..." + auth_header[-4:]
-                headers_copy["authorization"] = masked_key
-
-        try:
-            response = await super().handle_async_request(request)
-            return response
-        except Exception as e:
-            logger.error(f"HTTP Request Failed: {type(e).__name__}: {e}")
-            raise
-
-
-def get_api_key_for_backend(backend: str, provided_key: Optional[str] = None) -> Optional[str]:
+def get_api_key_for_backend(
+    backend: str, provided_key: Optional[str] = None
+) -> Optional[str]:
     """
     Get the API key for a given backend.
 
@@ -72,7 +51,9 @@ def get_api_key_for_backend(backend: str, provided_key: Optional[str] = None) ->
     return None
 
 
-def get_base_url_for_backend(backend: str, provided_url: Optional[str] = None) -> Optional[str]:
+def get_base_url_for_backend(
+    backend: str, provided_url: Optional[str] = None
+) -> Optional[str]:
     """
     Get the base URL for a given backend.
 
@@ -261,29 +242,18 @@ def model_configure(
     """
     # Determine if this is an OpenAI-compatible or special backend
     openai_compatible = backend in [
-        "openai", "gemini", "livai", "livchat", "llamame", "alcf"
+        "openai",
+        "gemini",
+        "livai",
+        "livchat",
+        "llamame",
+        "alcf",
     ]
 
     if openai_compatible:
         return configure_openai_backend(backend, model, api_key, base_url)
     else:
         return configure_special_backends(backend, model)
-
-
-def create_http_client(disable_ssl_verify: bool = False) -> httpx.AsyncClient:
-    """
-    Create an HTTP client with logging transport.
-
-    Args:
-        disable_ssl_verify: Whether to disable SSL verification (default: False)
-
-    Returns:
-        Configured AsyncClient with logging
-    """
-    return httpx.AsyncClient(
-        verify=not disable_ssl_verify,
-        transport=LoggingTransport()
-    )
 
 
 # Backend capability matrix
@@ -329,10 +299,13 @@ def get_backend_capabilities(backend: str) -> Dict[str, bool]:
     Returns:
         Dictionary of capability flags
     """
-    return BACKEND_CAPABILITIES.get(backend, {
-        "api_key_required": True,
-        "supports_function_calling": True,
-        "supports_streaming": True,
-        "supports_vision": False,
-        "supports_json_mode": True,
-    })
+    return BACKEND_CAPABILITIES.get(
+        backend,
+        {
+            "api_key_required": True,
+            "supports_function_calling": True,
+            "supports_streaming": True,
+            "supports_vision": False,
+            "supports_json_mode": True,
+        },
+    )

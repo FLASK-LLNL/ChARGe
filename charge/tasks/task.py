@@ -20,6 +20,7 @@ class Task(ABC):
         server_files: Optional[Union[str, list]] = None,
         mcp_server_allowed_tools: Optional[dict[str, list[str]]] = None,
         structured_output_schema: Optional[Type[BaseModel]] = None,
+        bearer_token: Optional[str] = None,
         **kwargs,
     ):
         """
@@ -59,13 +60,15 @@ class Task(ABC):
             user_prompt (str, optional): The user prompt for the task.
             verification_prompt (str, optional): The verification prompt for the task.
             refinement_prompt (str, optional): The refinement prompt for the task.
-            server_urls (Union[str, list], optional): The MCP server URLs to use with over SSE protocol
+            server_urls (Union[str, list], optional): The MCP server URLs to use with over HTTP/SSE protocol
                                                        for the task.
             server_files (Union[str, list], optional): The MCP server files to use with over STDIO protocl
                                                        for the task.
             mcp_server_allowed_tools (Optional[dict[str, list[str]]], optional):
                 Optional mapping from MCP server URL to an allowlist of tool names
                 that should be exposed from that server.
+            structured_output_schema: Optional[Type[BaseModel]]: Optional schema for how to format structured output
+            bearer_token: Optional[str]: Optional token to pass in the headers for any MCP communication
             **kwargs: Additional keyword arguments to be stored in the task.
 
         """
@@ -88,6 +91,7 @@ class Task(ABC):
             if server_url is not None and tool_names is not None
         }
         self.structured_output_schema = structured_output_schema
+        self.bearer_token = bearer_token
 
         for key, value in kwargs.items():
             if hasattr(self, key):

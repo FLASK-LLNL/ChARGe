@@ -272,6 +272,7 @@ class AgentFrameworkAgent(Agent):
 
         try:
             self.workbenches = builtin_tools + await setup_mcp_tools(
+                bearer_token=getattr(self.task, "bearer_token", None),
                 stdio_servers=self.task.server_files,
                 mcp_servers=self.task.server_urls,
                 mcp_server_allowed_tools=self.task.mcp_server_allowed_tools,
@@ -657,6 +658,10 @@ class AgentFrameworkBackend(AgentBackend):
         self.model_kwargs = (
             model_kwargs_configured if model_kwargs_configured is not None else {}
         )
+
+        # Update base_url with the actual value used (may come from env vars)
+        if "base_url" in self.model_kwargs and not self.base_url:
+            self.base_url = self.model_kwargs["base_url"]
 
         if self.client is None:
             raise ValueError("Failed to create OpenAI client.")

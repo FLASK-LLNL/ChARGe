@@ -34,7 +34,10 @@ except ImportError:
 
 
 def create_servers(
-    paths: List[str], urls: List[str], timeout: Optional[int] = 60
+    paths: List[str],
+    urls: List[str],
+    bearer_token: Optional[str] = None,
+    timeout: Optional[int] = 60,
 ) -> List[Any]:
     """
     Creates MCP servers from the task's server paths.
@@ -57,9 +60,12 @@ def create_servers(
         "Accept": "text/event-stream, application/json",
         "Cache-Control": "no-cache",
     }
-    wh_token = os.getenv("FLASK_WORMHOLE_TOKEN", None)
-    if wh_token:
-        headers["X-Token"] = wh_token
+    # wh_token = os.getenv("FLASK_WORMHOLE_TOKEN", None)
+    if bearer_token:
+        headers["X-Token"] = bearer_token
+    # else:
+    #     breakpoint()
+
     for url in urls:
         mcp_servers.append(
             StreamableHttpServerParams(
@@ -73,7 +79,10 @@ def create_servers(
 
 
 async def _setup_mcp_workbenches(
-    paths: List[str], urls: List[str]
+    paths: List[str],
+    urls: List[str],
+    bearer_token: str,
+    #        paths: List[str], urls: List[str], bearer_token: Optional[str] = None
 ) -> List[McpWorkbench]:
     """
     Sets up MCP workbenches from the task's server paths.
@@ -81,7 +90,7 @@ async def _setup_mcp_workbenches(
     Returns:
         None
     """
-    mcps = create_servers(paths, urls)
+    mcps = create_servers(paths, urls, bearer_token)
 
     if len(mcps) == 0:
         return []
@@ -104,10 +113,14 @@ async def _close_mcp_workbenches(workbenches: List[McpWorkbench]) -> None:
 
 
 async def call_mcp_tool_directly(
-    tool_name: str, arguments: dict, urls: list[str] = [], paths: list[str] = []
+    tool_name: str,
+    arguments: dict,
+    urls: list[str] = [],
+    paths: list[str] = [],
+    bearer_token: Optional[str] = None,
 ):
     """Call a tool directly from an available server URLs and paths."""
-    workbenches = await _setup_mcp_workbenches(paths, urls)
+    workbenches = await _setup_mcp_workbenches(paths, urls, bearer_token)
 
     try:
         # Find the right workbench (if you have multiple)
@@ -139,7 +152,9 @@ async def call_mcp_tool_directly(
         await _close_mcp_workbenches(workbenches)
 
 
-async def list_mcp_tools_direct(urls: list[str] = [], paths: list[str] = []) -> dict:
+async def list_mcp_tools_direct(
+    urls: list[str] = [], paths: list[str] = [], bearer_token: Optional[str] = None
+) -> dict:
     """
     List all tools available from MCP servers using the native MCP client library.
 
@@ -185,9 +200,9 @@ async def list_mcp_tools_direct(urls: list[str] = [], paths: list[str] = []) -> 
             }
 
             # Add wormhole token if available
-            wh_token = os.getenv("FLASK_WORMHOLE_TOKEN", None)
-            if wh_token:
-                headers["X-Token"] = wh_token
+            # wh_token = os.getenv("FLASK_WORMHOLE_TOKEN", None)
+            if bearer_token:
+                headers["X-Token"] = bearer_token
 
             # Create httpx client with custom headers
             http_client = httpx.AsyncClient(headers=headers, timeout=30.0)
