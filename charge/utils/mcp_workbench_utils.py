@@ -60,11 +60,8 @@ def create_servers(
         "Accept": "text/event-stream, application/json",
         "Cache-Control": "no-cache",
     }
-    # wh_token = os.getenv("FLASK_WORMHOLE_TOKEN", None)
     if bearer_token:
         headers["X-Token"] = bearer_token
-    # else:
-    #     breakpoint()
 
     for url in urls:
         mcp_servers.append(

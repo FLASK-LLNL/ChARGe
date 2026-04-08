@@ -66,8 +66,6 @@ def check_url_exists(url: str, bearer_token: Optional[str] = None) -> bool:
         "Accept": "text/event-stream, application/json",
         "Cache-Control": "no-cache",
     }
-    # wh_token = os.getenv("FLASK_WORMHOLE_TOKEN", None)
-    #    breakpoint()
     if bearer_token:
         headers["X-Token"] = bearer_token
     try:
