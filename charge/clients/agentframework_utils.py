@@ -120,9 +120,8 @@ class MCPWorkbenchAdapter:
                             f"Skipping MCP tool for {url} because its allowlist is empty"
                         )
                         continue
-                    headers = None
-                    if bearer_token:
-                        headers["X-Token"] = bearer_token
+                    # Set up headers with bearer token if provided
+                    headers = {"X-Token": bearer_token} if bearer_token else None
 
                     # Create httpx client with custom headers
                     #                    http_client = httpx.AsyncClient(headers=headers, timeout=30.0)
