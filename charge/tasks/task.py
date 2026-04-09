@@ -77,8 +77,8 @@ class Task(ABC):
         self.verification_prompt = verification_prompt
         self.refinement_prompt = refinement_prompt
 
-        self.server_urls = check_server_paths(server_urls)
-        self.server_files = check_server_paths(server_files)
+        self.server_urls = check_server_paths(server_urls, bearer_token=bearer_token)
+        self.server_files = check_server_paths(server_files, bearer_token=bearer_token)
         self.mcp_server_allowed_tools = {
             str(server_url): list(
                 dict.fromkeys(
