@@ -108,7 +108,6 @@ class MCPWorkbenchAdapter:
 
         # Create MCP tools
         # Note: Agent Framework uses MCPStreamableHTTPTool for MCP
-        # Import here to avoid issues if not available
         try:
             for url in self.mcp_servers:
                 try:
@@ -120,19 +119,26 @@ class MCPWorkbenchAdapter:
                             f"Skipping MCP tool for {url} because its allowlist is empty"
                         )
                         continue
-                    # Set up headers with bearer token if provided
-                    headers = {"X-Token": bearer_token} if bearer_token else None
 
-                    # Create httpx client with custom headers
-                    #                    http_client = httpx.AsyncClient(headers=headers, timeout=30.0)
-                    # breakpoint()
+                    # Set up headers for MCP streamable HTTP - include content negotiation headers
+                    headers = {
+                        "Content-Type": "application/json",
+                        "Accept": "text/event-stream, application/json",
+                        "Cache-Control": "no-cache",
+                    }
+
+                    # Add bearer token if provided
+                    if bearer_token:
+                        headers["X-Token"] = bearer_token
+
+                    # MCPStreamableHTTPTool requires an http_client with custom headers, not a headers parameter
+                    http_client = httpx.AsyncClient(headers=headers, timeout=30.0)
+
                     mcp_tool = MCPStreamableHTTPTool(
                         name=f"mcp_http_{url.split('/')[-1]}",
                         url=url,
                         allowed_tools=allowed_tools or None,
-                        # headers={"Authorization": "Bearer token"},
-                        headers=headers,
-                        # http_client=http_client,
+                        http_client=http_client,
                     )
                     tools.append(mcp_tool)
                     if allowed_tools:
