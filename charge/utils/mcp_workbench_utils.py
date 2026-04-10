@@ -190,7 +190,7 @@ async def list_mcp_tools_direct(urls: list[str] = [], paths: list[str] = []) -> 
                 headers["X-Token"] = wh_token
 
             # Create httpx client with custom headers
-            http_client = httpx.AsyncClient(headers=headers, timeout=30.0)
+            http_client = httpx.AsyncClient(headers=headers, timeout=1800.0)
 
             try:
                 # Connect using streamable HTTP client
