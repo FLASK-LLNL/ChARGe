@@ -132,7 +132,7 @@ class MCPWorkbenchAdapter:
                         headers["X-Token"] = bearer_token
 
                     # MCPStreamableHTTPTool requires an http_client with custom headers, not a headers parameter
-                    http_client = httpx.AsyncClient(headers=headers, timeout=30.0)
+                    http_client = httpx.AsyncClient(headers=headers, timeout=1800.0)
 
                     mcp_tool = MCPStreamableHTTPTool(
                         name=f"mcp_http_{url.split('/')[-1]}",

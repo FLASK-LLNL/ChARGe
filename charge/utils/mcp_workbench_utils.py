@@ -120,7 +120,7 @@ async def _get_http_mcp_session(url: str, bearer_token: Optional[str] = None):
         headers["X-Token"] = bearer_token
 
     # Create httpx client with custom headers
-    http_client = httpx.AsyncClient(headers=headers, timeout=30.0)
+    http_client = httpx.AsyncClient(headers=headers, timeout=1800.0)
 
     try:
         async with streamable_http_client(url_normalized, http_client=http_client) as (
