@@ -269,6 +269,109 @@ async def _close_mcp_workbenches(workbenches: List[McpWorkbench]) -> None:
     await asyncio.gather(*[workbench.stop() for workbench in workbenches])
 
 
+async def _list_tools_on_session(session, server_id: str) -> list[dict]:
+    """
+    Helper to list all tools from an established MCP session.
+
+    This encapsulates the common logic for both HTTP and stdio servers:
+    - List available tools
+    - Extract tool information (name, description, inputSchema)
+    - Log the results
+
+    Args:
+        session: Initialized MCP ClientSession
+        server_id: Server identifier for logging
+
+    Returns:
+        List of tool dictionaries with name, description, and inputSchema
+    """
+    logger.trace(f"Initialized MCP session for {server_id}")
+
+    # List tools
+    tools_result = await session.list_tools()
+
+    if hasattr(tools_result, "tools"):
+        tools = [
+            {
+                "name": tool.name,
+                "description": (
+                    tool.description if hasattr(tool, "description") else ""
+                ),
+                "inputSchema": (
+                    tool.inputSchema if hasattr(tool, "inputSchema") else {}
+                ),
+            }
+            for tool in tools_result.tools
+        ]
+    else:
+        tools = []
+
+    logger.trace(f"Found {len(tools)} tools on {server_id}:")
+    for tool in tools:
+        logger.trace(f"  - {tool['name']}: {tool.get('description', 'no description')}")
+
+    return tools
+
+
+async def _call_tool_on_session(
+    session, tool_name: str, arguments: dict, server_id: str
+):
+    """
+    Helper to call a tool on an established MCP session.
+
+    This encapsulates the common logic for both HTTP and stdio servers:
+    - List available tools
+    - Check if the requested tool exists
+    - Call the tool if found
+    - Extract and return the result content
+
+    Args:
+        session: Initialized MCP ClientSession
+        tool_name: Name of the tool to call
+        arguments: Dictionary of arguments to pass to the tool
+        server_id: Server identifier for logging
+
+    Returns:
+        ToolResult object (single result), list of ToolResult objects (multiple),
+        or None if tool not found or no results
+
+    Raises:
+        Returns None if tool not found (doesn't raise, allowing iteration to continue)
+    """
+    # List tools to check if our tool exists
+    tools_result = await session.list_tools()
+    available_tools = (
+        [tool.name for tool in tools_result.tools]
+        if hasattr(tools_result, "tools")
+        else []
+    )
+
+    if tool_name not in available_tools:
+        # Tool not found on this server, return None to continue searching
+        return None
+
+    logger.trace(f"Found tool {tool_name} on server {server_id}, calling it")
+
+    # Call the tool
+    result = await session.call_tool(name=tool_name, arguments=arguments)
+
+    # Process results - extract text from content objects
+    if hasattr(result, "content") and result.content:
+        num_results = len(result.content)
+        if num_results == 1:
+            # Return extracted text from single content item
+            return _extract_content_text(result.content[0])
+        elif num_results > 1:
+            # Return list of extracted texts
+            return [_extract_content_text(item) for item in result.content]
+        else:
+            logger.warning(f"Tool {tool_name} returned empty content: {result}")
+            return None
+    else:
+        logger.warning(f"Tool {tool_name} did not return valid content: {result}")
+        return None
+
+
 async def call_mcp_tool_directly(
     tool_name: str,
     arguments: dict,
@@ -302,43 +405,9 @@ async def call_mcp_tool_directly(
             logger.trace(f"Trying to call tool {tool_name} from MCP server: {url}")
 
             async with _get_http_mcp_session(url, bearer_token) as session:
-                # List tools to check if our tool exists
-                tools_result = await session.list_tools()
-                available_tools = (
-                    [tool.name for tool in tools_result.tools]
-                    if hasattr(tools_result, "tools")
-                    else []
-                )
-
-                if tool_name in available_tools:
-                    logger.trace(f"Found tool {tool_name} on server {url}, calling it")
-
-                    # Call the tool
-                    result = await session.call_tool(
-                        name=tool_name, arguments=arguments
-                    )
-
-                    # Process results - extract text from content objects
-                    if hasattr(result, "content") and result.content:
-                        num_results = len(result.content)
-                        if num_results == 1:
-                            # Return extracted text from single content item
-                            return _extract_content_text(result.content[0])
-                        elif num_results > 1:
-                            # Return list of extracted texts
-                            return [
-                                _extract_content_text(item) for item in result.content
-                            ]
-                        else:
-                            logger.warning(
-                                f"Tool {tool_name} returned empty content: {result}"
-                            )
-                            return None
-                    else:
-                        logger.warning(
-                            f"Tool {tool_name} did not return valid content: {result}"
-                        )
-                        return None
+                result = await _call_tool_on_session(session, tool_name, arguments, url)
+                if result is not None:
+                    return result
 
         except Exception as e:
             logger.trace(f"Could not call tool {tool_name} from {url}: {e}")
@@ -350,45 +419,11 @@ async def call_mcp_tool_directly(
             logger.trace(f"Trying to call tool {tool_name} from stdio server: {path}")
 
             async with _get_stdio_mcp_session(path) as session:
-                # List tools to check if our tool exists
-                tools_result = await session.list_tools()
-                available_tools = (
-                    [tool.name for tool in tools_result.tools]
-                    if hasattr(tools_result, "tools")
-                    else []
+                result = await _call_tool_on_session(
+                    session, tool_name, arguments, path
                 )
-
-                if tool_name in available_tools:
-                    logger.trace(
-                        f"Found tool {tool_name} on stdio server {path}, calling it"
-                    )
-
-                    # Call the tool
-                    result = await session.call_tool(
-                        name=tool_name, arguments=arguments
-                    )
-
-                    # Process results - extract text from content objects
-                    if hasattr(result, "content") and result.content:
-                        num_results = len(result.content)
-                        if num_results == 1:
-                            # Return extracted text from single content item
-                            return _extract_content_text(result.content[0])
-                        elif num_results > 1:
-                            # Return list of extracted texts
-                            return [
-                                _extract_content_text(item) for item in result.content
-                            ]
-                        else:
-                            logger.warning(
-                                f"Tool {tool_name} returned empty content: {result}"
-                            )
-                            return None
-                    else:
-                        logger.warning(
-                            f"Tool {tool_name} did not return valid content: {result}"
-                        )
-                        return None
+                if result is not None:
+                    return result
 
         except Exception as e:
             logger.trace(f"Could not call tool {tool_name} from stdio {path}: {e}")
@@ -433,33 +468,7 @@ async def list_mcp_tools_direct(
             logger.trace(f"Connecting to MCP server via streamable HTTP: {server_id}")
 
             async with _get_http_mcp_session(url, bearer_token) as session:
-                logger.trace(f"Initialized MCP session for {server_id}")
-
-                # List tools
-                tools_result = await session.list_tools()
-
-                if hasattr(tools_result, "tools"):
-                    tools = [
-                        {
-                            "name": tool.name,
-                            "description": (
-                                tool.description if hasattr(tool, "description") else ""
-                            ),
-                            "inputSchema": (
-                                tool.inputSchema if hasattr(tool, "inputSchema") else {}
-                            ),
-                        }
-                        for tool in tools_result.tools
-                    ]
-                else:
-                    tools = []
-
-                all_tools[server_id] = tools
-                logger.trace(f"Found {len(tools)} tools on {server_id}:")
-                for tool in tools:
-                    logger.trace(
-                        f"  - {tool['name']}: {tool.get('description', 'no description')}"
-                    )
+                all_tools[server_id] = await _list_tools_on_session(session, server_id)
 
         except Exception as e:
             logger.warning(f"Error connecting to MCP server {server_id}: {e}")
@@ -475,33 +484,7 @@ async def list_mcp_tools_direct(
             logger.trace(f"Connecting to MCP server via stdio: {server_id}")
 
             async with _get_stdio_mcp_session(path) as session:
-                logger.trace(f"Initialized MCP session for {server_id}")
-
-                # List tools
-                tools_result = await session.list_tools()
-
-                if hasattr(tools_result, "tools"):
-                    tools = [
-                        {
-                            "name": tool.name,
-                            "description": (
-                                tool.description if hasattr(tool, "description") else ""
-                            ),
-                            "inputSchema": (
-                                tool.inputSchema if hasattr(tool, "inputSchema") else {}
-                            ),
-                        }
-                        for tool in tools_result.tools
-                    ]
-                else:
-                    tools = []
-
-                all_tools[server_id] = tools
-                logger.trace(f"Found {len(tools)} tools on {server_id}:")
-                for tool in tools:
-                    logger.trace(
-                        f"  - {tool['name']}: {tool.get('description', 'no description')}"
-                    )
+                all_tools[server_id] = await _list_tools_on_session(session, server_id)
 
         except Exception as e:
             logger.trace(f"Error connecting to stdio MCP server {server_id}: {e}")
