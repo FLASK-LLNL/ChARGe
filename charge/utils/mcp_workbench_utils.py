@@ -84,6 +84,32 @@ def _extract_content_text(content_item):
     return ToolResult(content_item)
 
 
+def _create_streaming_bearer_token_header(
+    bearer_token: Optional[str] = None,
+) -> dict[str, str]:
+    """
+    Helper to create a header with a bearer token for an MCP session for HTTP/SSE servers.
+
+    Args:
+        bearer_token: Optional bearer token for authentication
+
+    Returns:
+        Dictionary with header fields
+    """
+    # Prepare headers with content negotiation and authentication
+    headers = {
+        # Streamable/streaming HTTP MCP endpoints commonly require this for content negotiation
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream, application/json",
+        "Cache-Control": "no-cache",
+    }
+    # Add bearer token if provided
+    if bearer_token:
+        headers["X-Token"] = bearer_token
+
+    return headers
+
+
 @asynccontextmanager
 async def _get_http_mcp_session(url: str, bearer_token: Optional[str] = None):
     """
@@ -110,14 +136,7 @@ async def _get_http_mcp_session(url: str, bearer_token: Optional[str] = None):
         url_normalized = f"{url_normalized}/mcp"
 
     # Prepare headers with content negotiation and authentication
-    headers = {
-        "Content-Type": "application/json",
-        "Accept": "text/event-stream, application/json",
-        "Cache-Control": "no-cache",
-    }
-
-    if bearer_token:
-        headers["X-Token"] = bearer_token
+    headers = _create_streaming_bearer_token_header(bearer_token)
 
     # Create httpx client with custom headers
     http_client = httpx.AsyncClient(headers=headers, timeout=1800.0)
@@ -196,14 +215,7 @@ def create_servers(
                 read_timeout_seconds=timeout,
             )
         )
-    headers = {
-        # Streamable/streaming HTTP MCP endpoints commonly require this for content negotiation
-        "Content-Type": "application/json",
-        "Accept": "text/event-stream, application/json",
-        "Cache-Control": "no-cache",
-    }
-    if bearer_token:
-        headers["X-Token"] = bearer_token
+    headers = _create_streaming_bearer_token_header(bearer_token)
 
     for url in urls:
         mcp_servers.append(

@@ -5,6 +5,7 @@ from typing import Type, Union, Optional
 import json
 import warnings
 import requests
+from charge.utils.mcp_workbench_utils import _create_streaming_bearer_token_header
 
 
 def normalize_string(s: str) -> str:
@@ -61,13 +62,7 @@ def check_url_exists(url: str, bearer_token: Optional[str] = None) -> bool:
         warnings.warn(f"URL '{url}' does not end with '/mcp'")
         return False
 
-    headers = {
-        # Streamable/streaming HTTP MCP endpoints commonly require this for content negotiation
-        "Accept": "text/event-stream, application/json",
-        "Cache-Control": "no-cache",
-    }
-    if bearer_token:
-        headers["X-Token"] = bearer_token
+    headers = _create_streaming_bearer_token_header(bearer_token)
     try:
         with requests.get(url, stream=True, timeout=5, headers=headers) as response:
             # 200 is ideal. 406 still proves the server is reachable (just unhappy with Accept).

@@ -13,6 +13,7 @@ from typing import List, Optional, Any, Dict
 from loguru import logger
 import httpx
 
+from charge.utils.mcp_workbench_utils import _create_streaming_bearer_token_header
 
 # Error handling
 _POSSIBLE_CONNECTION_ERRORS: List[type[Exception]] = [ConnectionError]
@@ -120,15 +121,7 @@ class MCPWorkbenchAdapter:
                         continue
 
                     # Set up headers for MCP streamable HTTP - include content negotiation headers
-                    headers = {
-                        "Content-Type": "application/json",
-                        "Accept": "text/event-stream, application/json",
-                        "Cache-Control": "no-cache",
-                    }
-
-                    # Add bearer token if provided
-                    if bearer_token:
-                        headers["X-Token"] = bearer_token
+                    headers = _create_streaming_bearer_token_header(bearer_token)
 
                     # MCPStreamableHTTPTool requires an http_client with custom headers, not a headers parameter
                     http_client = httpx.AsyncClient(headers=headers, timeout=1800.0)
