@@ -34,29 +34,67 @@ output, result = await run_rsa_loop(
 )
 ```
 
-### Using Custom Domain-Specific Prompts
-
-The default prompts are task-agnostic. For domain-specific tasks (chemistry, biology, etc.), you can provide custom prompts:
-
 ```python
 from charge.algorithms import RSAPrompts
+from pydantic import BaseModel
+from typing import List
 
-# Option 1: Load from files
+# Example: Chemistry retrosynthesis customization
+
+# 1. Define custom output schema
+class ChemistryOutput(BaseModel):
+    reasoning_summary: str
+    reactants_smiles_list: List[str]
+    products_smiles_list: List[str]
+
+# 2. Load custom prompts
 chemistry_prompts = RSAPrompts(
     proposal_system_prompt=Path("chemistry_system.txt").read_text(),
     aggregation_template=Path("chemistry_aggregation.txt").read_text(),
 )
 
-# Option 2: Provide strings directly
-chemistry_prompts = RSAPrompts(
-    proposal_system_prompt="You are a chemistry expert...",
-    aggregation_template="Synthesize {candidates} into a better solution...",
-)
+# 3. Create custom formatter
+def format_chemistry_candidates(proposals):
+    text = ""
+    for idx, prop in enumerate(proposals, 1):
+        result = prop["result"]
+        text += f"\n---- Candidate {idx} ----\n"
+        text += f"Reasoning: {result.reasoning_summary}\n"
+        text += f"Reactants: {', '.join(result.reactants_smiles_list)}\n"
+        text += f"Products: {', '.join(result.products_smiles_list)}\n"
+    return text
 
-# Pass to factories
+# 4. Create custom validator
+def validate_chemistry(result):
+    return (hasattr(result, 'reactants_smiles_list') and
+            len(result.reactants_smiles_list) > 0)
+
+# 5. Use with RSA
 factories = RSATaskFactories(
-    ...,
-    prompts=chemistry_prompts,  # Use domain-specific prompts
+    user_prompt="Synthesize aspirin from...",
+    output_schema=ChemistryOutput,
+    format_candidates=format_chemistry_candidates,
+    validate_proposal=validate_chemistry,
+    prompts=chemistry_prompts,
+    builtin_tools=[verify_smiles, ...],  # Domain tools
+)
+```
+
+Or provide fully custom task factories:
+
+```python
+# For maximum control, provide custom task creation functions
+def create_my_proposal_task():
+    return MyDomainTask(...)
+
+def create_my_aggregation_task(candidates, subset, step, total):
+    return MyAggregationTask(...)
+
+factories = RSATaskFactories(
+    create_proposal_task=create_my_proposal_task,
+    create_aggregation_task=create_my_aggregation_task,
+    format_candidates=my_formatter,
+    output_schema=MySchema,
 )
 ```
 

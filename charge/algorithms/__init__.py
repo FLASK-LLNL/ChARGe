@@ -12,6 +12,10 @@ from charge.algorithms.rsa import (
     RSAPrompts,
     RSACallbacks,
     RSATaskFactories,
+    GenericRSAOutput,
+    default_format_candidates,
+    create_default_proposal_task,
+    create_default_aggregation_task,
 )
 
 __all__ = [
@@ -20,4 +24,8 @@ __all__ = [
     "RSAPrompts",
     "RSACallbacks",
     "RSATaskFactories",
+    "GenericRSAOutput",
+    "default_format_candidates",
+    "create_default_proposal_task",
+    "create_default_aggregation_task",
 ]
