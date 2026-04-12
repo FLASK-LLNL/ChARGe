@@ -271,18 +271,6 @@ class AgentFrameworkAgent(Agent):
             return
 
         try:
-            # bearer_token = getattr(self.task, "bearer_token", None)
-            # if bearer_token:
-            #     logger.info(
-            #         f"Setting up MCP tools with bearer_token (length: {len(bearer_token)})"
-            #     )
-            # else:
-            #     logger.warning(
-            #         "Setting up MCP tools WITHOUT bearer_token - authentication may fail"
-            #     )
-
-            # logger.info(f"MCP server URLs: {self.task.server_urls}")
-
             self.workbenches = builtin_tools + await setup_mcp_tools(
                 bearer_token=getattr(self.task, "bearer_token", None),
                 stdio_servers=self.task.server_files,

@@ -77,8 +77,7 @@ class MCPWorkbenchAdapter:
         }
         self._tools: List[Any] = []
 
-    async def create_tools(self, bearer_token: str) -> List[Any]:
-        #    async def create_tools(self, bearer_token: Optional[str] = None) -> List[Any]:
+    async def create_tools(self, bearer_token: Optional[str] = None) -> List[Any]:
         """
         Create Agent Framework MCP tools from server configurations.
 

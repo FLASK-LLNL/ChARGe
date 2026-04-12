@@ -219,10 +219,7 @@ def create_servers(
 
 # BVE FIXME so that it is not autogen specific
 async def _setup_mcp_workbenches(
-    paths: List[str],
-    urls: List[str],
-    bearer_token: str,
-    #        paths: List[str], urls: List[str], bearer_token: Optional[str] = None
+    paths: List[str], urls: List[str], bearer_token: Optional[str] = None
 ) -> List[McpWorkbench]:
     """
     DEPRECATED: Sets up AutoGen MCP workbenches from the task's server paths.
