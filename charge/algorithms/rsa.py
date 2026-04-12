@@ -14,9 +14,10 @@ import random
 import json
 import os
 import asyncio
-from typing import Any, Callable, Optional, TypeVar, Generic
+from typing import Any, Callable, Optional, TypeVar, Generic, List
 from pathlib import Path
 from dataclasses import dataclass, field
+from pydantic import BaseModel
 
 
 # Type variable for output schemas
@@ -26,6 +27,21 @@ T = TypeVar('T')
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
 _DEFAULT_PROPOSAL_SYSTEM = _PROMPTS_DIR / "default_proposal_system.txt"
 _DEFAULT_AGGREGATION_TEMPLATE = _PROMPTS_DIR / "default_aggregation_template.txt"
+
+
+# Generic default output schema
+class GenericRSAOutput(BaseModel):
+    """Generic output schema for RSA proposals and aggregations.
+
+    This provides a sensible default that works for any task.
+    Domain-specific implementations can define their own schemas.
+
+    Attributes:
+        reasoning: Explanation of the approach and solution
+        solution: The proposed solution as a string
+    """
+    reasoning: str
+    solution: str
 
 
 @dataclass
@@ -146,44 +162,236 @@ class RSACallbacks:
         print(f"[RSA Error] {message}", file=sys.stderr)
 
 
+def default_format_candidates(proposals: list[dict]) -> str:
+    """Generic formatter for RSA candidates.
+
+    Works with any Pydantic schema by extracting all fields and formatting them.
+    Domain-specific implementations can provide custom formatters.
+
+    Args:
+        proposals: List of proposal dicts with 'result' key containing validated output
+
+    Returns:
+        Formatted text suitable for aggregation prompts
+    """
+    candidates_text = ""
+    for idx, prop in enumerate(proposals, 1):
+        prop_result = prop["result"]
+        candidates_text += f"\n---- Candidate {idx} ----\n"
+
+        # Format all fields from the schema
+        for field_name, field_value in prop_result.model_dump().items():
+            # Format field name nicely (snake_case -> Title Case)
+            display_name = field_name.replace('_', ' ').title()
+            candidates_text += f"{display_name}: {field_value}\n"
+
+    return candidates_text
+
+
+def create_default_proposal_task(
+    user_prompt: str,
+    system_prompt: Optional[str] = None,
+    output_schema: Optional[type[BaseModel]] = None,
+    **task_kwargs
+) -> Any:
+    """Create a generic proposal task using default prompts.
+
+    This is a production-ready default that works for any problem.
+    Domain-specific implementations can provide custom task creation.
+
+    Args:
+        user_prompt: The problem/question to solve
+        system_prompt: Optional override for system prompt (uses default if None)
+        output_schema: Optional output schema (uses GenericRSAOutput if None)
+        **task_kwargs: Additional arguments passed to Task (server_urls, builtin_tools, etc.)
+
+    Returns:
+        Task instance configured for proposal generation
+    """
+    from charge.tasks.task import Task
+
+    if system_prompt is None:
+        # Load default proposal system prompt
+        if _DEFAULT_PROPOSAL_SYSTEM.exists():
+            system_prompt = _DEFAULT_PROPOSAL_SYSTEM.read_text()
+        else:
+            system_prompt = "You are an expert problem solver. Generate a high-quality solution."
+
+    if output_schema is None:
+        output_schema = GenericRSAOutput
+
+    task = Task(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        structured_output_schema=output_schema,
+        **task_kwargs
+    )
+
+    return task
+
+
+def create_default_aggregation_task(
+    original_user_prompt: str,
+    candidates_text: str,
+    subset: list[dict],
+    step: int,
+    total_steps: int,
+    aggregation_template: Optional[str] = None,
+    output_schema: Optional[type[BaseModel]] = None,
+    **task_kwargs
+) -> Any:
+    """Create a generic aggregation task using default template.
+
+    This is a production-ready default that works for any problem.
+    Domain-specific implementations can provide custom task creation.
+
+    Args:
+        original_user_prompt: The original problem/question
+        candidates_text: Formatted candidate solutions
+        subset: List of candidate proposal dicts (unused in generic version)
+        step: Current aggregation step (2..T)
+        total_steps: Total number of steps (T)
+        aggregation_template: Optional override for template (uses default if None)
+        output_schema: Optional output schema (uses GenericRSAOutput if None)
+        **task_kwargs: Additional arguments passed to Task
+
+    Returns:
+        Task instance configured for aggregation
+    """
+    from charge.tasks.task import Task
+
+    if aggregation_template is None:
+        # Load default aggregation template
+        if _DEFAULT_AGGREGATION_TEMPLATE.exists():
+            aggregation_template = _DEFAULT_AGGREGATION_TEMPLATE.read_text()
+        else:
+            aggregation_template = (
+                "Original problem:\n{original_prompt}\n\n"
+                "Candidates (Step {step} of {total_steps}):\n{candidates}\n\n"
+                "Synthesize these into a single improved solution."
+            )
+
+    if output_schema is None:
+        output_schema = GenericRSAOutput
+
+    # Format the aggregation prompt
+    user_prompt = aggregation_template.format(
+        original_prompt=original_user_prompt,
+        candidates=candidates_text,
+        step=step,
+        total_steps=total_steps,
+    )
+
+    # Use same system prompt as proposals (could be customized separately)
+    system_prompt = _DEFAULT_PROPOSAL_SYSTEM.read_text() if _DEFAULT_PROPOSAL_SYSTEM.exists() else None
+
+    task = Task(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        structured_output_schema=output_schema,
+        **task_kwargs
+    )
+
+    return task
+
+
 class RSATaskFactories(Generic[T]):
     """Factory functions for creating RSA tasks.
 
-    This class encapsulates the domain-specific task creation logic,
-    allowing RSA to work with any task type.
+    This class encapsulates task creation logic. All parameters are optional
+    with production-ready defaults, allowing RSA to work out-of-box.
+    Domain-specific implementations can override any component.
     """
 
     def __init__(
         self,
-        create_proposal_task: Callable[[], Any],
-        create_aggregation_task: Callable[[str, list[dict], int, int], Any],
-        format_candidates: Callable[[list[dict]], str],
-        output_schema: type[T],
+        user_prompt: Optional[str] = None,
+        create_proposal_task: Optional[Callable[[], Any]] = None,
+        create_aggregation_task: Optional[Callable[[str, list[dict], int, int], Any]] = None,
+        format_candidates: Optional[Callable[[list[dict]], str]] = None,
+        output_schema: Optional[type[T]] = None,
         validate_proposal: Optional[Callable[[Any], bool]] = None,
         prompts: Optional[RSAPrompts] = None,
+        **task_kwargs
     ):
-        """Initialize task factories.
+        """Initialize task factories with optional overrides.
+
+        All parameters have sensible defaults for out-of-box usage.
 
         Args:
+            user_prompt: The problem/question to solve (required for default factories).
+                        Not needed if providing custom factories.
             create_proposal_task: Factory that returns a Task for generating proposals.
-                                 Should return a fresh Task instance each time.
+                                 If None, uses create_default_proposal_task.
             create_aggregation_task: Factory that returns a Task for aggregating proposals.
-                                    Takes (candidates_text, subset, step, total_steps).
+                                    If None, uses create_default_aggregation_task.
             format_candidates: Function to format proposals into text for aggregation.
-                              Takes list of proposal dicts, returns formatted string.
+                              If None, uses default_format_candidates.
             output_schema: Pydantic model class for validating task outputs.
+                          If None, uses GenericRSAOutput.
             validate_proposal: Optional function to validate a proposal result.
-                              Takes result object, returns True if valid.
-                              Used to filter out empty/invalid proposals.
+                              If None, accepts all proposals (returns True).
             prompts: Optional RSAPrompts instance with custom prompts.
                     If None, uses default task-agnostic prompts from ChARGe.
+            **task_kwargs: Additional arguments passed to Task instances
+                          (server_urls, builtin_tools, etc.)
         """
-        self.create_proposal_task = create_proposal_task
-        self.create_aggregation_task = create_aggregation_task
-        self.format_candidates = format_candidates
-        self.output_schema = output_schema
+        self.output_schema = output_schema or GenericRSAOutput
         self.validate_proposal = validate_proposal or self._default_validator
         self.prompts = prompts or RSAPrompts()
+        self.task_kwargs = task_kwargs
+        self.user_prompt = user_prompt
+
+        # Use provided factories or create defaults
+        if create_proposal_task is not None:
+            self.create_proposal_task = create_proposal_task
+        else:
+            # Create default factory using user_prompt
+            if user_prompt is None:
+                raise ValueError(
+                    "user_prompt is required when using default task factories. "
+                    "Either provide user_prompt or custom create_proposal_task/create_aggregation_task."
+                )
+            self.create_proposal_task = self._create_default_proposal_factory()
+
+        if create_aggregation_task is not None:
+            self.create_aggregation_task = create_aggregation_task
+        else:
+            # Create default factory
+            if user_prompt is None:
+                raise ValueError(
+                    "user_prompt is required when using default task factories. "
+                    "Either provide user_prompt or custom create_proposal_task/create_aggregation_task."
+                )
+            self.create_aggregation_task = self._create_default_aggregation_factory()
+
+        self.format_candidates = format_candidates or default_format_candidates
+
+    def _create_default_proposal_factory(self) -> Callable[[], Any]:
+        """Create a default proposal task factory."""
+        def factory():
+            return create_default_proposal_task(
+                user_prompt=self.user_prompt,
+                system_prompt=self.prompts.proposal_system_prompt,
+                output_schema=self.output_schema,
+                **self.task_kwargs
+            )
+        return factory
+
+    def _create_default_aggregation_factory(self) -> Callable[[str, list[dict], int, int], Any]:
+        """Create a default aggregation task factory."""
+        def factory(candidates_text: str, subset: list[dict], step: int, total_steps: int):
+            return create_default_aggregation_task(
+                original_user_prompt=self.user_prompt,
+                candidates_text=candidates_text,
+                subset=subset,
+                step=step,
+                total_steps=total_steps,
+                aggregation_template=self.prompts.aggregation_template,
+                output_schema=self.output_schema,
+                **self.task_kwargs
+            )
+        return factory
 
     def _default_validator(self, result: Any) -> bool:
         """Default validator - always returns True."""
