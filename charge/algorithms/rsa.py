@@ -16,11 +16,16 @@ import os
 import asyncio
 from typing import Any, Callable, Optional, TypeVar, Generic
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 # Type variable for output schemas
 T = TypeVar('T')
+
+# Default prompt paths
+_PROMPTS_DIR = Path(__file__).parent / "prompts"
+_DEFAULT_PROPOSAL_SYSTEM = _PROMPTS_DIR / "default_proposal_system.txt"
+_DEFAULT_AGGREGATION_TEMPLATE = _PROMPTS_DIR / "default_aggregation_template.txt"
 
 
 @dataclass
@@ -53,6 +58,46 @@ class RSAConfig:
             self.log_dir = f"/tmp/rsa_execution_{timestamp}"
 
         os.makedirs(self.log_dir, exist_ok=True)
+
+
+@dataclass
+class RSAPrompts:
+    """Prompts for RSA proposal and aggregation tasks.
+
+    Provides default task-agnostic prompts that can be overridden for domain-specific use.
+
+    Attributes:
+        proposal_system_prompt: System prompt for proposal generation tasks
+        aggregation_template: Template for aggregation prompts (uses {original_prompt},
+                             {candidates}, {step}, {total_steps} placeholders)
+    """
+    proposal_system_prompt: Optional[str] = None
+    aggregation_template: Optional[str] = None
+
+    def __post_init__(self):
+        """Load default prompts if not provided."""
+        if self.proposal_system_prompt is None:
+            if _DEFAULT_PROPOSAL_SYSTEM.exists():
+                self.proposal_system_prompt = _DEFAULT_PROPOSAL_SYSTEM.read_text()
+            else:
+                # Fallback if file doesn't exist
+                self.proposal_system_prompt = (
+                    "You are an expert problem solver. Generate a high-quality solution "
+                    "to the problem provided by the user. Use available tools and provide "
+                    "clear reasoning."
+                )
+
+        if self.aggregation_template is None:
+            if _DEFAULT_AGGREGATION_TEMPLATE.exists():
+                self.aggregation_template = _DEFAULT_AGGREGATION_TEMPLATE.read_text()
+            else:
+                # Fallback if file doesn't exist
+                self.aggregation_template = (
+                    "You are aggregating multiple solutions.\n\n"
+                    "Original problem:\n{original_prompt}\n\n"
+                    "Candidates (Step {step} of {total_steps}):\n{candidates}\n\n"
+                    "Synthesize these into a single improved solution."
+                )
 
 
 class RSACallbacks:
@@ -115,6 +160,7 @@ class RSATaskFactories(Generic[T]):
         format_candidates: Callable[[list[dict]], str],
         output_schema: type[T],
         validate_proposal: Optional[Callable[[Any], bool]] = None,
+        prompts: Optional[RSAPrompts] = None,
     ):
         """Initialize task factories.
 
@@ -129,12 +175,15 @@ class RSATaskFactories(Generic[T]):
             validate_proposal: Optional function to validate a proposal result.
                               Takes result object, returns True if valid.
                               Used to filter out empty/invalid proposals.
+            prompts: Optional RSAPrompts instance with custom prompts.
+                    If None, uses default task-agnostic prompts from ChARGe.
         """
         self.create_proposal_task = create_proposal_task
         self.create_aggregation_task = create_aggregation_task
         self.format_candidates = format_candidates
         self.output_schema = output_schema
         self.validate_proposal = validate_proposal or self._default_validator
+        self.prompts = prompts or RSAPrompts()
 
     def _default_validator(self, result: Any) -> bool:
         """Default validator - always returns True."""

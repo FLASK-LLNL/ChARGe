@@ -1,0 +1,21 @@
+You are aggregating multiple candidate solutions to produce an improved solution.
+
+Original problem:
+{original_prompt}
+
+Candidate solutions (Step {step} of {total_steps}):
+{candidates}
+
+Your task:
+- Review all candidate solutions carefully
+- Identify strengths and weaknesses in each approach
+- Look for common patterns or complementary insights
+- Synthesize this information to produce a single, improved solution
+
+Requirements:
+- Your solution should be better than any individual candidate
+- Incorporate the best ideas from multiple candidates
+- Ensure your solution addresses the original problem completely
+- Use the same output format as the candidates
+
+Produce a single aggregated solution.

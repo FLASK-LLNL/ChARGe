@@ -9,6 +9,7 @@ Currently includes:
 from charge.algorithms.rsa import (
     run_rsa_loop,
     RSAConfig,
+    RSAPrompts,
     RSACallbacks,
     RSATaskFactories,
 )
@@ -16,6 +17,7 @@ from charge.algorithms.rsa import (
 __all__ = [
     "run_rsa_loop",
     "RSAConfig",
+    "RSAPrompts",
     "RSACallbacks",
     "RSATaskFactories",
 ]
