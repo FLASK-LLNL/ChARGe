@@ -162,11 +162,10 @@ class MCPWorkbenchAdapter:
 
 
 async def setup_mcp_tools(
-    bearer_token: str,
     stdio_servers: Optional[List[str]] = None,
     mcp_servers: Optional[List[str]] = None,
     mcp_server_allowed_tools: Optional[Dict[str, List[str]]] = None,
-    #    bearer_token: Optional[str] = None
+    bearer_token: Optional[str] = None,
 ) -> List[Any]:
     """
     Setup MCP tools for Agent Framework from server configurations.

@@ -272,10 +272,10 @@ class AgentFrameworkAgent(Agent):
 
         try:
             self.workbenches = builtin_tools + await setup_mcp_tools(
-                bearer_token=getattr(self.task, "bearer_token", None),
                 stdio_servers=self.task.server_files,
                 mcp_servers=self.task.server_urls,
                 mcp_server_allowed_tools=self.task.mcp_server_allowed_tools,
+                bearer_token=getattr(self.task, "bearer_token", None),
             )
             logger.info(f"Set up {len(self.workbenches)} MCP tools")
         except Exception as e:
