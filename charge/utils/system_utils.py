@@ -105,7 +105,6 @@ def check_server_paths(
         CHARGE_ERROR_ON_MISSING_SERVER is set to 1.
     """
 
-    # breakpoint()
     if server_paths is None:
         return []
     if not isinstance(server_paths, list) and not isinstance(server_paths, str):
