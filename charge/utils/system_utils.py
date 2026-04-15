@@ -3,8 +3,9 @@ import os.path as osp
 import re
 from typing import Type, Union, Optional
 import json
-import warnings
+from loguru import logger
 import requests
+from charge.utils.mcp_workbench_utils import _create_streaming_bearer_token_header
 
 
 def normalize_string(s: str) -> str:
@@ -51,52 +52,48 @@ def read_from_file(self, file_path: str, key: str) -> str:
         raise ValueError("Only .txt and .json files are supported")
 
 
-def check_url_exists(url: str) -> bool:
+def check_url_exists(url: str, bearer_token: Optional[str] = None) -> bool:
+    # breakpoint()
     if not url.startswith("http://") and not url.startswith("https://"):
-        warnings.warn(f"URL '{url}' does not start with 'http://' or 'https://'")
+        logger.warning(f"URL '{url}' does not start with 'http://' or 'https://'")
         return False
 
     if not url.endswith("/mcp"):
-        warnings.warn(f"URL '{url}' does not end with '/mcp'")
+        logger.warning(f"URL '{url}' does not end with '/mcp'")
         return False
 
-    headers = {
-        # Streamable/streaming HTTP MCP endpoints commonly require this for content negotiation
-        "Accept": "text/event-stream, application/json",
-        "Cache-Control": "no-cache",
-    }
-    wh_token = os.getenv("FLASK_WORMHOLE_TOKEN", None)
-    if wh_token:
-        headers["X-Token"] = wh_token
+    headers = _create_streaming_bearer_token_header(bearer_token)
     try:
-        with requests.get(url, stream=True, timeout=5, headers=headers) as response:
+        with requests.get(url, stream=True, timeout=1, headers=headers) as response:
             # 200 is ideal. 406 still proves the server is reachable (just unhappy with Accept).
             if response.status_code == 200:
                 return True
             if response.status_code == 406:
-                warnings.warn(
+                logger.trace(
                     f"Reached MCP URL '{url}' but got 406 Not Acceptable; "
                     f"server likely requires streaming Accept headers. Treating as reachable."
                 )
                 return True
 
             if response.status_code == 400:
-                warnings.warn(
+                logger.trace(
                     f"Reached MCP URL '{url}' but got 400 Bad Request; "
                     f"no session context. Treating as reachable."
                 )
                 return True
 
-            warnings.warn(f"Error reaching URL '{url}': {response.status_code}")
+            logger.warning(f"Error reaching URL '{url}': {response.status_code}")
             return False
     except requests.RequestException as e:
-        warnings.warn(f"Error reaching URL '{url}': {e}")
+        logger.warning(f"Error reaching URL '{url}': {e}")
         return False
 
     return True
 
 
-def check_server_paths(server_paths: Optional[Union[str, list]]) -> list:
+def check_server_paths(
+    server_paths: Optional[Union[str, list]], bearer_token: Optional[str] = None
+) -> list:
     """
     Gracefully handle errors in server paths provided by user.
     Args:
@@ -124,15 +121,15 @@ def check_server_paths(server_paths: Optional[Union[str, list]]) -> list:
     valid_paths = []
     for path in _paths:
         if path.startswith("http://") or path.startswith("https://"):
-            if check_url_exists(path):
+            if check_url_exists(url=path, bearer_token=bearer_token):
                 valid_paths.append(path)
             else:
-                warnings.warn(f"Server URL '{path}' is not reachable.")
+                logger.warning(f"Server URL '{path}' is not reachable.")
         else:
             if _check_file_exists(path):
                 valid_paths.append(path)
             else:
-                warnings.warn(f"Server path '{path}' does not exist.")
+                logger.warning(f"Server path '{path}' does not exist.")
 
     CHARGE_RAISE_ON_MISSING_SERVER = (
         os.getenv("CHARGE_ERROR_ON_MISSING_SERVER", "0") == "1"

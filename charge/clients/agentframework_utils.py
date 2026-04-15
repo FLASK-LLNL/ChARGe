@@ -11,7 +11,9 @@ except ImportError:
 
 from typing import List, Optional, Any, Dict
 from loguru import logger
+import httpx
 
+from charge.utils.mcp_workbench_utils import _create_streaming_bearer_token_header
 
 # Error handling
 _POSSIBLE_CONNECTION_ERRORS: List[type[Exception]] = [ConnectionError]
@@ -76,7 +78,7 @@ class MCPWorkbenchAdapter:
         }
         self._tools: List[Any] = []
 
-    async def create_tools(self) -> List[Any]:
+    async def create_tools(self, bearer_token: Optional[str] = None) -> List[Any]:
         """
         Create Agent Framework MCP tools from server configurations.
 
@@ -106,7 +108,6 @@ class MCPWorkbenchAdapter:
 
         # Create MCP tools
         # Note: Agent Framework uses MCPStreamableHTTPTool for MCP
-        # Import here to avoid issues if not available
         try:
             for url in self.mcp_servers:
                 try:
@@ -118,10 +119,18 @@ class MCPWorkbenchAdapter:
                             f"Skipping MCP tool for {url} because its allowlist is empty"
                         )
                         continue
+
+                    # Set up headers for MCP streamable HTTP - include content negotiation headers
+                    headers = _create_streaming_bearer_token_header(bearer_token)
+
+                    # MCPStreamableHTTPTool requires an http_client with custom headers, not a headers parameter
+                    http_client = httpx.AsyncClient(headers=headers, timeout=1800.0)
+
                     mcp_tool = MCPStreamableHTTPTool(
                         name=f"mcp_http_{url.split('/')[-1]}",
                         url=url,
                         allowed_tools=allowed_tools or None,
+                        http_client=http_client,
                     )
                     tools.append(mcp_tool)
                     if allowed_tools:
@@ -149,6 +158,7 @@ async def setup_mcp_tools(
     stdio_servers: Optional[List[str]] = None,
     mcp_servers: Optional[List[str]] = None,
     mcp_server_allowed_tools: Optional[Dict[str, List[str]]] = None,
+    bearer_token: Optional[str] = None,
 ) -> List[Any]:
     """
     Setup MCP tools for Agent Framework from server configurations.
@@ -166,5 +176,5 @@ async def setup_mcp_tools(
         mcp_servers=mcp_servers,
         mcp_server_allowed_tools=mcp_server_allowed_tools,
     )
-    tools = await adapter.create_tools()
+    tools = await adapter.create_tools(bearer_token=bearer_token)
     return tools

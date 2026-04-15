@@ -150,7 +150,7 @@ class AgentFrameworkAgent(Agent):
         memory: Optional[Memory] = None,
         max_retries: int = 3,
         max_tool_calls: int = 30,
-        timeout: int = 60,
+        timeout: int = 1800,
         backend: Optional[str] = None,
         model_kwargs: Optional[dict] = None,
         reasoning_effort: Literal["low", "medium", "high"] = "medium",
@@ -275,6 +275,7 @@ class AgentFrameworkAgent(Agent):
                 stdio_servers=self.task.server_files,
                 mcp_servers=self.task.server_urls,
                 mcp_server_allowed_tools=self.task.mcp_server_allowed_tools,
+                bearer_token=getattr(self.task, "bearer_token", None),
             )
             logger.info(f"Set up {len(self.workbenches)} MCP tools")
         except Exception as e:
@@ -657,6 +658,10 @@ class AgentFrameworkBackend(AgentBackend):
         self.model_kwargs = (
             model_kwargs_configured if model_kwargs_configured is not None else {}
         )
+
+        # Update base_url with the actual value used (may come from env vars)
+        if "base_url" in self.model_kwargs and not self.base_url:
+            self.base_url = self.model_kwargs["base_url"]
 
         if self.client is None:
             raise ValueError("Failed to create OpenAI client.")
