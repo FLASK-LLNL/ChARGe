@@ -471,11 +471,17 @@ async def list_mcp_tools_direct(
                 all_tools[server_id] = await _list_tools_on_session(session, server_id)
 
         except Exception as e:
-            logger.warning(f"Error connecting to MCP server {server_id}: {e}")
-            import traceback
+            # Extract the actual error from nested ExceptionGroups
+            error_msg = str(e)
+            if hasattr(e, "exceptions") and e.exceptions:
+                # Walk down the ExceptionGroup chain to find the root cause
+                current = e
+                while hasattr(current, "exceptions") and current.exceptions:
+                    current = current.exceptions[0]
+                error_msg = str(current)
 
-            logger.warning(traceback.format_exc())
-            all_tools[server_id] = {"error": str(e)}
+            logger.warning(f"Error connecting to MCP server {server_id}: {error_msg}")
+            all_tools[server_id] = {"error": error_msg}
 
     # Handle stdio MCP servers
     for path in paths:
@@ -487,10 +493,18 @@ async def list_mcp_tools_direct(
                 all_tools[server_id] = await _list_tools_on_session(session, server_id)
 
         except Exception as e:
-            logger.trace(f"Error connecting to stdio MCP server {server_id}: {e}")
-            import traceback
+            # Extract the actual error from nested ExceptionGroups
+            error_msg = str(e)
+            if hasattr(e, "exceptions") and e.exceptions:
+                # Walk down the ExceptionGroup chain to find the root cause
+                current = e
+                while hasattr(current, "exceptions") and current.exceptions:
+                    current = current.exceptions[0]
+                error_msg = str(current)
 
-            logger.trace(traceback.format_exc())
-            all_tools[server_id] = {"error": str(e)}
+            logger.trace(
+                f"Error connecting to stdio MCP server {server_id}: {error_msg}"
+            )
+            all_tools[server_id] = {"error": error_msg}
 
     return all_tools
