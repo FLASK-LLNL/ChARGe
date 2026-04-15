@@ -269,7 +269,7 @@ async def _close_mcp_workbenches(workbenches: List[McpWorkbench]) -> None:
     await asyncio.gather(*[workbench.stop() for workbench in workbenches])
 
 
-async def _list_tools_on_session(session, server_id: str) -> list[dict]:
+async def _list_tools_on_session(session: ClientSession, server_id: str) -> list[dict]:
     """
     Helper to list all tools from an established MCP session.
 
@@ -314,7 +314,7 @@ async def _list_tools_on_session(session, server_id: str) -> list[dict]:
 
 
 async def _call_tool_on_session(
-    session, tool_name: str, arguments: dict, server_id: str
+    session: ClientSession, tool_name: str, arguments: dict, server_id: str
 ):
     """
     Helper to call a tool on an established MCP session.
@@ -341,9 +341,9 @@ async def _call_tool_on_session(
     # List tools to check if our tool exists
     tools_result = await session.list_tools()
     available_tools = (
-        [tool.name for tool in tools_result.tools]
+        {tool.name for tool in tools_result.tools}
         if hasattr(tools_result, "tools")
-        else []
+        else set()
     )
 
     if tool_name not in available_tools:
