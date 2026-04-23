@@ -237,6 +237,7 @@ def create_default_aggregation_task(
     step: int,
     total_steps: int,
     aggregation_template: Optional[str] = None,
+    system_prompt: Optional[str] = None,
     output_schema: Optional[type[BaseModel]] = None,
     **task_kwargs
 ) -> Any:
@@ -248,10 +249,11 @@ def create_default_aggregation_task(
     Args:
         original_user_prompt: The original problem/question
         candidates_text: Formatted candidate solutions
-        subset: List of candidate proposal dicts (unused in generic version)
+        subset: list of candidate proposal dicts (unused in generic version)
         step: Current aggregation step (2..T)
         total_steps: Total number of steps (T)
         aggregation_template: Optional override for template (uses default if None)
+        system_prompt: Optional system prompt for aggregations (uses default if None)
         output_schema: Optional output schema (uses GenericRSAOutput if None)
         **task_kwargs: Additional arguments passed to Task
 
@@ -282,8 +284,9 @@ def create_default_aggregation_task(
         total_steps=total_steps,
     )
 
-    # Use same system prompt as proposals (could be customized separately)
-    system_prompt = _DEFAULT_PROPOSAL_SYSTEM.read_text() if _DEFAULT_PROPOSAL_SYSTEM.exists() else None
+    # Use provided system prompt or default to generic prompt
+    if system_prompt is None:
+        system_prompt = _DEFAULT_PROPOSAL_SYSTEM.read_text() if _DEFAULT_PROPOSAL_SYSTEM.exists() else None
 
     task = Task(
         system_prompt=system_prompt,
@@ -388,6 +391,7 @@ class RSATaskFactories(Generic[T]):
                 step=step,
                 total_steps=total_steps,
                 aggregation_template=self.prompts.aggregation_template,
+                system_prompt=self.prompts.proposal_system_prompt,  # ← ADDED: Pass chemistry prompt
                 output_schema=self.output_schema,
                 **self.task_kwargs
             )
