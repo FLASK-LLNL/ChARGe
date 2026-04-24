@@ -65,8 +65,17 @@ class RSAConfig:
 
     def __post_init__(self):
         """Validate configuration parameters and set defaults."""
-        if self.n < 1 or self.k < 1 or self.t < 1:
-            raise ValueError(f"Invalid RSA parameters: N={self.n}, K={self.k}, T={self.t} (all must be >= 1)")
+        if self.n < 2 or self.k < 2 or self.t < 2:
+            raise ValueError(
+                f"Invalid RSA parameters: N={self.n}, K={self.k}, T={self.t}. "
+                f"All must be >= 2. (T=1 would skip aggregation, defeating RSA's purpose)"
+            )
+
+        if self.k > self.n:
+            raise ValueError(
+                f"Invalid RSA parameters: K ({self.k}) cannot be greater than N ({self.n}). "
+                f"K is the subset size for aggregation and must be <= N (number of proposals)."
+            )
 
         if self.log_dir is None:
             import datetime
@@ -440,12 +449,8 @@ async def run_rsa_loop(
     Raises:
         ValueError: If all proposals fail or invalid parameters
     """
-
-    # Validate K <= N
+    # K validation happens in RSAConfig.__post_init__
     k = config.k
-    if k > config.n:
-        await callbacks.logger_warning(f"K ({k}) > N ({config.n}), adjusting K to N")
-        k = config.n
 
     # Helper function to run a single proposal
     async def run_single_proposal(proposal_index: int, proposal_runner: Any):
@@ -634,13 +639,11 @@ async def run_rsa_loop(
             (" (parallel mode)" if config.parallel else " (sequential mode)")
         )
 
-        # Adjust K if needed
-        current_k = k
+        # Log if K needs adjustment due to insufficient proposals
         if len(current_proposals) < k:
             await callbacks.logger_warning(
-                f"Not enough proposals ({len(current_proposals)}) for K={k}, using all available"
+                f"Step {step}: Only {len(current_proposals)} proposals available, K will be adjusted from {k} to {len(current_proposals)} for this stage"
             )
-            current_k = len(current_proposals)
 
         # Generate aggregations
         num_aggregations = max(config.n, len(current_proposals))
