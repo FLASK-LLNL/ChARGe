@@ -83,32 +83,39 @@ class RSAPrompts:
     Provides default task-agnostic prompts that can be overridden for domain-specific use.
 
     Attributes:
-        proposal_system_prompt: System prompt for proposal generation tasks
-        aggregation_template: Template for aggregation prompts (uses {original_prompt},
-                             {candidates}, {step}, {total_steps} placeholders)
+        system_prompt: System prompt defining domain expert (used for both proposals and aggregations)
+        proposal_prompt: Task-specific instructions for proposal generation
+        aggregation_prompt: Task-specific instructions for aggregation (uses {original_prompt},
+                           {candidates}, {step}, {total_steps} placeholders)
     """
-    proposal_system_prompt: Optional[str] = None
-    aggregation_template: Optional[str] = None
+    system_prompt: Optional[str] = None
+    proposal_prompt: Optional[str] = None
+    aggregation_prompt: Optional[str] = None
 
     def __post_init__(self):
         """Load default prompts if not provided."""
-        if self.proposal_system_prompt is None:
+        if self.system_prompt is None:
+            self.system_prompt = (
+                "You are an expert problem solver using systematic reasoning and available tools."
+            )
+
+        if self.proposal_prompt is None:
             if _DEFAULT_PROPOSAL_SYSTEM.exists():
-                self.proposal_system_prompt = _DEFAULT_PROPOSAL_SYSTEM.read_text()
+                # Load old default file for backward compatibility
+                self.proposal_prompt = _DEFAULT_PROPOSAL_SYSTEM.read_text()
             else:
                 # Fallback if file doesn't exist
-                self.proposal_system_prompt = (
-                    "You are an expert problem solver. Generate a high-quality solution "
-                    "to the problem provided by the user. Use available tools and provide "
-                    "clear reasoning."
+                self.proposal_prompt = (
+                    "Your task is to generate a high-quality solution to the problem. "
+                    "Use available tools and provide clear reasoning."
                 )
 
-        if self.aggregation_template is None:
+        if self.aggregation_prompt is None:
             if _DEFAULT_AGGREGATION_TEMPLATE.exists():
-                self.aggregation_template = _DEFAULT_AGGREGATION_TEMPLATE.read_text()
+                self.aggregation_prompt = _DEFAULT_AGGREGATION_TEMPLATE.read_text()
             else:
                 # Fallback if file doesn't exist
-                self.aggregation_template = (
+                self.aggregation_prompt = (
                     "You are aggregating multiple solutions.\n\n"
                     "Original problem:\n{original_prompt}\n\n"
                     "Candidates (Step {step} of {total_steps}):\n{candidates}\n\n"
@@ -191,6 +198,7 @@ def default_format_candidates(proposals: list[dict]) -> str:
 def create_default_proposal_task(
     user_prompt: str,
     system_prompt: Optional[str] = None,
+    proposal_prompt: Optional[str] = None,
     output_schema: Optional[type[BaseModel]] = None,
     **task_kwargs
 ) -> Any:
@@ -201,7 +209,8 @@ def create_default_proposal_task(
 
     Args:
         user_prompt: The problem/question to solve
-        system_prompt: Optional override for system prompt (uses default if None)
+        system_prompt: Domain expert definition (e.g., "You are an expert chemist")
+        proposal_prompt: Task instructions for generating proposals
         output_schema: Optional output schema (uses GenericRSAOutput if None)
         **task_kwargs: Additional arguments passed to Task (server_urls, builtin_tools, etc.)
 
@@ -211,18 +220,20 @@ def create_default_proposal_task(
     from charge.tasks.task import Task
 
     if system_prompt is None:
-        # Load default proposal system prompt
-        if _DEFAULT_PROPOSAL_SYSTEM.exists():
-            system_prompt = _DEFAULT_PROPOSAL_SYSTEM.read_text()
-        else:
-            system_prompt = "You are an expert problem solver. Generate a high-quality solution."
+        system_prompt = "You are an expert problem solver using systematic reasoning and available tools."
+
+    if proposal_prompt is None:
+        proposal_prompt = "Your task is to generate a high-quality solution to the problem. Use available tools and provide clear reasoning."
+
+    # Combine proposal instructions with user's problem
+    combined_user_prompt = f"{proposal_prompt}\n\n{user_prompt}"
 
     if output_schema is None:
         output_schema = GenericRSAOutput
 
     task = Task(
         system_prompt=system_prompt,
-        user_prompt=user_prompt,
+        user_prompt=combined_user_prompt,
         structured_output_schema=output_schema,
         **task_kwargs
     )
@@ -236,7 +247,7 @@ def create_default_aggregation_task(
     subset: list[dict],
     step: int,
     total_steps: int,
-    aggregation_template: Optional[str] = None,
+    aggregation_prompt: Optional[str] = None,
     system_prompt: Optional[str] = None,
     output_schema: Optional[type[BaseModel]] = None,
     **task_kwargs
@@ -252,8 +263,9 @@ def create_default_aggregation_task(
         subset: list of candidate proposal dicts (unused in generic version)
         step: Current aggregation step (2..T)
         total_steps: Total number of steps (T)
-        aggregation_template: Optional override for template (uses default if None)
-        system_prompt: Optional system prompt for aggregations (uses default if None)
+        aggregation_prompt: Task instructions template for aggregation (uses {original_prompt},
+                           {candidates}, {step}, {total_steps} placeholders)
+        system_prompt: Domain expert definition (same as proposals)
         output_schema: Optional output schema (uses GenericRSAOutput if None)
         **task_kwargs: Additional arguments passed to Task
 
@@ -262,12 +274,15 @@ def create_default_aggregation_task(
     """
     from charge.tasks.task import Task
 
-    if aggregation_template is None:
+    if system_prompt is None:
+        system_prompt = "You are an expert problem solver using systematic reasoning and available tools."
+
+    if aggregation_prompt is None:
         # Load default aggregation template
         if _DEFAULT_AGGREGATION_TEMPLATE.exists():
-            aggregation_template = _DEFAULT_AGGREGATION_TEMPLATE.read_text()
+            aggregation_prompt = _DEFAULT_AGGREGATION_TEMPLATE.read_text()
         else:
-            aggregation_template = (
+            aggregation_prompt = (
                 "Original problem:\n{original_prompt}\n\n"
                 "Candidates (Step {step} of {total_steps}):\n{candidates}\n\n"
                 "Synthesize these into a single improved solution."
@@ -277,16 +292,12 @@ def create_default_aggregation_task(
         output_schema = GenericRSAOutput
 
     # Format the aggregation prompt
-    user_prompt = aggregation_template.format(
+    user_prompt = aggregation_prompt.format(
         original_prompt=original_user_prompt,
         candidates=candidates_text,
         step=step,
         total_steps=total_steps,
     )
-
-    # Use provided system prompt or default to generic prompt
-    if system_prompt is None:
-        system_prompt = _DEFAULT_PROPOSAL_SYSTEM.read_text() if _DEFAULT_PROPOSAL_SYSTEM.exists() else None
 
     task = Task(
         system_prompt=system_prompt,
@@ -375,7 +386,8 @@ class RSATaskFactories(Generic[T]):
         def factory():
             return create_default_proposal_task(
                 user_prompt=self.user_prompt,
-                system_prompt=self.prompts.proposal_system_prompt,
+                system_prompt=self.prompts.system_prompt,
+                proposal_prompt=self.prompts.proposal_prompt,
                 output_schema=self.output_schema,
                 **self.task_kwargs
             )
@@ -390,8 +402,8 @@ class RSATaskFactories(Generic[T]):
                 subset=subset,
                 step=step,
                 total_steps=total_steps,
-                aggregation_template=self.prompts.aggregation_template,
-                system_prompt=self.prompts.proposal_system_prompt,  # ← ADDED: Pass chemistry prompt
+                aggregation_prompt=self.prompts.aggregation_prompt,
+                system_prompt=self.prompts.system_prompt,  # Same expert as proposals
                 output_schema=self.output_schema,
                 **self.task_kwargs
             )
