@@ -1,129 +1,166 @@
-# ChARGe Algorithms
+# ChARGe RSA Algorithm
 
-This module provides generic algorithms that work with ChARGe tasks.
+Recursive Self-Aggregation (RSA): Generate N diverse proposals, recursively aggregate K-subset samples across T stages.
 
-## Recursive Self-Aggregation (RSA)
-
-The RSA algorithm generates N diverse proposals and recursively aggregates them T times using K-subset sampling to find high-quality solutions.
-
-### Basic Usage with Default Prompts
+## Minimal Working Example
 
 ```python
+import asyncio
 from charge.algorithms import run_rsa_loop, RSAConfig, RSACallbacks, RSATaskFactories
+from charge.experiment import Experiment
 
-# Configure RSA
-config = RSAConfig(n=8, k=4, t=3)
+async def main():
+    # Create experiment and agent
+    experiment = Experiment(name="rsa_example")
+    runner = experiment.create_agent_with_experiment_state(
+        task=None,
+        agent_name="rsa_agent"
+    )
 
-# Setup callbacks (uses defaults if omitted)
-callbacks = RSACallbacks()
+    # Configure RSA (N=4 proposals, K=2 subset size, T=2 stages)
+    config = RSAConfig(n=4, k=2, t=2)
 
-# Create task factories
-factories = RSATaskFactories(
-    create_proposal_task=lambda: YourTask(...),
-    create_aggregation_task=lambda candidates, subset, step, total: YourAggTask(...),
-    format_candidates=lambda subset: format_to_text(subset),
-    output_schema=YourOutputSchema,
-)
+    # Create task factories with defaults (no customization needed)
+    factories = RSATaskFactories(
+        user_prompt="What are three solutions to reduce traffic congestion?"
+    )
 
-# Run RSA
-output, result = await run_rsa_loop(
-    config=config,
-    factories=factories,
-    callbacks=callbacks,
-    runner=your_runner,
-)
+    # Setup callbacks
+    callbacks = RSACallbacks()
+
+    # Run RSA
+    output, result = await run_rsa_loop(
+        config=config,
+        factories=factories,
+        callbacks=callbacks,
+        runner=runner,
+    )
+
+    print(f"Final result: {result.solution}")
+
+asyncio.run(main())
 ```
+
+That's it. RSA works out-of-the-box with sensible defaults.
+
+## Customization
+
+### 3-Part Prompt Structure
+
+RSA uses three prompts:
+1. **`system_prompt`**: Domain expert definition (same for proposals and aggregations)
+2. **`proposal_prompt`**: Task instructions for generating solutions
+3. **`aggregation_prompt`**: Task instructions for evaluating/synthesizing solutions
 
 ```python
 from charge.algorithms import RSAPrompts
+from pathlib import Path
+
+# Load custom prompts
+prompts = RSAPrompts(
+    system_prompt="You are an expert chemist specializing in retrosynthesis.",
+    proposal_prompt=Path("proposal_task.txt").read_text(),
+    aggregation_prompt=Path("aggregation_task.txt").read_text(),
+)
+
+factories = RSATaskFactories(
+    user_prompt="Synthesize aspirin from basic precursors",
+    prompts=prompts,
+)
+```
+
+### Custom Output Schema
+
+```python
 from pydantic import BaseModel
 from typing import List
 
-# Example: Chemistry retrosynthesis customization
-
-# 1. Define custom output schema
 class ChemistryOutput(BaseModel):
     reasoning_summary: str
     reactants_smiles_list: List[str]
     products_smiles_list: List[str]
 
-# 2. Load custom prompts
-chemistry_prompts = RSAPrompts(
-    proposal_system_prompt=Path("chemistry_system.txt").read_text(),
-    aggregation_template=Path("chemistry_aggregation.txt").read_text(),
+factories = RSATaskFactories(
+    user_prompt="Provide retrosynthesis for CC(=O)Oc1ccccc1C(=O)O",
+    output_schema=ChemistryOutput,
+    prompts=prompts,
 )
+```
 
-# 3. Create custom formatter
-def format_chemistry_candidates(proposals):
+### Custom Formatter and Validator
+
+```python
+def format_candidates(subset):
+    """Format proposals for aggregation"""
     text = ""
-    for idx, prop in enumerate(proposals, 1):
+    for idx, prop in enumerate(subset, 1):
         result = prop["result"]
         text += f"\n---- Candidate {idx} ----\n"
         text += f"Reasoning: {result.reasoning_summary}\n"
         text += f"Reactants: {', '.join(result.reactants_smiles_list)}\n"
-        text += f"Products: {', '.join(result.products_smiles_list)}\n"
     return text
 
-# 4. Create custom validator
-def validate_chemistry(result):
+def validate_proposal(result):
+    """Check if proposal is valid"""
     return (hasattr(result, 'reactants_smiles_list') and
             len(result.reactants_smiles_list) > 0)
 
-# 5. Use with RSA
 factories = RSATaskFactories(
-    user_prompt="Synthesize aspirin from...",
+    user_prompt="...",
     output_schema=ChemistryOutput,
-    format_candidates=format_chemistry_candidates,
-    validate_proposal=validate_chemistry,
-    prompts=chemistry_prompts,
-    builtin_tools=[verify_smiles, ...],  # Domain tools
+    prompts=prompts,
+    format_candidates=format_candidates,
+    validate_proposal=validate_proposal,
 )
 ```
 
-Or provide fully custom task factories:
+### Adding Tools
 
 ```python
-# For maximum control, provide custom task creation functions
-def create_my_proposal_task():
-    return MyDomainTask(...)
-
-def create_my_aggregation_task(candidates, subset, step, total):
-    return MyAggregationTask(...)
+from your_tools import verify_smiles, canonicalize_smiles
 
 factories = RSATaskFactories(
-    create_proposal_task=create_my_proposal_task,
-    create_aggregation_task=create_my_aggregation_task,
-    format_candidates=my_formatter,
-    output_schema=MySchema,
+    user_prompt="...",
+    output_schema=ChemistryOutput,
+    prompts=prompts,
+    builtin_tools=[verify_smiles, canonicalize_smiles],  # Direct tool functions
+    server_urls=["http://localhost:8000/mcp"],           # MCP server URLs
 )
 ```
-
-### Default Prompts
-
-ChARGe provides task-agnostic default prompts in `charge/algorithms/prompts/`:
-- `default_proposal_system.txt` - Generic problem-solving system prompt
-- `default_aggregation_template.txt` - Generic aggregation template
-
-These work out-of-the-box for any task but can be swapped for domain-specific prompts.
-
-### Aggregation Template Placeholders
-
-The aggregation template supports these placeholders:
-- `{original_prompt}` - The original user prompt
-- `{candidates}` - Formatted candidate solutions
-- `{step}` - Current aggregation step (2..T)
-- `{total_steps}` - Total number of steps (T)
 
 ## Components
 
 ### RSAConfig
-Algorithm parameters: `n` (proposals), `k` (subset size), `t` (stages), `parallel` (bool), `log_dir` (path)
+- `n`: Number of initial proposals (default: 8)
+- `k`: Subset size for aggregation (default: 4)
+- `t`: Number of stages (default: 3)
+- `parallel`: Run proposals in parallel (default: True)
+- `log_dir`: Directory for execution logs (default: auto-generated)
 
 ### RSAPrompts
-Prompt configuration: `proposal_system_prompt`, `aggregation_template`
+- `system_prompt`: Domain expert (e.g., "You are an expert chemist")
+- `proposal_prompt`: Generation task instructions
+- `aggregation_prompt`: Evaluation task instructions (supports `{original_prompt}`, `{candidates}`, `{step}`, `{total_steps}`)
 
 ### RSACallbacks
-Logging hooks: `log_progress`, `logger_info`, `logger_warning`, `logger_error`
+- `log_progress`: Progress callback for UI updates
+- `logger_info`, `logger_warning`, `logger_error`: Logging functions
 
 ### RSATaskFactories
-Task creation logic: `create_proposal_task`, `create_aggregation_task`, `format_candidates`, `output_schema`, `validate_proposal`, `prompts`
+- `user_prompt`: The problem to solve (required)
+- `prompts`: Custom RSAPrompts (optional, uses generic defaults)
+- `output_schema`: Pydantic model for validation (optional, uses GenericRSAOutput)
+- `format_candidates`: Function to format proposals for aggregation (optional)
+- `validate_proposal`: Function to check proposal validity (optional)
+- `builtin_tools`: Direct tool functions (optional)
+- `server_urls`: MCP server URLs (optional)
+- `**task_kwargs`: Additional Task parameters
+
+## Default Prompts
+
+ChARGe provides generic defaults in `charge/algorithms/prompts/`:
+- `default_proposal_system.txt` - Generic expert definition
+- `default_proposal_prompt.txt` - Generic generation task
+- `default_aggregation_prompt.txt` - Generic evaluation task
+
+These work for any problem but should be replaced with domain-specific prompts for best results.
