@@ -195,7 +195,7 @@ def create_servers(
     paths: List[str],
     urls: List[str],
     bearer_token: Optional[str] = None,
-    timeout: Optional[int] = 60,
+    timeout: Optional[int] = 1800,
 ) -> List[Any]:
     """
     DEPRECATED: Creates AutoGen MCP server parameters from the task's server paths.

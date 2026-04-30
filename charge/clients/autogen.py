@@ -235,7 +235,7 @@ class AutoGenAgent(Agent):
         memory: Optional[Any] = None,
         max_retries: int = 3,
         max_tool_calls: int = 30,
-        timeout: int = 60,
+        timeout: int = 1800,
         backend: Optional[str] = None,
         model_kwargs: Optional[dict] = None,
         builtin_tools: Optional[list[Any]] = None,
