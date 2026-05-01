@@ -233,19 +233,26 @@ class AgentFrameworkAgent(Agent):
         agent_name: str,
         reasoning_effort: Literal["low", "medium", "high"],
         instructions: str,
+        temperature: Optional[float] = None,
     ) -> AFAgent:
+        default_options = {
+            "reasoning": {
+                "effort": reasoning_effort,
+                "summary": "detailed",
+            },
+            "include": ["reasoning.encrypted_content"],
+        }
+
+        # Add temperature if specified
+        if temperature is not None:
+            default_options["temperature"] = temperature
+
         af_agent = AFAgent[OpenAIChatOptions](
             client=self.client,
             name=agent_name,
             instructions=instructions,
             tools=self.workbenches,
-            default_options={
-                "reasoning": {
-                    "effort": reasoning_effort,
-                    "summary": "detailed",
-                },
-                "include": ["reasoning.encrypted_content"],
-            },
+            default_options=default_options,
             context_providers=[
                 # This provider ensures session.state contains the history
                 InMemoryHistoryProvider(load_messages=True)
@@ -345,8 +352,12 @@ class AgentFrameworkAgent(Agent):
             try:
                 logger.info(f"Attempt {attempt}/{self.max_retries}")
 
+                # Create fresh session for retry attempts to avoid orphaned tool calls
+                # from previous failed attempts (which cause "No tool output found" errors)
+                retry_session = agent.create_session() if attempt > 1 else session
+
                 # Run agent (Agent Framework returns AgentResponse)
-                stream = await agent.run(user_prompt, session=session, stream=True)
+                stream = await agent.run(user_prompt, session=retry_session, stream=True)
                 tool_call_names: dict[str, str] = {}
                 async for update in stream:
                     if not update.contents:
@@ -547,8 +558,10 @@ class AgentFrameworkAgent(Agent):
                 instructions = (
                     self.task.get_system_prompt() if self.task is not None else ""
                 )
+                # Get temperature from task if available
+                temperature = getattr(self.task, "temperature", None)
                 self._af_agent = self._create_agent(
-                    self.agent_name, self.reasoning_effort, instructions=instructions
+                    self.agent_name, self.reasoning_effort, instructions=instructions, temperature=temperature
                 )
                 self._agent_signature = agent_signature
 
@@ -606,7 +619,7 @@ class AgentFrameworkBackend(AgentBackend):
         api_key: Optional API key.
         base_url: Optional base URL for custom endpoints.
         model_kwargs: Additional client kwargs.
-        use_responses_api: (DEPRECATED in AF) Whether to use Responses API.
+        use_responses_api: (Deprecated) Whether to use Responses API.
     """
 
     AGENT_COUNT = 0
