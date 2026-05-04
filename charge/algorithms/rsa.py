@@ -21,7 +21,7 @@ from pydantic import BaseModel
 
 
 # Type variable for output schemas
-T = TypeVar('T')
+T = TypeVar("T")
 
 # Default prompt paths
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
@@ -40,6 +40,7 @@ class GenericRSAOutput(BaseModel):
         reasoning: Explanation of the approach and solution
         solution: The proposed solution as a string
     """
+
     reasoning: str
     solution: str
 
@@ -56,6 +57,7 @@ class RSAConfig:
         log_dir: Directory to save execution logs (default: /tmp/rsa_execution_{timestamp})
         disable_validation: If True, skip output schema validation (default: False)
     """
+
     n: int
     k: int
     t: int
@@ -79,6 +81,7 @@ class RSAConfig:
 
         if self.log_dir is None:
             import datetime
+
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             self.log_dir = f"/tmp/rsa_execution_{timestamp}"
 
@@ -97,6 +100,7 @@ class RSAPrompts:
         aggregation_prompt: Task-specific instructions for aggregation (uses {original_prompt},
                            {candidates}, {step}, {total_steps} placeholders)
     """
+
     system_prompt: Optional[str] = None
     proposal_prompt: Optional[str] = None
     aggregation_prompt: Optional[str] = None
@@ -104,9 +108,7 @@ class RSAPrompts:
     def __post_init__(self):
         """Load default prompts if not provided."""
         if self.system_prompt is None:
-            self.system_prompt = (
-                "You are an expert problem solver using systematic reasoning and available tools."
-            )
+            self.system_prompt = "You are an expert problem solver using systematic reasoning and available tools."
 
         if self.proposal_prompt is None:
             if _DEFAULT_PROPOSAL_SYSTEM.exists():
@@ -170,11 +172,13 @@ class RSACallbacks:
     async def _default_logger_warning(self, message: str):
         """Default warning logger - print to stderr."""
         import sys
+
         print(f"[RSA Warning] {message}", file=sys.stderr)
 
     async def _default_logger_error(self, message: str):
         """Default error logger - print to stderr."""
         import sys
+
         print(f"[RSA Error] {message}", file=sys.stderr)
 
 
@@ -198,7 +202,7 @@ def default_format_candidates(proposals: list[dict]) -> str:
         # Format all fields from the schema
         for field_name, field_value in prop_result.model_dump().items():
             # Format field name nicely (snake_case -> Title Case)
-            display_name = field_name.replace('_', ' ').title()
+            display_name = field_name.replace("_", " ").title()
             candidates_text += f"{display_name}: {field_value}\n"
 
     return candidates_text
@@ -209,7 +213,7 @@ def create_default_proposal_task(
     system_prompt: Optional[str] = None,
     proposal_prompt: Optional[str] = None,
     output_schema: Optional[type[BaseModel]] = None,
-    **task_kwargs
+    **task_kwargs,
 ) -> Any:
     """Create a generic proposal task using default prompts.
 
@@ -244,7 +248,7 @@ def create_default_proposal_task(
         system_prompt=system_prompt,
         user_prompt=combined_user_prompt,
         structured_output_schema=output_schema,
-        **task_kwargs
+        **task_kwargs,
     )
 
     return task
@@ -259,7 +263,7 @@ def create_default_aggregation_task(
     aggregation_prompt: Optional[str] = None,
     system_prompt: Optional[str] = None,
     output_schema: Optional[type[BaseModel]] = None,
-    **task_kwargs
+    **task_kwargs,
 ) -> Any:
     """Create a generic aggregation task using default template.
 
@@ -312,7 +316,7 @@ def create_default_aggregation_task(
         system_prompt=system_prompt,
         user_prompt=user_prompt,
         structured_output_schema=output_schema,
-        **task_kwargs
+        **task_kwargs,
     )
 
     return task
@@ -330,12 +334,14 @@ class RSATaskFactories(Generic[T]):
         self,
         user_prompt: Optional[str] = None,
         create_proposal_task: Optional[Callable[[], Any]] = None,
-        create_aggregation_task: Optional[Callable[[str, list[dict], int, int], Any]] = None,
+        create_aggregation_task: Optional[
+            Callable[[str, list[dict], int, int], Any]
+        ] = None,
         format_candidates: Optional[Callable[[list[dict]], str]] = None,
         output_schema: Optional[type[T]] = None,
         validate_proposal: Optional[Callable[[Any], bool]] = None,
         prompts: Optional[RSAPrompts] = None,
-        **task_kwargs
+        **task_kwargs,
     ):
         """Initialize task factories with optional overrides.
 
@@ -392,19 +398,26 @@ class RSATaskFactories(Generic[T]):
 
     def _create_default_proposal_factory(self) -> Callable[[], Any]:
         """Create a default proposal task factory."""
+
         def factory():
             return create_default_proposal_task(
                 user_prompt=self.user_prompt,
                 system_prompt=self.prompts.system_prompt,
                 proposal_prompt=self.prompts.proposal_prompt,
                 output_schema=self.output_schema,
-                **self.task_kwargs
+                **self.task_kwargs,
             )
+
         return factory
 
-    def _create_default_aggregation_factory(self) -> Callable[[str, list[dict], int, int], Any]:
+    def _create_default_aggregation_factory(
+        self,
+    ) -> Callable[[str, list[dict], int, int], Any]:
         """Create a default aggregation task factory."""
-        def factory(candidates_text: str, subset: list[dict], step: int, total_steps: int):
+
+        def factory(
+            candidates_text: str, subset: list[dict], step: int, total_steps: int
+        ):
             return create_default_aggregation_task(
                 original_user_prompt=self.user_prompt,
                 candidates_text=candidates_text,
@@ -414,8 +427,9 @@ class RSATaskFactories(Generic[T]):
                 aggregation_prompt=self.prompts.aggregation_prompt,
                 system_prompt=self.prompts.system_prompt,  # Same expert as proposals
                 output_schema=self.output_schema,
-                **self.task_kwargs
+                **self.task_kwargs,
             )
+
         return factory
 
     def _default_validator(self, result: Any) -> bool:
@@ -456,14 +470,19 @@ async def run_rsa_loop(
     async def run_single_proposal(proposal_index: int, proposal_runner: Any):
         """Run a single proposal and return result or None if failed"""
         try:
-            await callbacks.logger_info(f"Generating proposal {proposal_index+1}/{config.n}")
+            await callbacks.logger_info(
+                f"Generating proposal {proposal_index+1}/{config.n}"
+            )
 
             # Create proposal task
             proposal_task = factories.create_proposal_task()
             proposal_runner.task = proposal_task
 
             # Disable validation if requested
-            if config.disable_validation or os.getenv("CHARGE_DISABLE_OUTPUT_VALIDATION", "0") == "1":
+            if (
+                config.disable_validation
+                or os.getenv("CHARGE_DISABLE_OUTPUT_VALIDATION", "0") == "1"
+            ):
                 proposal_task.structured_output_schema = None
 
             # Save proposal prompt
@@ -472,7 +491,9 @@ async def run_rsa_loop(
                 "system_prompt": proposal_task.get_system_prompt(),
                 "user_prompt": proposal_task.get_user_prompt(),
             }
-            with open(f"{config.log_dir}/proposer_{proposal_index+1:02d}_prompt.json", "w") as f:
+            with open(
+                f"{config.log_dir}/proposer_{proposal_index+1:02d}_prompt.json", "w"
+            ) as f:
                 json.dump(proposer_log, f, indent=2)
 
             # Run proposal
@@ -481,37 +502,52 @@ async def run_rsa_loop(
                 await callback_handler.drain()
 
             # Validate output
-            proposal_result = factories.output_schema.model_validate_json(proposal_output)
+            proposal_result = factories.output_schema.model_validate_json(
+                proposal_output
+            )
 
             # Check if proposal is valid using custom validator
             if not factories.validate_proposal(proposal_result):
-                await callbacks.logger_warning(f"Proposal {proposal_index+1} failed validation (empty or invalid), skipping")
+                await callbacks.logger_warning(
+                    f"Proposal {proposal_index+1} failed validation (empty or invalid), skipping"
+                )
                 return None
 
             # Save proposal output
             proposer_output_log = {
                 "proposal_index": proposal_index + 1,
                 "result": proposal_result.model_dump(),
-                "full_output": json.loads(proposal_output)
+                "full_output": json.loads(proposal_output),
             }
-            with open(f"{config.log_dir}/proposer_{proposal_index+1:02d}_output.json", "w") as f:
+            with open(
+                f"{config.log_dir}/proposer_{proposal_index+1:02d}_output.json", "w"
+            ) as f:
                 json.dump(proposer_output_log, f, indent=2)
 
-            await callbacks.logger_info(f"Proposal {proposal_index+1} completed successfully")
+            await callbacks.logger_info(
+                f"Proposal {proposal_index+1} completed successfully"
+            )
 
             return {
                 "output": proposal_output,
                 "result": proposal_result,
-                "index": proposal_index
+                "index": proposal_index,
             }
 
+        except asyncio.CancelledError:
+            await callbacks.logger_warning(f"Proposal {proposal_index+1} was cancelled")
+            return None
         except Exception as e:
-            await callbacks.logger_warning(f"Proposal {proposal_index+1} failed: {str(e)}")
+            await callbacks.logger_warning(
+                f"Proposal {proposal_index+1} failed: {str(e)}"
+            )
             return None
 
     # Stage 1: Generate N initial proposals
-    await callbacks.logger_info(f"RSA Step 1/{config.t}: Generating {config.n} initial proposals" +
-                      (" (parallel mode)" if config.parallel else " (sequential mode)"))
+    await callbacks.logger_info(
+        f"RSA Step 1/{config.t}: Generating {config.n} initial proposals"
+        + (" (parallel mode)" if config.parallel else " (sequential mode)")
+    )
 
     if config.parallel and runner_factory:
         # Parallel mode: generate all proposals concurrently
@@ -529,13 +565,17 @@ async def run_rsa_loop(
         proposals = []
         for i, result in enumerate(proposal_results):
             if isinstance(result, Exception):
-                await callbacks.logger_warning(f"Proposal {i+1} failed with exception: {str(result)}")
+                await callbacks.logger_warning(
+                    f"Proposal {i+1} failed with exception: {str(result)}"
+                )
             elif result is not None:
                 proposals.append(result)
     else:
         # Sequential mode: generate proposals one by one
         if config.parallel and not runner_factory:
-            await callbacks.logger_warning("Parallel mode requested but no runner_factory provided, falling back to sequential")
+            await callbacks.logger_warning(
+                "Parallel mode requested but no runner_factory provided, falling back to sequential"
+            )
 
         proposals = []
         for i in range(config.n):
@@ -549,7 +589,9 @@ async def run_rsa_loop(
     await callbacks.logger_info(f"Generated {len(proposals)} valid proposals")
 
     # Helper function to run a single aggregation
-    async def run_single_aggregation(agg_index: int, step: int, current_proposals: list, agg_runner: Any):
+    async def run_single_aggregation(
+        agg_index: int, step: int, current_proposals: list, agg_runner: Any
+    ):
         """Run a single aggregation and return result or None if failed"""
         try:
             # Adjust K if needed
@@ -569,14 +611,14 @@ async def run_rsa_loop(
 
             # Create aggregation task
             agg_task = factories.create_aggregation_task(
-                candidates_text,
-                subset,
-                step,
-                config.t
+                candidates_text, subset, step, config.t
             )
             agg_runner.task = agg_task
 
-            if config.disable_validation or os.getenv("CHARGE_DISABLE_OUTPUT_VALIDATION", "0") == "1":
+            if (
+                config.disable_validation
+                or os.getenv("CHARGE_DISABLE_OUTPUT_VALIDATION", "0") == "1"
+            ):
                 agg_task.structured_output_schema = None
 
             # Save aggregation prompt
@@ -588,7 +630,10 @@ async def run_rsa_loop(
                 "user_prompt": agg_task.get_user_prompt(),
                 "candidates_text": candidates_text,
             }
-            with open(f"{config.log_dir}/aggregator_step{step}_{agg_index+1:02d}_prompt.json", "w") as f:
+            with open(
+                f"{config.log_dir}/aggregator_step{step}_{agg_index+1:02d}_prompt.json",
+                "w",
+            ) as f:
                 json.dump(aggregator_log, f, indent=2)
 
             # Run aggregation
@@ -601,7 +646,9 @@ async def run_rsa_loop(
 
             # Check if aggregation is valid using custom validator
             if not factories.validate_proposal(agg_result):
-                await callbacks.logger_warning(f"Aggregation {agg_index+1} (Step {step}) failed validation (empty or invalid), skipping")
+                await callbacks.logger_warning(
+                    f"Aggregation {agg_index+1} (Step {step}) failed validation (empty or invalid), skipping"
+                )
                 return None
 
             # Save aggregation output
@@ -610,33 +657,47 @@ async def run_rsa_loop(
                 "aggregation_index": agg_index + 1,
                 "k_subset_indices": subset_indices,
                 "result": agg_result.model_dump(),
-                "full_output": json.loads(agg_output)
+                "full_output": json.loads(agg_output),
             }
-            with open(f"{config.log_dir}/aggregator_step{step}_{agg_index+1:02d}_output.json", "w") as f:
+            with open(
+                f"{config.log_dir}/aggregator_step{step}_{agg_index+1:02d}_output.json",
+                "w",
+            ) as f:
                 json.dump(aggregator_output_log, f, indent=2)
 
-            await callbacks.logger_info(f"Aggregation {agg_index+1} (Step {step}) completed successfully")
+            await callbacks.logger_info(
+                f"Aggregation {agg_index+1} (Step {step}) completed successfully"
+            )
 
             return {
                 "output": agg_output,
                 "result": agg_result,
                 "index": agg_index,
-                "step": step
+                "step": step,
             }
 
+        except asyncio.CancelledError:
+            await callbacks.logger_warning(
+                f"Aggregation {agg_index+1} (Step {step}) was cancelled"
+            )
+            return None
         except Exception as e:
-            await callbacks.logger_warning(f"Aggregation {agg_index+1} (Step {step}) failed: {str(e)}")
+            await callbacks.logger_warning(
+                f"Aggregation {agg_index+1} (Step {step}) failed: {str(e)}"
+            )
             return None
 
     # Stages 2-T: Recursive aggregation
     # BARRIER: Wait for all Stage 1 proposals to complete before starting Stage 2
     current_proposals = proposals
-    await callbacks.logger_info(f"Stage 1 complete. Generated {len(proposals)} valid proposals.")
+    await callbacks.logger_info(
+        f"Stage 1 complete. Generated {len(proposals)} valid proposals."
+    )
 
     for step in range(2, config.t + 1):
         await callbacks.logger_info(
-            f"RSA Step {step}/{config.t}: Aggregating {len(current_proposals)} proposals into {k}-subsets" +
-            (" (parallel mode)" if config.parallel else " (sequential mode)")
+            f"RSA Step {step}/{config.t}: Aggregating {len(current_proposals)} proposals into {k}-subsets"
+            + (" (parallel mode)" if config.parallel else " (sequential mode)")
         )
 
         # Log if K needs adjustment due to insufficient proposals
@@ -665,28 +726,38 @@ async def run_rsa_loop(
             next_proposals = []
             for i, result in enumerate(agg_results):
                 if isinstance(result, Exception):
-                    await callbacks.logger_warning(f"Aggregation {i+1} (Step {step}) failed with exception: {str(result)}")
+                    await callbacks.logger_warning(
+                        f"Aggregation {i+1} (Step {step}) failed with exception: {str(result)}"
+                    )
                 elif result is not None:
                     next_proposals.append(result)
 
         else:
             # Sequential mode: run aggregations one by one
             if config.parallel and not runner_factory:
-                await callbacks.logger_warning("Parallel mode requested but no runner_factory provided, falling back to sequential")
+                await callbacks.logger_warning(
+                    "Parallel mode requested but no runner_factory provided, falling back to sequential"
+                )
 
             next_proposals = []
             for i in range(num_aggregations):
-                result = await run_single_aggregation(i, step, current_proposals, runner)
+                result = await run_single_aggregation(
+                    i, step, current_proposals, runner
+                )
                 if result is not None:
                     next_proposals.append(result)
 
         if not next_proposals:
-            await callbacks.logger_warning(f"No successful aggregations in step {step}, using previous proposals")
+            await callbacks.logger_warning(
+                f"No successful aggregations in step {step}, using previous proposals"
+            )
             break
 
         # BARRIER: All aggregations in current stage complete before moving to next stage
         current_proposals = next_proposals
-        await callbacks.logger_info(f"Stage {step} complete. Generated {len(current_proposals)} valid aggregations.")
+        await callbacks.logger_info(
+            f"Stage {step} complete. Generated {len(current_proposals)} valid aggregations."
+        )
 
     # Select final proposal (first one from final stage)
     if not current_proposals:
@@ -707,6 +778,8 @@ async def run_rsa_loop(
     log_path = Path(config.log_dir) / "FINAL_OUTPUT.json"
     log_path.write_text(json.dumps(final_log, indent=2))
 
-    await callbacks.logger_info(f"RSA completed! Final output saved to {config.log_dir}")
+    await callbacks.logger_info(
+        f"RSA completed! Final output saved to {config.log_dir}"
+    )
 
     return final_output, final_result
