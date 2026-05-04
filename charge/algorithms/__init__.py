@@ -1,8 +1,12 @@
-from charge._tags import verifier, hypothesis
-from charge._utils import enable_cmd_history_and_shell_integration
+"""
+ChARGe Algorithms Module
 
-# Make algorithms available at top level
-from charge.algorithms import (
+This module provides generic algorithms that work with ChARGe tasks.
+Currently includes:
+- RSA (Recursive Self-Aggregation): N-K-T algorithm for proposal generation and aggregation
+"""
+
+from charge.algorithms.rsa import (
     run_rsa_loop,
     RSAConfig,
     RSAPrompts,
@@ -15,9 +19,6 @@ from charge.algorithms import (
 )
 
 __all__ = [
-    "verifier",
-    "hypothesis",
-    "enable_cmd_history_and_shell_integration",
     "run_rsa_loop",
     "RSAConfig",
     "RSAPrompts",
