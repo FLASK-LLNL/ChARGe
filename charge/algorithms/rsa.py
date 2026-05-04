@@ -363,7 +363,7 @@ class RSATaskFactories(Generic[T]):
             prompts: Optional RSAPrompts instance with custom prompts.
                     If None, uses default task-agnostic prompts from ChARGe.
             **task_kwargs: Additional arguments passed to Task instances
-                          (server_urls, builtin_tools, etc.)
+                          (server_urls, builtin_tools, bearer_token, etc.)
         """
         self.output_schema = output_schema or GenericRSAOutput
         self.validate_proposal = validate_proposal or self._default_validator
