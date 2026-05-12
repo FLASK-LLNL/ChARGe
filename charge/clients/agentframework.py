@@ -352,14 +352,23 @@ class AgentFrameworkAgent(Agent):
                     if not update.contents:
                         continue
 
+                    # Check for reasoning summary events (handle both old and new API formats)
                     if (
                         update.contents[0].raw_representation
                         and update.contents[0].raw_representation.type
-                        == "response.reasoning_summary_text.done"
                     ):
-                        # Reasoning text - use callback to transmit back
-                        if reasoning_callback:
-                            await reasoning_callback(update.contents[0].text)
+                        raw_type = update.contents[0].raw_representation.type
+                        # Only capture .done events, not .delta events
+                        if (
+                            "reasoning_summary" in raw_type
+                            or "thinking_summary" in raw_type
+                        ) and raw_type.endswith(".done"):
+                            # Reasoning summary - use callback to transmit back
+                            if reasoning_callback and update.contents[0].text:
+                                await reasoning_callback(update.contents[0].text)
+                                logger.debug(
+                                    f"Captured reasoning summary from event: {raw_type}"
+                                )
 
                     for content in update.contents:
                         content_type = content.type
