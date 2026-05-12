@@ -1,6 +1,6 @@
 """
 Recursive Self-Aggregation (RSA) Algorithm
-
+https://arxiv.org/pdf/2509.26626
 This module provides the core N-K-T RSA loop that can be used by any task type
 (retrosynthesis, LMO, etc.) through customizable factory functions and formatters.
 
