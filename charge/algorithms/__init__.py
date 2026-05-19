@@ -1,17 +1,13 @@
-"""
-ChARGe Algorithms Module
+"""ChARGe algorithms.
 
-This module provides generic algorithms that work with ChARGe tasks.
-Currently includes:
-- RSA (Recursive Self-Aggregation): N-K-T algorithm for proposal generation and aggregation
+Currently provides:
+
+- RSA (Recursive Self-Aggregation): an N-K-T proposal-and-aggregation loop,
+  exposed as a :class:`Task` subclass for direct use with any ChARGe runner.
 """
 
 from charge.algorithms.rsa import (
-    run_rsa_loop,
-    RSAConfig,
-    RSAPrompts,
-    RSACallbacks,
-    RSATaskFactories,
+    RSATask,
     GenericRSAOutput,
     default_format_candidates,
     create_default_proposal_task,
@@ -19,11 +15,7 @@ from charge.algorithms.rsa import (
 )
 
 __all__ = [
-    "run_rsa_loop",
-    "RSAConfig",
-    "RSAPrompts",
-    "RSACallbacks",
-    "RSATaskFactories",
+    "RSATask",
     "GenericRSAOutput",
     "default_format_candidates",
     "create_default_proposal_task",
