@@ -324,6 +324,15 @@ class RSATask(Task):
 
     # ---------------------- The N-K-T orchestrator ----------------------
 
+    async def run(self, runner, **kwargs):
+        """Polymorphic :meth:`Task.run` entry point for RSA.
+
+        Delegates to :meth:`run_rsa`, which drives the N-K-T loop. Exists so
+        callers can invoke RSA through the generic Task API
+        (``await rsa_task.run(runner, ...)``) without knowing it is RSA.
+        """
+        return await self.run_rsa(runner, **kwargs)
+
     async def run_rsa(
         self,
         runner: Any,
