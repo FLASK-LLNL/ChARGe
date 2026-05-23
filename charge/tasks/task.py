@@ -21,6 +21,7 @@ class Task(ABC):
         mcp_server_allowed_tools: Optional[dict[str, list[str]]] = None,
         structured_output_schema: Optional[Type[BaseModel]] = None,
         bearer_token: Optional[str] = None,
+        attachments: Optional[list[dict]] = None,
         **kwargs,
     ):
         """
@@ -92,6 +93,7 @@ class Task(ABC):
         }
         self.structured_output_schema = structured_output_schema
         self.bearer_token = bearer_token
+        self.attachments = attachments or []
 
         for key, value in kwargs.items():
             if hasattr(self, key):
@@ -232,6 +234,7 @@ class Task(ABC):
             "server_urls": self.server_urls,
             "server_files": self.server_files,
             "mcp_server_allowed_tools": self.mcp_server_allowed_tools,
+            "attachments": self.attachments,
             "constructor_args": self.constructor_args,
         }
 
@@ -247,6 +250,7 @@ class Task(ABC):
             "mcp_server_allowed_tools",
             "structured_output_schema",
             "constructor_args",
+            "attachments",
         }
 
         extra_attrs = {}
@@ -289,6 +293,7 @@ class Task(ABC):
             "server_urls": data.get("server_urls"),
             "server_files": data.get("server_files"),
             "mcp_server_allowed_tools": data.get("mcp_server_allowed_tools"),
+            "attachments": data.get("attachments") or [],
         }
 
         # Add any extra attributes as kwargs
