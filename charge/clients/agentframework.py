@@ -16,6 +16,7 @@ try:
     from agent_framework import (
         Agent as AFAgent,
         AgentSession,
+        Content,
         InMemoryHistoryProvider,
         tool as agentframework_tool,
     )
@@ -205,6 +206,19 @@ class AgentFrameworkAgent(Agent):
             getattr(tool_obj, "__name__", repr(tool_obj))
             for tool_obj in self._resolve_builtin_tools()
         )
+        attachments = (
+            tuple(
+                (
+                    str(attachment.get("id", "")),
+                    str(attachment.get("mimeType", "")),
+                    str(attachment.get("dataUrl", "")),
+                )
+                for attachment in (getattr(self.task, "attachments", []) or [])
+                if isinstance(attachment, dict)
+            )
+            if self.task is not None
+            else ()
+        )
         server_files = tuple(self.task.server_files or []) if self.task else ()
         server_urls = tuple(self.task.server_urls or []) if self.task else ()
         mcp_server_allowed_tools = (
@@ -226,6 +240,7 @@ class AgentFrameworkAgent(Agent):
             server_urls,
             builtin_tool_names,
             mcp_server_allowed_tools,
+            attachments,
         )
 
     def _create_agent(
@@ -292,7 +307,7 @@ class AgentFrameworkAgent(Agent):
         # Nothing to clean
         pass
 
-    def _prepare_task_prompt(self, **kwargs) -> str:
+    def _prepare_task_prompt(self, **kwargs) -> str | list[Content]:
         """
         Prepares the task prompt for the agent.
 
@@ -313,12 +328,24 @@ class AgentFrameworkAgent(Agent):
                 + "\n\nPlease provide the answer as a JSON object with the following keys: "
                 + f"{keys}\n\n"
             )
-        return user_prompt
+        attachments = getattr(self.task, "attachments", []) or []
+        if not attachments:
+            return user_prompt
+
+        contents: list[Content] = [Content.from_text(user_prompt)]
+        for attachment in attachments:
+            if not isinstance(attachment, dict):
+                continue
+            data_url = attachment.get("dataUrl")
+            mime_type = attachment.get("mimeType")
+            if isinstance(data_url, str) and isinstance(mime_type, str):
+                contents.append(Content.from_uri(data_url, media_type=mime_type))
+        return contents
 
     async def _execute_with_retries(
         self,
         agent: AFAgent,
-        user_prompt: str,
+        user_prompt: str | list[Content],
         session: AgentSession,
         reasoning_callback: ReasoningCallbackType,
     ) -> str:
@@ -560,6 +587,7 @@ class AgentFrameworkAgent(Agent):
                     self.agent_name, self.reasoning_effort, instructions=instructions
                 )
                 self._agent_signature = agent_signature
+                self._agent_session = None
 
             # Create or reuse session for stateful conversation
             if self._agent_session is None:
