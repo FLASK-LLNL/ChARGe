@@ -12,8 +12,9 @@ and common utilities that can be used by both AutoGen and Agent Framework implem
 """
 
 import os
+import requests
 
-from typing import Tuple, Optional, Dict, Any
+from typing import Tuple, Optional, Dict, Any, List
 from loguru import logger
 
 
@@ -308,3 +309,85 @@ def get_backend_capabilities(backend: str) -> Dict[str, bool]:
             "supports_json_mode": True,
         },
     )
+
+
+def discover_available_models(
+    base_url: str,
+    api_key: Optional[str] = None,
+    timeout: int = 10,
+) -> List[Dict[str, Any]]:
+    """
+    Discover available models from an OpenAI API-compatible endpoint.
+
+    Args:
+        base_url: Base URL of the API endpoint (e.g., "https://api.openai.com/v1")
+        api_key: API key for authentication (optional)
+        timeout: Request timeout in seconds
+
+    Returns:
+        List of model dictionaries from the API response
+
+    Raises:
+        requests.exceptions.RequestException: If the request fails
+
+    Example:
+        >>> models = discover_available_models(
+        ...     "https://api.openai.com/v1",
+        ...     api_key="sk-..."
+        ... )
+        >>> print([m['id'] for m in models])
+        ['gpt-4', 'gpt-3.5-turbo', ...]
+    """
+    url = f"{base_url.rstrip('/')}/models"
+
+    headers = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    try:
+        response = requests.get(url, headers=headers, timeout=timeout)
+        response.raise_for_status()
+
+        data = response.json()
+
+        # OpenAI API returns models in a "data" field
+        if "data" in data:
+            return data["data"]
+        # Some implementations return models directly
+        elif isinstance(data, list):
+            return data
+        else:
+            logger.warning(f"Unexpected response format from {url}: {data}")
+            return []
+
+    except Exception as e:
+        logger.error(f"Failed to discover models from {url}: {e}")
+        raise
+
+
+def get_model_ids(
+    base_url: str,
+    api_key: Optional[str] = None,
+    timeout: int = 10,
+) -> List[str]:
+    """
+    Get list of model IDs from an OpenAI API-compatible endpoint.
+
+    Args:
+        base_url: Base URL of the API endpoint
+        api_key: API key for authentication (optional)
+        timeout: Request timeout in seconds
+
+    Returns:
+        List of model ID strings
+
+    Raises:
+        requests.exceptions.RequestException: If the request fails
+
+    Example:
+        >>> model_ids = get_model_ids("https://api.openai.com/v1", api_key="sk-...")
+        >>> print(model_ids)
+        ['gpt-4', 'gpt-3.5-turbo', ...]
+    """
+    models = discover_available_models(base_url, api_key, timeout)
+    return [model.get("id", "") for model in models if "id" in model]
