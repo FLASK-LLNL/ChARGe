@@ -64,6 +64,39 @@ def _wrap_agentframework_builtin_tool(tool_obj: Any) -> Any:
     return wrapped_tool
 
 
+def _usage_details_to_dict(usage_details: Any) -> dict[str, int]:
+    if not usage_details:
+        return {}
+    usage: dict[str, int] = {}
+    if isinstance(usage_details, dict):
+        source = usage_details
+    else:
+        source = {
+            key: getattr(usage_details, key, None)
+            for key in (
+                "input_token_count",
+                "output_token_count",
+                "total_token_count",
+            )
+        }
+    mapping = {
+        "input_token_count": "inputTokens",
+        "output_token_count": "outputTokens",
+        "total_token_count": "totalTokens",
+    }
+    for source_key, target_key in mapping.items():
+        value = source.get(source_key)
+        if isinstance(value, int):
+            usage[target_key] = value
+    if "totalTokens" not in usage and (
+        "inputTokens" in usage or "outputTokens" in usage
+    ):
+        usage["totalTokens"] = usage.get("inputTokens", 0) + usage.get(
+            "outputTokens", 0
+        )
+    return usage
+
+
 def create_agentframework_client(
     backend: str,
     model: str,
@@ -179,6 +212,7 @@ class AgentFrameworkAgent(Agent):
         self._agent_signature: Optional[tuple[Any, ...]] = None
 
         self._agent_session: Optional[AgentSession] = None
+        self._last_usage: dict[str, int] = {}
 
     def _resolve_builtin_tools(self) -> list[Any]:
         task_builtin_tools = (
@@ -443,6 +477,9 @@ class AgentFrameworkAgent(Agent):
                                     call_id=call_id,
                                 )
                 result = await stream.get_final_response()
+                self._last_usage = _usage_details_to_dict(
+                    getattr(result, "usage_details", None)
+                )
 
                 # Extract content from result
                 proposed_content = ""
@@ -599,6 +636,7 @@ class AgentFrameworkAgent(Agent):
             "model": self.model,
             "backend": self.backend,
             "model_kwargs": self.model_kwargs,
+            "lastUsage": self._last_usage,
         }
 
     def load_memory(self, json_str: str) -> None:
