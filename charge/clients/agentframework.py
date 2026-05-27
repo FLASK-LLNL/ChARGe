@@ -206,19 +206,6 @@ class AgentFrameworkAgent(Agent):
             getattr(tool_obj, "__name__", repr(tool_obj))
             for tool_obj in self._resolve_builtin_tools()
         )
-        attachments = (
-            tuple(
-                (
-                    str(attachment.get("id", "")),
-                    str(attachment.get("mimeType", "")),
-                    str(attachment.get("dataUrl", "")),
-                )
-                for attachment in (getattr(self.task, "attachments", []) or [])
-                if isinstance(attachment, dict)
-            )
-            if self.task is not None
-            else ()
-        )
         server_files = tuple(self.task.server_files or []) if self.task else ()
         server_urls = tuple(self.task.server_urls or []) if self.task else ()
         mcp_server_allowed_tools = (
@@ -240,7 +227,6 @@ class AgentFrameworkAgent(Agent):
             server_urls,
             builtin_tool_names,
             mcp_server_allowed_tools,
-            attachments,
         )
 
     def _create_agent(
@@ -587,7 +573,6 @@ class AgentFrameworkAgent(Agent):
                     self.agent_name, self.reasoning_effort, instructions=instructions
                 )
                 self._agent_signature = agent_signature
-                self._agent_session = None
 
             # Create or reuse session for stateful conversation
             if self._agent_session is None:
