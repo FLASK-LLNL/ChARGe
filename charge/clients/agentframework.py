@@ -76,14 +76,25 @@ def _usage_details_to_dict(usage_details: Any) -> dict[str, int]:
             for key in (
                 "input_token_count",
                 "output_token_count",
+                "reasoning_token_count",
                 "total_token_count",
             )
         }
+        output_details = getattr(usage_details, "output_tokens_details", None)
+        if output_details is not None:
+            source["reasoning_token_count"] = getattr(
+                output_details, "reasoning_tokens", None
+            )
     mapping = {
         "input_token_count": "inputTokens",
         "output_token_count": "outputTokens",
+        "reasoning_token_count": "reasoningTokens",
         "total_token_count": "totalTokens",
     }
+    if isinstance(source.get("output_tokens_details"), dict):
+        reasoning_tokens = source["output_tokens_details"].get("reasoning_tokens")
+        if isinstance(reasoning_tokens, int):
+            source["reasoning_token_count"] = reasoning_tokens
     for source_key, target_key in mapping.items():
         value = source.get(source_key)
         if isinstance(value, int):
