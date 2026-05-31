@@ -40,7 +40,7 @@ def mock_vllm_models_response():
     """Mock vLLM models API response (alternative format)."""
     return [
         {"id": "meta-llama/Llama-3.1-70B-Instruct"},
-        {"id": "deepseek-ai/DeepSeek-R1"},
+        {"id": "google/Gemma-4"},
     ]
 
 
@@ -76,7 +76,7 @@ def test_discover_available_models_list_format(mock_vllm_models_response):
 
     assert len(models) == 2
     assert models[0]["id"] == "meta-llama/Llama-3.1-70B-Instruct"
-    assert models[1]["id"] == "deepseek-ai/DeepSeek-R1"
+    assert models[1]["id"] == "google/Gemma-4"
 
 
 @responses.activate
