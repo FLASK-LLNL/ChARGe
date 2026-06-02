@@ -19,7 +19,7 @@ def test_agentframework_prepares_multimodal_prompt_for_attachments():
     agent = AgentFrameworkAgent(
         task=task,
         client=object(),
-        agent_name="test",
+        agent_key="test",
         model="test-model",
     )
 
@@ -51,7 +51,7 @@ def test_agentframework_signature_does_not_include_turn_attachments():
     agent = AgentFrameworkAgent(
         task=task,
         client=object(),
-        agent_name="test",
+        agent_key="test",
         model="test-model",
     )
 

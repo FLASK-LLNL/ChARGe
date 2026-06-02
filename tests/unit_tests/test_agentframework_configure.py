@@ -189,8 +189,8 @@ def test_agentframework_pool_agent_naming(agentframework_module):
     agent1 = backend.create_agent(task=task)
     agent2 = backend.create_agent(task=task)
 
-    assert agent1.agent_name == "af_agent_1"
-    assert agent2.agent_name == "af_agent_2"
+    assert agent1.agent_key == "af_agent_1"
+    assert agent2.agent_key == "af_agent_2"
 
 
 def test_responses_api_without_flag_raises_error(agentframework_module):
@@ -224,8 +224,8 @@ def test_agentframework_pool_create_agent_naming(agentframework_module):
 
     # Create first agent
     agent1 = backend.create_agent(task=task)
-    assert "_1" in agent1.agent_name
+    assert "_1" in agent1.agent_key
 
     # Create second agent
     agent2 = backend.create_agent(task=task)
-    assert "_2" in agent2.agent_name
+    assert "_2" in agent2.agent_key

@@ -30,7 +30,12 @@ except ImportError:
         "Install with: pip install 'charge[agentframework]'"
     )
 
-from charge.clients.agent_factory import AgentBackend, Agent, ReasoningCallbackType
+from charge.clients.agent_factory import (
+    AgentBackend,
+    Agent,
+    AgentCallbackType,
+    ReasoningCallbackType,
+)
 from charge.clients.agentframework_utils import (
     POSSIBLE_CONNECTION_ERRORS,
     setup_mcp_tools,
@@ -177,7 +182,7 @@ class AgentFrameworkAgent(Agent):
     Args:
         task (Task): The task to be performed by the agent.
         client: The Agent Framework client.
-        agent_name (str): Name of the agent.
+        agent_key (str): Name of the agent.
         model (str): Model name.
         memory (Optional[Any], optional): Memory instance for conversation state. Defaults to None.
         max_retries (int, optional): Maximum number of retries. Defaults to 3.
@@ -190,7 +195,7 @@ class AgentFrameworkAgent(Agent):
         self,
         task: Optional[Task],
         client: OpenAIChatClient,
-        agent_name: str,
+        agent_key: str,
         model: str | None,
         memory: Optional[Memory] = None,
         max_retries: int = 3,
@@ -200,21 +205,19 @@ class AgentFrameworkAgent(Agent):
         model_kwargs: Optional[dict] = None,
         reasoning_effort: Literal["low", "medium", "high"] = "medium",
         builtin_tools: Optional[list[Any]] = None,
-        callback: Optional[Any] = None,
+        callback: AgentCallbackType = None,
         **kwargs,
     ) -> None:
-        super().__init__(task=task, **kwargs)
+        super().__init__(task=task, callback=callback, **kwargs)
         self.max_retries = max_retries
         self.max_tool_calls = max_tool_calls
         self.workbenches: List[Any] = []  # Will be MCP workbenches
         self.builtin_tools = builtin_tools or []
-        self.agent_name = agent_name
+        self.agent_key = agent_key
         self.client = client
         self.timeout = timeout
         self.setup_kwargs = kwargs
         self.reasoning_effort = reasoning_effort
-        self.callback = callback
-
         self.model = model
         self.backend = backend
         self.model_kwargs = model_kwargs if model_kwargs is not None else {}
@@ -276,13 +279,13 @@ class AgentFrameworkAgent(Agent):
 
     def _create_agent(
         self,
-        agent_name: str,
+        agent_key: str,
         reasoning_effort: Literal["low", "medium", "high"],
         instructions: str,
     ) -> AFAgent:
         af_agent = AFAgent[OpenAIChatOptions](
             client=self.client,
-            name=agent_name,
+            name=agent_key,
             instructions=instructions,
             tools=self.workbenches,
             default_options={
@@ -438,53 +441,47 @@ class AgentFrameworkAgent(Agent):
                             if call_id and tool_name:
                                 tool_call_names[call_id] = tool_name
                             if self.callback is not None and tool_name and call_id:
-                                if hasattr(self.callback, "on_tool_call"):
-                                    await maybe_await_async(
-                                        self.callback.on_tool_call,
-                                        tool_name,
-                                        content.arguments,
-                                        source=self.agent_name,
-                                        call_id=call_id,
-                                    )
+                                await maybe_await_async(
+                                    self.callback.on_tool_call,
+                                    tool_name,
+                                    content.arguments,
+                                    source=self.agent_key,
+                                    call_id=call_id,
+                                )
                         elif content_type == "mcp_server_tool_call":
                             call_id = content.call_id
                             tool_name = content.tool_name
                             if call_id and tool_name:
                                 tool_call_names[call_id] = tool_name
                             if self.callback is not None and tool_name and call_id:
-                                if hasattr(self.callback, "on_tool_call"):
-                                    await maybe_await_async(
-                                        self.callback.on_tool_call,
-                                        tool_name,
-                                        content.arguments,
-                                        source=self.agent_name,
-                                        call_id=call_id,
-                                    )
+                                await maybe_await_async(
+                                    self.callback.on_tool_call,
+                                    tool_name,
+                                    content.arguments,
+                                    source=self.agent_key,
+                                    call_id=call_id,
+                                )
                         elif content_type == "function_result":
                             call_id = content.call_id
                             tool_name = tool_call_names.get(call_id or "", "tool")
-                            if self.callback is not None and hasattr(
-                                self.callback, "on_tool_result"
-                            ):
+                            if self.callback is not None:
                                 await maybe_await_async(
                                     self.callback.on_tool_result,
                                     tool_name,
                                     content.result,
                                     is_error=bool(content.exception),
-                                    source=self.agent_name,
+                                    source=self.agent_key,
                                     call_id=call_id,
                                 )
                         elif content_type == "mcp_server_tool_result":
                             call_id = content.call_id
                             tool_name = tool_call_names.get(call_id or "", "tool")
-                            if self.callback is not None and hasattr(
-                                self.callback, "on_tool_result"
-                            ):
+                            if self.callback is not None:
                                 await maybe_await_async(
                                     self.callback.on_tool_result,
                                     tool_name,
                                     content.output,
-                                    source=self.agent_name,
+                                    source=self.agent_key,
                                     call_id=call_id,
                                 )
                 result = await stream.get_final_response()
@@ -570,7 +567,7 @@ class AgentFrameworkAgent(Agent):
             schema = structured_out.model_json_schema()
 
             conversion_agent = self._create_agent(
-                f"{self.agent_name}_structured_output",
+                f"{self.agent_key}_structured_output",
                 reasoning_effort="low",
                 instructions="You are an agent that converts model output to a structured JSON format.",
             )
@@ -605,7 +602,7 @@ class AgentFrameworkAgent(Agent):
                  the output will be checked with the task's formatting method and
                  the json string will be returned.
         """
-        logger.info(f"Running Agent Framework agent: {self.agent_name}")
+        logger.info(f"Running Agent Framework agent: {self.agent_key}")
 
         # Set up workbenches from task server paths
         await self.setup_mcp_workbenches()
@@ -618,7 +615,7 @@ class AgentFrameworkAgent(Agent):
                     self.task.get_system_prompt() if self.task is not None else ""
                 )
                 self._af_agent = self._create_agent(
-                    self.agent_name, self.reasoning_effort, instructions=instructions
+                    self.agent_key, self.reasoning_effort, instructions=instructions
                 )
                 self._agent_signature = agent_signature
 
@@ -741,8 +738,9 @@ class AgentFrameworkBackend(AgentBackend):
         self,
         task: Optional[Task],
         max_retries: int = 3,
-        agent_name: Optional[str] = None,
+        agent_key: Optional[str] = None,
         memory: Optional[Memory] = None,
+        callback: AgentCallbackType = None,
         **kwargs,
     ) -> AgentFrameworkAgent:
         self.max_retries = max_retries
@@ -751,19 +749,20 @@ class AgentFrameworkBackend(AgentBackend):
         ), "Chat client must be initialized to create an agent."
 
         AgentFrameworkBackend.AGENT_COUNT += 1
-        default_name = f"af_agent_{AgentFrameworkBackend.AGENT_COUNT}"
-        agent_name = default_name if agent_name is None else agent_name
+        default_key = f"af_agent_{AgentFrameworkBackend.AGENT_COUNT}"
+        agent_key = default_key if agent_key is None else agent_key
 
         agent = AgentFrameworkAgent(
             task=task,
             client=self.client,
-            agent_name=agent_name,
+            agent_key=agent_key,
             max_retries=max_retries,
             model=self.model,
             backend=self.backend,
             model_kwargs=self.model_kwargs,
             memory=memory,
             reasoning_effort=self.reasoning_effort,
+            callback=callback,
             **kwargs,
         )
         return agent
