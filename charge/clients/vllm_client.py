@@ -120,24 +120,12 @@ class VLLMClient(ChatCompletionClient):
         return self._model_info
 
     def count_tokens(self, messages: List[Any], **kwargs) -> int:
-        """Estimate token count (rough approximation)"""
-        # Rough estimate: 4 chars per token
-        total_chars = sum(
-            len(
-                str(
-                    m.get("content", "")
-                    if isinstance(m, dict)
-                    else getattr(m, "content", "")
-                )
-            )
-            for m in messages
-        )
-        return total_chars // 4
+        """Return token count if available."""
+        raise NotImplementedError("vLLM token counts are unavailable")
 
     def remaining_tokens(self, messages: List[Any], **kwargs) -> int:
-        """Return remaining tokens available"""
-        used = self.count_tokens(messages, **kwargs)
-        return max(0, 8192 - used)  # Assume 8K context
+        """Return remaining tokens if available."""
+        raise NotImplementedError("vLLM remaining token count is unavailable")
 
     def total_usage(self) -> dict:
         """Return total token usage"""
