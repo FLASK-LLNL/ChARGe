@@ -19,7 +19,6 @@ import json
 
 @dataclass
 class AgentRegistryEntry:
-    agent_key: str
     agent: Agent
     runtime_config: AgentRuntimeConfig
 
@@ -61,16 +60,16 @@ class Experiment:
             return agent
 
         if agent_key:
-            runtime_config = AgentRuntimeConfig(agent_key=agent_key)
+            runtime_config = AgentRuntimeConfig()
             agent, runtime_config = create_agent_for_runtime_config(
                 task=task,
+                agent_key=agent_key,
                 memory=self.memory,
                 runtime_config=runtime_config,
                 create_kwargs=kwargs,
                 callback=callback,
             )
             self.agent_registry[agent_key] = AgentRegistryEntry(
-                agent_key=agent_key,
                 agent=agent,
                 runtime_config=runtime_config,
             )
@@ -94,7 +93,7 @@ class Experiment:
         agent_sessions = {}
         for agent_key, registry_item in self.agent_registry.items():
             agent_sessions[agent_key] = serialize_agent_session(
-                agent_key, registry_item.agent, registry_item.runtime_config
+                registry_item.agent, registry_item.runtime_config
             )
         if agent_sessions:
             state["agentSessions"] = agent_sessions
@@ -112,12 +111,11 @@ class Experiment:
         for raw_agent_key, record in agent_sessions.items():
             if not isinstance(record, dict):
                 continue
-            agent_key = str(record.get("agentKey") or raw_agent_key)
+            agent_key = str(raw_agent_key)
             agent, runtime_config = restore_agent_session(
                 agent_key, record, memory=self.memory
             )
             self.agent_registry[agent_key] = AgentRegistryEntry(
-                agent_key=agent_key,
                 agent=agent,
                 runtime_config=runtime_config,
             )

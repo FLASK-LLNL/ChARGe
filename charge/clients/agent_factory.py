@@ -37,6 +37,30 @@ class AgentCallback(Protocol):
 AgentCallbackType: TypeAlias = Optional[AgentCallback]
 
 
+@dataclass(frozen=True)
+class AgentInstructionSnapshot:
+    message_count: int
+    instructions: str
+
+    @classmethod
+    def from_json(cls, record: dict[str, Any]) -> "AgentInstructionSnapshot":
+        message_count = record["messageCount"]
+        instructions = record["instructions"]
+        if not isinstance(message_count, int):
+            raise TypeError("instructionHistory messageCount must be an integer")
+        if not isinstance(instructions, str) or not instructions:
+            raise TypeError(
+                "instructionHistory instructions must be a non-empty string"
+            )
+        return cls(message_count=message_count, instructions=instructions)
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "messageCount": self.message_count,
+            "instructions": self.instructions,
+        }
+
+
 class Agent:
     """
     Base class for an Agent that performs Tasks.
@@ -44,6 +68,7 @@ class Agent:
 
     task: Optional[Task]
     callback: AgentCallbackType
+    instruction_history: list[AgentInstructionSnapshot]
 
     def __init__(
         self,
@@ -55,6 +80,7 @@ class Agent:
         self.task = task
         self.callback: AgentCallbackType = callback
         self.kwargs = kwargs
+        self.instruction_history = []
 
     @abstractmethod
     def run(self, reasoning_callback: ReasoningCallbackType = None, **kwargs) -> Any:
@@ -135,7 +161,10 @@ class AgentFactory:
         """
         Abstract method to create and return an Agent instance.
         """
-        return cls.backends[backend.lower()].create_agent(
+        backend_key = backend.lower()
+        if backend_key not in cls.backends:
+            raise TypeError(f"AgentFactory does not accept backend {backend!r}")
+        return cls.backends[backend_key].create_agent(
             task, agent_key=agent_key, memory=memory, callback=callback, **kwargs
         )
 
@@ -160,26 +189,22 @@ class AgentFactory:
 
 @dataclass
 class AgentRuntimeConfig:
-    agent_key: str
     backend: str = DEFAULT_BACKEND
     model: Optional[str] = None
 
     @classmethod
-    def from_agent(cls, *, agent_key: str, agent: Agent) -> "AgentRuntimeConfig":
+    def from_agent(cls, *, agent: Agent) -> "AgentRuntimeConfig":
         model_info = agent.get_model_info()
         backend = model_info.get("backend") if isinstance(model_info, dict) else None
         model = model_info.get("model") if isinstance(model_info, dict) else None
         backend_obj = AgentFactory.default_backend()
         return cls(
-            agent_key=agent_key,
             backend=str(backend or backend_obj.backend),
             model=model or backend_obj.model,
         )
 
     @classmethod
-    def from_record(
-        cls, agent_key: str, record: dict[str, Any]
-    ) -> "AgentRuntimeConfig":
+    def from_record(cls, record: dict[str, Any]) -> "AgentRuntimeConfig":
         runtime_config = record.get("runtimeConfig")
         if not isinstance(runtime_config, dict):
             runtime_config = {}
@@ -192,14 +217,12 @@ class AgentRuntimeConfig:
             or DEFAULT_BACKEND
         )
         return cls(
-            agent_key=agent_key,
             backend=backend,
             model=runtime_config.get("model") or model_info.get("model"),
         )
 
     def to_json(self) -> dict[str, Any]:
         return {
-            "agentKey": self.agent_key,
             "backend": self.backend,
             "model": self.model,
         }
@@ -208,6 +231,7 @@ class AgentRuntimeConfig:
 def create_agent_for_runtime_config(
     *,
     task: Optional[Task],
+    agent_key: str,
     memory: Optional[Memory],
     runtime_config: AgentRuntimeConfig,
     create_kwargs: Optional[dict[str, Any]] = None,
@@ -216,23 +240,22 @@ def create_agent_for_runtime_config(
     agent = AgentFactory.create_agent(
         task=task,
         memory=memory,
-        agent_key=runtime_config.agent_key,
+        agent_key=agent_key,
         callback=callback,
         **(create_kwargs or {}),
     )
-    return agent, AgentRuntimeConfig.from_agent(
-        agent_key=runtime_config.agent_key,
-        agent=agent,
-    )
+    return agent, AgentRuntimeConfig.from_agent(agent=agent)
 
 
 def verify_restored_agent_config(
-    saved_config: AgentRuntimeConfig, current_config: AgentRuntimeConfig
+    agent_key: str,
+    saved_config: AgentRuntimeConfig,
+    current_config: AgentRuntimeConfig,
 ) -> None:
     if saved_config.backend != current_config.backend:
         raise RuntimeError(
             "Cannot restore agent session with mismatched backend for "
-            f"{saved_config.agent_key!r}: saved {saved_config.backend!r}, "
+            f"{agent_key!r}: saved {saved_config.backend!r}, "
             f"current {current_config.backend!r}."
         )
     if (
@@ -242,7 +265,7 @@ def verify_restored_agent_config(
     ):
         warnings.warn(
             "Restoring agent session with a different model for "
-            f"{saved_config.agent_key!r}: saved {saved_config.model!r}, "
+            f"{agent_key!r}: saved {saved_config.model!r}, "
             f"current {current_config.model!r}.",
             RuntimeWarning,
             stacklevel=2,
@@ -250,19 +273,24 @@ def verify_restored_agent_config(
 
 
 def serialize_agent_session(
-    agent_key: str, agent: Agent, runtime_config: AgentRuntimeConfig
+    agent: Agent,
+    runtime_config: AgentRuntimeConfig,
 ) -> dict[str, Any]:
     task_json = None
     task = agent.task
     if task is not None:
         task_json = task.to_json()
-    return {
-        "agentKey": agent_key,
+    record = {
         "runtimeConfig": runtime_config.to_json(),
         "memory": agent.save_memory(),
         "modelInfo": agent.get_model_info(),
         "task": task_json,
     }
+    if agent.instruction_history:
+        record["instructionHistory"] = [
+            snapshot.to_json() for snapshot in agent.instruction_history
+        ]
+    return record
 
 
 def restore_agent_session(
@@ -284,13 +312,14 @@ def restore_agent_session(
                 stacklevel=2,
             )
 
-    saved_config = AgentRuntimeConfig.from_record(agent_key, record)
+    saved_config = AgentRuntimeConfig.from_record(record)
     agent, current_config = create_agent_for_runtime_config(
         task=task,
+        agent_key=agent_key,
         memory=memory,
         runtime_config=saved_config,
     )
-    verify_restored_agent_config(saved_config, current_config)
+    verify_restored_agent_config(agent_key, saved_config, current_config)
 
     memory_json = record.get("memory")
     if memory_json:
@@ -304,4 +333,11 @@ def restore_agent_session(
                 RuntimeWarning,
                 stacklevel=2,
             )
+    instruction_history = record.get("instructionHistory")
+    if isinstance(instruction_history, list):
+        agent.instruction_history = [
+            AgentInstructionSnapshot.from_json(snapshot)
+            for snapshot in instruction_history
+            if isinstance(snapshot, dict)
+        ]
     return agent, current_config

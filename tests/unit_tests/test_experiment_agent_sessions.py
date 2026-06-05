@@ -7,6 +7,7 @@ from charge.clients.agent_factory import (
     AgentBackend,
     AgentCallbackType,
     AgentFactory,
+    AgentInstructionSnapshot,
     DEFAULT_BACKEND,
 )
 from charge.experiments.experiment import Experiment
@@ -86,6 +87,9 @@ def test_experiment_saves_and_rehydrates_raw_agent_sessions():
         assert isinstance(agent, DummyAgent)
         assert agent.agent_key == "molecule:node_1"
         agent.saved_memory = '{"state":{"in_memory":{"messages":[{"role":"user"}]}}}'
+        agent.instruction_history = [
+            AgentInstructionSnapshot(message_count=1, instructions="System")
+        ]
 
         state = experiment.save_state()
 
@@ -94,13 +98,16 @@ def test_experiment_saves_and_rehydrates_raw_agent_sessions():
             state["agentSessions"]["molecule:node_1"]["task"]["system_prompt"]
             == "System"
         )
+        assert state["agentSessions"]["molecule:node_1"]["instructionHistory"] == [
+            {"messageCount": 1, "instructions": "System"}
+        ]
         assert "metadata" not in state["agentSessions"]["molecule:node_1"]
         assert "messageMetadata" not in state["agentSessions"]["molecule:node_1"]
+        assert "agentKey" not in state["agentSessions"]["molecule:node_1"]
         runtime_config = state["agentSessions"]["molecule:node_1"]["runtimeConfig"]
-        assert runtime_config["agentKey"] == "molecule:node_1"
         assert "agentName" not in runtime_config
         assert runtime_config["backend"] == "dummy"
-        assert set(runtime_config) == {"agentKey", "backend", "model"}
+        assert set(runtime_config) == {"backend", "model"}
         assert (
             state["agentSessions"]["molecule:node_1"]["modelInfo"]["model"]
             == "dummy-model"
@@ -111,6 +118,9 @@ def test_experiment_saves_and_rehydrates_raw_agent_sessions():
         restored_agent = restored.agent_registry["molecule:node_1"].agent
         assert isinstance(restored_agent, DummyAgent)
         assert restored_agent.loaded_memory == agent.saved_memory
+        assert restored_agent.instruction_history == [
+            AgentInstructionSnapshot(message_count=1, instructions="System")
+        ]
 
         restored_agent = restored.create_agent_with_experiment_state(
             Task(system_prompt="System", user_prompt="Continue"),
@@ -135,9 +145,7 @@ def test_experiment_load_state_rejects_backend_mismatch():
         "items": [],
         "agentSessions": {
             "molecule:node_1": {
-                "agentKey": "molecule:node_1",
                 "runtimeConfig": {
-                    "agentKey": "molecule:node_1",
                     "backend": "other",
                     "model": "dummy-model",
                 },
