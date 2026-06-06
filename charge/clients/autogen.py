@@ -519,8 +519,11 @@ class AutoGenAgent(Agent):
         try:
             agent = self._create_agent()
             user_prompt = self._prepare_task_prompt()
+            self.begin_task_run()
+            await self.notify_task_start()
             result = await self._execute_with_retries(agent, user_prompt)
         finally:
+            self.finish_task_run()
             await self.close_workbenches()
 
         return result

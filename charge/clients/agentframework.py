@@ -34,7 +34,6 @@ from charge.clients.agent_factory import (
     AgentBackend,
     Agent,
     AgentCallbackType,
-    AgentInstructionSnapshot,
     ReasoningCallbackType,
 )
 from charge.clients.agentframework_utils import (
@@ -626,16 +625,17 @@ class AgentFrameworkAgent(Agent):
 
             # Prepare prompt
             user_prompt = self._prepare_task_prompt()
+            self.begin_task_run()
+            await self.notify_task_start()
 
             # Execute with retries
             result = await self._execute_with_retries(
                 self._af_agent, user_prompt, self._agent_session, reasoning_callback
             )
-            self._capture_instruction_snapshot(instructions)
-
             return result
 
         finally:
+            self.finish_task_run()
             await self.close_workbenches()
 
     def get_model_info(self) -> dict[str, Any]:
@@ -662,37 +662,6 @@ class AgentFrameworkAgent(Agent):
         if self._agent_session is None:
             return ""
         return json.dumps(self._agent_session.to_dict())
-
-    @staticmethod
-    def _session_messages(session: AgentSession) -> list[dict[str, Any]]:
-        session_dict = session.to_dict()
-        messages = (
-            session_dict.get("state", {}).get("in_memory", {}).get("messages", [])
-        )
-        return messages if isinstance(messages, list) else []
-
-    def _capture_instruction_snapshot(self, instructions: str) -> None:
-        if self._agent_session is None:
-            return
-        instructions = instructions.strip()
-        if not instructions:
-            return
-
-        message_count = len(self._session_messages(self._agent_session))
-        if message_count <= 0:
-            return
-
-        snapshot = AgentInstructionSnapshot(
-            message_count=message_count,
-            instructions=instructions,
-        )
-        if (
-            self.instruction_history
-            and self.instruction_history[-1].message_count == message_count
-        ):
-            self.instruction_history[-1] = snapshot
-        else:
-            self.instruction_history.append(snapshot)
 
 
 class AgentFrameworkBackend(AgentBackend):

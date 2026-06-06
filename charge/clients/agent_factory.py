@@ -2,6 +2,7 @@ from charge.tasks.task import Task
 from charge.experiments.memory import Memory
 from abc import abstractmethod
 from dataclasses import dataclass
+import json
 import warnings
 from typing import Any, Awaitable, Callable, Literal, Optional, Protocol, TypeAlias
 
@@ -81,6 +82,84 @@ class Agent:
         self.callback: AgentCallbackType = callback
         self.kwargs = kwargs
         self.instruction_history = []
+        self.pending_user_message: Optional[dict[str, Any]] = None
+
+    def _message_count(self) -> int:
+        try:
+            memory = json.loads(self.save_memory() or "{}")
+        except (TypeError, ValueError):
+            return 0
+        if not isinstance(memory, dict):
+            return 0
+        state = memory.get("state")
+        if not isinstance(state, dict):
+            return 0
+        in_memory = state.get("in_memory")
+        if not isinstance(in_memory, dict):
+            return 0
+        messages = in_memory.get("messages")
+        return len(messages) if isinstance(messages, list) else 0
+
+    def begin_task_run(self) -> None:
+        if self.task is None:
+            self.pending_user_message = None
+            return
+        text = self.task.get_user_prompt().strip()
+        if not text:
+            self.pending_user_message = None
+            return
+        pending: dict[str, Any] = {
+            "text": text,
+            "afterMessageCount": self._message_count(),
+        }
+        attachments = getattr(self.task, "attachments", []) or []
+        images = []
+        for attachment in attachments:
+            if not isinstance(attachment, dict):
+                continue
+            images.append(
+                {
+                    "id": str(attachment.get("id") or f"image_{len(images) + 1}"),
+                    "name": str(attachment.get("name") or f"Image {len(images) + 1}"),
+                    "mimeType": str(attachment.get("mimeType") or ""),
+                    "sizeBytes": int(attachment.get("sizeBytes") or 0),
+                    "dataUrl": attachment.get("dataUrl"),
+                }
+            )
+        if images:
+            pending["images"] = images
+        self.pending_user_message = pending
+
+    def finish_task_run(self) -> None:
+        self._capture_instruction_snapshot()
+        self.pending_user_message = None
+
+    def _capture_instruction_snapshot(self) -> None:
+        if self.task is None:
+            return
+        instructions = self.task.get_system_prompt().strip()
+        if not instructions:
+            return
+        message_count = self._message_count()
+        if message_count <= 0:
+            return
+        snapshot = AgentInstructionSnapshot(
+            message_count=message_count,
+            instructions=instructions,
+        )
+        if (
+            self.instruction_history
+            and self.instruction_history[-1].message_count == message_count
+        ):
+            self.instruction_history[-1] = snapshot
+        else:
+            self.instruction_history.append(snapshot)
+
+    async def notify_task_start(self) -> None:
+        callback = self.callback
+        on_task_start = getattr(callback, "on_task_start", None)
+        if on_task_start is not None:
+            await on_task_start()
 
     @abstractmethod
     def run(self, reasoning_callback: ReasoningCallbackType = None, **kwargs) -> Any:
@@ -290,6 +369,8 @@ def serialize_agent_session(
         record["instructionHistory"] = [
             snapshot.to_json() for snapshot in agent.instruction_history
         ]
+    if agent.pending_user_message:
+        record["pendingUserMessage"] = agent.pending_user_message
     return record
 
 
