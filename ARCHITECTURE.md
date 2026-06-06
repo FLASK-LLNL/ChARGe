@@ -32,7 +32,7 @@ Structured output is represented by a Pydantic `BaseModel` subclass. `Task.check
 
 `AgentFactory` provides a registry of named backend instances. Backends implement `AgentBackend.create_agent(task=...)` and produce `Agent` instances with an async `run()` method.
 
-The AutoGen path builds model clients, MCP workbenches, and tool wrappers around AutoGen agent primitives. It supports a broader set of providers, including OpenAI-compatible endpoints and local-style backends such as Ollama, Hugging Face, and vLLM where implemented.
+[DEPRECATED] The AutoGen path builds model clients, MCP workbenches, and tool wrappers around AutoGen agent primitives. It supports a broader set of providers, including OpenAI-compatible endpoints and local-style backends such as Ollama, Hugging Face, and vLLM where implemented.
 
 The Agent Framework path builds Microsoft Agent Framework clients and tool adapters. It is primarily for OpenAI-compatible endpoints. When changing shared model configuration, verify both backend implementations because they translate settings differently.
 
