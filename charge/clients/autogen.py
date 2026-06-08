@@ -524,6 +524,7 @@ class AutoGenAgent(Agent):
             result = await self._execute_with_retries(agent, user_prompt)
         finally:
             self.finish_task_run()
+            await self.notify_task_finish()
             await self.close_workbenches()
 
         return result

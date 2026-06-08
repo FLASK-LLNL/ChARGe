@@ -15,6 +15,10 @@ ReasoningCallbackType: TypeAlias = Optional[Callable[[str], Awaitable[None]]]
 
 
 class AgentCallback(Protocol):
+    async def on_task_start(self) -> None: ...
+
+    async def on_task_finish(self) -> None: ...
+
     async def on_tool_call(
         self,
         tool_name: str,
@@ -156,10 +160,12 @@ class Agent:
             self.instruction_history.append(snapshot)
 
     async def notify_task_start(self) -> None:
-        callback = self.callback
-        on_task_start = getattr(callback, "on_task_start", None)
-        if on_task_start is not None:
-            await on_task_start()
+        if self.callback is not None:
+            await self.callback.on_task_start()
+
+    async def notify_task_finish(self) -> None:
+        if self.callback is not None:
+            await self.callback.on_task_finish()
 
     @abstractmethod
     def run(self, reasoning_callback: ReasoningCallbackType = None, **kwargs) -> Any:
