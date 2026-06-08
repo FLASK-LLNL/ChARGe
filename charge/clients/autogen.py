@@ -40,7 +40,6 @@ from charge.clients.agent_factory import (
     AgentFactory,
     Agent,
     AgentCallbackType,
-    ReasoningCallbackType,
 )
 from charge.clients.client import Client
 from charge.clients.huggingface_client import HuggingFaceLocalClient
@@ -500,9 +499,7 @@ class AutoGenAgent(Agent):
             f"Last error: {last_error}"
         )
 
-    async def run(
-        self, reasoning_callback: ReasoningCallbackType = None, **kwargs
-    ) -> str:
+    async def run(self, **kwargs) -> str:
         """
         Runs the agent.
 

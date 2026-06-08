@@ -29,7 +29,7 @@ class DummyAgent(Agent):
         self.saved_memory = ""
         self.loaded_memory = ""
 
-    def run(self, reasoning_callback=None, **kwargs) -> str:
+    def run(self, **kwargs) -> str:
         return "ok"
 
     def load_memory(self, json_str: str) -> None:

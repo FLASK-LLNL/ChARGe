@@ -4,20 +4,25 @@ from abc import abstractmethod
 from dataclasses import dataclass
 import json
 import warnings
-from typing import Any, Awaitable, Callable, Literal, Optional, Protocol, TypeAlias
+from typing import Any, Literal, Optional, Protocol, TypeAlias
 
 DEFAULT_BACKEND = "agentframework"
 """
 Default backend to use for agent factory
 """
 
-ReasoningCallbackType: TypeAlias = Optional[Callable[[str], Awaitable[None]]]
-
 
 class AgentCallback(Protocol):
     async def on_task_start(self) -> None: ...
 
     async def on_task_finish(self) -> None: ...
+
+    async def on_reasoning_update(
+        self,
+        text: str,
+        *,
+        source: Optional[str] = None,
+    ) -> None: ...
 
     async def on_tool_call(
         self,
@@ -168,7 +173,7 @@ class Agent:
             await self.callback.on_task_finish()
 
     @abstractmethod
-    def run(self, reasoning_callback: ReasoningCallbackType = None, **kwargs) -> Any:
+    def run(self, **kwargs) -> Any:
         """
         Abstract method to run the Agent's task.
         """

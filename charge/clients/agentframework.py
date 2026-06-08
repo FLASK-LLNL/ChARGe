@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import inspect
 import json
-from typing import Any, Awaitable, Callable, Optional, Union, List, Literal
+from typing import Any, Callable, Optional, Union, List, Literal
 
 from loguru import logger
 
@@ -34,7 +34,6 @@ from charge.clients.agent_factory import (
     AgentBackend,
     Agent,
     AgentCallbackType,
-    ReasoningCallbackType,
 )
 from charge.clients.agentframework_utils import (
     POSSIBLE_CONNECTION_ERRORS,
@@ -381,7 +380,6 @@ class AgentFrameworkAgent(Agent):
         agent: AFAgent,
         user_prompt: str | list[Content],
         session: AgentSession,
-        reasoning_callback: ReasoningCallbackType,
     ) -> str:
         """
         Executes the agent with retry logic and output validation.
@@ -390,9 +388,6 @@ class AgentFrameworkAgent(Agent):
             agent: The agent instance to run.
             user_prompt: The prompt to send to the agent.
             session: The agent session for conversation state.
-            reasoning_callback: An optional function to be called whenever a
-                                reasoning summary is generated.
-
         Returns:
             Valid output content as a string.
 
@@ -425,8 +420,11 @@ class AgentFrameworkAgent(Agent):
                             or "thinking_summary" in raw_type
                         ) and raw_type.endswith(".done"):
                             # Reasoning summary - use callback to transmit back
-                            if reasoning_callback and update.contents[0].text:
-                                await reasoning_callback(update.contents[0].text)
+                            if self.callback is not None and update.contents[0].text:
+                                await self.callback.on_reasoning_update(
+                                    update.contents[0].text,
+                                    source=self.agent_key,
+                                )
                                 logger.debug(
                                     f"Captured reasoning summary from event: {raw_type}"
                                 )
@@ -591,9 +589,7 @@ class AgentFrameworkAgent(Agent):
             logger.error(f"Failed to convert to structured format: {e}")
             raise ValueError(f"Structured output conversion failed: {e}") from e
 
-    async def run(
-        self, reasoning_callback: ReasoningCallbackType = None, **kwargs
-    ) -> str:
+    async def run(self, **kwargs) -> str:
         """
         Runs the agent.
 
@@ -630,7 +626,7 @@ class AgentFrameworkAgent(Agent):
 
             # Execute with retries
             result = await self._execute_with_retries(
-                self._af_agent, user_prompt, self._agent_session, reasoning_callback
+                self._af_agent, user_prompt, self._agent_session
             )
             return result
 

@@ -6,7 +6,6 @@ from charge.clients.agent_factory import (
     AgentCallbackType,
     AgentFactory,
     AgentRuntimeConfig,
-    ReasoningCallbackType,
     create_agent_for_runtime_config,
     restore_agent_session,
     serialize_agent_session,
@@ -153,7 +152,6 @@ class Experiment:
 
     async def run_async(
         self,
-        reasoning_callback: ReasoningCallbackType = None,
         *,
         agent_key: Optional[str] = None,
         callback: AgentCallbackType = None,
@@ -167,13 +165,12 @@ class Experiment:
                 callback=callback,
                 **kwargs,
             )
-            result = await maybe_await_async(agent.run, reasoning_callback)
+            result = await maybe_await_async(agent.run)
             await maybe_await_async(self.add_to_context, agent, current_task, result)
             self.finished_tasks.append((current_task, result))
 
     def run(
         self,
-        reasoning_callback: ReasoningCallbackType = None,
         *,
         agent_key: Optional[str] = None,
         callback: AgentCallbackType = None,
@@ -181,7 +178,6 @@ class Experiment:
     ) -> None:
         asyncio.run(
             self.run_async(
-                reasoning_callback,
                 agent_key=agent_key,
                 callback=callback,
                 **kwargs,
