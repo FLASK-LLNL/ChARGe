@@ -81,6 +81,7 @@ def _usage_details_to_dict(usage_details: Any) -> dict[str, int]:
                 "input_token_count",
                 "output_token_count",
                 "reasoning_token_count",
+                "openai.reasoning_tokens",
                 "total_token_count",
             )
         }
@@ -93,6 +94,7 @@ def _usage_details_to_dict(usage_details: Any) -> dict[str, int]:
         "input_token_count": "inputTokens",
         "output_token_count": "outputTokens",
         "reasoning_token_count": "reasoningTokens",
+        "openai.reasoning_tokens": "reasoningTokens",
         "total_token_count": "totalTokens",
     }
     if isinstance(source.get("output_tokens_details"), dict):
