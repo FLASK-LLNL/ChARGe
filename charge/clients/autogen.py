@@ -39,7 +39,7 @@ from charge.clients.agent_factory import (
     AgentBackend,
     AgentFactory,
     Agent,
-    ReasoningCallbackType,
+    AgentCallbackType,
 )
 from charge.clients.client import Client
 from charge.clients.huggingface_client import HuggingFaceLocalClient
@@ -230,7 +230,7 @@ class AutoGenAgent(Agent):
         self,
         task: Optional[Task],
         model_client: Union[AsyncOpenAI, ChatCompletionClient],
-        agent_name: str,
+        agent_key: str,
         model: str,
         memory: Optional[Any] = None,
         max_retries: int = 3,
@@ -239,14 +239,15 @@ class AutoGenAgent(Agent):
         backend: Optional[str] = None,
         model_kwargs: Optional[dict] = None,
         builtin_tools: Optional[list[Any]] = None,
+        callback: AgentCallbackType = None,
         **kwargs,
     ) -> None:
-        super().__init__(task=task, **kwargs)
+        super().__init__(task=task, callback=callback, **kwargs)
         self.max_retries = max_retries
         self.max_tool_calls = max_tool_calls
         self.workbenches: List[McpWorkbench] = []
         self.builtin_tools = builtin_tools or []
-        self.agent_name = agent_name
+        self.agent_key = agent_key
         self.model_client = model_client
         self.timeout = timeout
         self.memory: list[ChARGeListMemory] | ChARGeListMemory = self.setup_memory(
@@ -254,7 +255,6 @@ class AutoGenAgent(Agent):
         )
         self.setup_kwargs = kwargs
 
-        self.context_history = []
         self.model = model
         self.backend = backend
         self.model_kwargs = model_kwargs if model_kwargs is not None else {}
@@ -339,7 +339,7 @@ class AutoGenAgent(Agent):
             self.task.get_system_prompt(),
             self.workbenches,
             max_tool_calls=self.max_tool_calls,
-            name=self.agent_name,
+            name=self.agent_key,
             memory=self.memory,
             builtin_tools=self._get_wrapped_builtin_tools(),
             **self.setup_kwargs,
@@ -413,7 +413,7 @@ class AutoGenAgent(Agent):
             assert self.task is not None
             self._structured_output_agent = generate_agent(
                 self.model_client,
-                f"{self.agent_name}_structured_output",
+                f"{self.agent_key}_structured_output",
                 "You are an agent that converts model output to a structured format.",
                 [],  # No tools needed
                 max_tool_calls=1,
@@ -444,7 +444,6 @@ class AutoGenAgent(Agent):
             try:
                 logger.info(f"Attempt {attempt}/{self.max_retries}")
                 result = await agent.run(task=user_prompt)
-                self.context_history.append(result)
 
                 if not result.messages:
                     logger.warning(f"Attempt {attempt}: No messages in result")
@@ -500,9 +499,7 @@ class AutoGenAgent(Agent):
             f"Last error: {last_error}"
         )
 
-    async def run(
-        self, reasoning_callback: ReasoningCallbackType = None, **kwargs
-    ) -> str:
+    async def run(self, **kwargs) -> str:
         """
         Runs the agent.
 
@@ -519,8 +516,12 @@ class AutoGenAgent(Agent):
         try:
             agent = self._create_agent()
             user_prompt = self._prepare_task_prompt()
+            self.begin_task_run()
+            await self.notify_task_start()
             result = await self._execute_with_retries(agent, user_prompt)
         finally:
+            self.finish_task_run()
+            await self.notify_task_finish()
             await self.close_workbenches()
 
         return result
@@ -584,18 +585,6 @@ class AutoGenAgent(Agent):
             await self.model_client.close()
         return agent_state
 
-    def get_context_history(self) -> list:
-        """
-        Returns the context history of the agent.
-        """
-        return self.context_history
-
-    def load_context_history(self, history: list) -> None:
-        """
-        Loads the context history into the agent.
-        """
-        self.context_history = history
-
     def load_memory(self, json_str: str) -> None:
         """
         Loads memory content into the agent's memory.
@@ -645,7 +634,7 @@ class AutoGenAgent(Agent):
             mime_type=MemoryMimeType.TEXT,
         )
 
-        name = self.agent_name or "Agent"
+        name = self.agent_key or "Agent"
         if isinstance(self.memory, list):
             await self.memory[-1].add(content, source_agent=name)
         else:
@@ -666,7 +655,7 @@ class AutoGenAgent(Agent):
             mime_type=MemoryMimeType.TEXT,
         )
 
-        name = self.agent_name or "Agent"
+        name = self.agent_key or "Agent"
         if isinstance(self.memory, list):
             self.memory[-1].add_sync(content, source_agent=name)
         else:
@@ -748,15 +737,16 @@ class AutoGenBackend(AgentBackend):
         self,
         task: Optional[Task],
         max_retries: int = 3,
-        agent_name: Optional[str] = None,
+        agent_key: Optional[str] = None,
         memory: Optional[Memory] = None,
+        callback: AgentCallbackType = None,
         **kwargs,
     ):
         """Creates an AutoGen agent for the given task.
         Args:
             task (Task): The task to be performed by the agent.
             max_retries (int, optional): Maximum number of retries for failed tasks. Defaults to 3.
-            agent_name (Optional[str], optional): Name of the agent. If None, a default name will be assigned. Defaults to None.
+            agent_key (Optional[str], optional): Name of the agent. If None, a default name will be assigned. Defaults to None.
             **kwargs: Additional keyword arguments.
         Returns:
             AutoGenAgent: The created AutoGen agent.
@@ -768,17 +758,18 @@ class AutoGenBackend(AgentBackend):
 
         AutoGenBackend.AGENT_COUNT += 1
 
-        default_name = f"autogen_agent_{AutoGenBackend.AGENT_COUNT}"
-        agent_name = default_name if agent_name is None else agent_name
+        default_key = f"autogen_agent_{AutoGenBackend.AGENT_COUNT}"
+        agent_key = default_key if agent_key is None else agent_key
 
         agent = AutoGenAgent(
             task=task,
             model_client=self.model_client,
-            agent_name=agent_name,
+            agent_key=agent_key,
             max_retries=max_retries,
             model=self.model,  # type: ignore
             backend=self.backend,
             model_kwargs=self.model_kwargs,
+            callback=callback,
             **kwargs,
         )
         # Add memory

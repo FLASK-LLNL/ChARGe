@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import inspect
 import json
-from typing import Any, Awaitable, Callable, Optional, Union, List, Literal
+from typing import Any, Callable, Optional, Union, List, Literal
 
 from loguru import logger
 
@@ -30,7 +30,11 @@ except ImportError:
         "Install with: pip install 'charge[agentframework]'"
     )
 
-from charge.clients.agent_factory import AgentBackend, Agent, ReasoningCallbackType
+from charge.clients.agent_factory import (
+    AgentBackend,
+    Agent,
+    AgentCallbackType,
+)
 from charge.clients.agentframework_utils import (
     POSSIBLE_CONNECTION_ERRORS,
     setup_mcp_tools,
@@ -62,6 +66,52 @@ def _wrap_agentframework_builtin_tool(tool_obj: Any) -> Any:
     )
     setattr(wrapped_tool, "_charge_agentframework_wrapped", True)
     return wrapped_tool
+
+
+def _usage_details_to_dict(usage_details: Any) -> dict[str, int]:
+    if not usage_details:
+        return {}
+    usage: dict[str, int] = {}
+    if isinstance(usage_details, dict):
+        source = usage_details
+    else:
+        source = {
+            key: getattr(usage_details, key, None)
+            for key in (
+                "input_token_count",
+                "output_token_count",
+                "reasoning_token_count",
+                "openai.reasoning_tokens",
+                "total_token_count",
+            )
+        }
+        output_details = getattr(usage_details, "output_tokens_details", None)
+        if output_details is not None:
+            source["reasoning_token_count"] = getattr(
+                output_details, "reasoning_tokens", None
+            )
+    mapping = {
+        "input_token_count": "inputTokens",
+        "output_token_count": "outputTokens",
+        "reasoning_token_count": "reasoningTokens",
+        "openai.reasoning_tokens": "reasoningTokens",
+        "total_token_count": "totalTokens",
+    }
+    if isinstance(source.get("output_tokens_details"), dict):
+        reasoning_tokens = source["output_tokens_details"].get("reasoning_tokens")
+        if isinstance(reasoning_tokens, int):
+            source["reasoning_token_count"] = reasoning_tokens
+    for source_key, target_key in mapping.items():
+        value = source.get(source_key)
+        if isinstance(value, int):
+            usage[target_key] = value
+    if "totalTokens" not in usage and (
+        "inputTokens" in usage or "outputTokens" in usage
+    ):
+        usage["totalTokens"] = usage.get("inputTokens", 0) + usage.get(
+            "outputTokens", 0
+        )
+    return usage
 
 
 def create_agentframework_client(
@@ -133,7 +183,7 @@ class AgentFrameworkAgent(Agent):
     Args:
         task (Task): The task to be performed by the agent.
         client: The Agent Framework client.
-        agent_name (str): Name of the agent.
+        agent_key (str): Name of the agent.
         model (str): Model name.
         memory (Optional[Any], optional): Memory instance for conversation state. Defaults to None.
         max_retries (int, optional): Maximum number of retries. Defaults to 3.
@@ -146,7 +196,7 @@ class AgentFrameworkAgent(Agent):
         self,
         task: Optional[Task],
         client: OpenAIChatClient,
-        agent_name: str,
+        agent_key: str,
         model: str | None,
         memory: Optional[Memory] = None,
         max_retries: int = 3,
@@ -156,21 +206,19 @@ class AgentFrameworkAgent(Agent):
         model_kwargs: Optional[dict] = None,
         reasoning_effort: Literal["low", "medium", "high"] = "medium",
         builtin_tools: Optional[list[Any]] = None,
-        callback: Optional[Any] = None,
+        callback: AgentCallbackType = None,
         **kwargs,
     ) -> None:
-        super().__init__(task=task, **kwargs)
+        super().__init__(task=task, callback=callback, **kwargs)
         self.max_retries = max_retries
         self.max_tool_calls = max_tool_calls
         self.workbenches: List[Any] = []  # Will be MCP workbenches
         self.builtin_tools = builtin_tools or []
-        self.agent_name = agent_name
+        self.agent_key = agent_key
         self.client = client
         self.timeout = timeout
         self.setup_kwargs = kwargs
         self.reasoning_effort = reasoning_effort
-        self.callback = callback
-
         self.model = model
         self.backend = backend
         self.model_kwargs = model_kwargs if model_kwargs is not None else {}
@@ -179,6 +227,7 @@ class AgentFrameworkAgent(Agent):
         self._agent_signature: Optional[tuple[Any, ...]] = None
 
         self._agent_session: Optional[AgentSession] = None
+        self._last_usage: dict[str, int] = {}
 
     def _resolve_builtin_tools(self) -> list[Any]:
         task_builtin_tools = (
@@ -206,19 +255,6 @@ class AgentFrameworkAgent(Agent):
             getattr(tool_obj, "__name__", repr(tool_obj))
             for tool_obj in self._resolve_builtin_tools()
         )
-        attachments = (
-            tuple(
-                (
-                    str(attachment.get("id", "")),
-                    str(attachment.get("mimeType", "")),
-                    str(attachment.get("dataUrl", "")),
-                )
-                for attachment in (getattr(self.task, "attachments", []) or [])
-                if isinstance(attachment, dict)
-            )
-            if self.task is not None
-            else ()
-        )
         server_files = tuple(self.task.server_files or []) if self.task else ()
         server_urls = tuple(self.task.server_urls or []) if self.task else ()
         mcp_server_allowed_tools = (
@@ -240,18 +276,17 @@ class AgentFrameworkAgent(Agent):
             server_urls,
             builtin_tool_names,
             mcp_server_allowed_tools,
-            attachments,
         )
 
     def _create_agent(
         self,
-        agent_name: str,
+        agent_key: str,
         reasoning_effort: Literal["low", "medium", "high"],
         instructions: str,
     ) -> AFAgent:
         af_agent = AFAgent[OpenAIChatOptions](
             client=self.client,
-            name=agent_name,
+            name=agent_key,
             instructions=instructions,
             tools=self.workbenches,
             default_options={
@@ -347,7 +382,6 @@ class AgentFrameworkAgent(Agent):
         agent: AFAgent,
         user_prompt: str | list[Content],
         session: AgentSession,
-        reasoning_callback: ReasoningCallbackType,
     ) -> str:
         """
         Executes the agent with retry logic and output validation.
@@ -356,9 +390,6 @@ class AgentFrameworkAgent(Agent):
             agent: The agent instance to run.
             user_prompt: The prompt to send to the agent.
             session: The agent session for conversation state.
-            reasoning_callback: An optional function to be called whenever a
-                                reasoning summary is generated.
-
         Returns:
             Valid output content as a string.
 
@@ -391,8 +422,11 @@ class AgentFrameworkAgent(Agent):
                             or "thinking_summary" in raw_type
                         ) and raw_type.endswith(".done"):
                             # Reasoning summary - use callback to transmit back
-                            if reasoning_callback and update.contents[0].text:
-                                await reasoning_callback(update.contents[0].text)
+                            if self.callback is not None and update.contents[0].text:
+                                await self.callback.on_reasoning_update(
+                                    update.contents[0].text,
+                                    source=self.agent_key,
+                                )
                                 logger.debug(
                                     f"Captured reasoning summary from event: {raw_type}"
                                 )
@@ -407,56 +441,53 @@ class AgentFrameworkAgent(Agent):
                             if call_id and tool_name:
                                 tool_call_names[call_id] = tool_name
                             if self.callback is not None and tool_name and call_id:
-                                if hasattr(self.callback, "on_tool_call"):
-                                    await maybe_await_async(
-                                        self.callback.on_tool_call,
-                                        tool_name,
-                                        content.arguments,
-                                        source=self.agent_name,
-                                        call_id=call_id,
-                                    )
+                                await maybe_await_async(
+                                    self.callback.on_tool_call,
+                                    tool_name,
+                                    content.arguments,
+                                    source=self.agent_key,
+                                    call_id=call_id,
+                                )
                         elif content_type == "mcp_server_tool_call":
                             call_id = content.call_id
                             tool_name = content.tool_name
                             if call_id and tool_name:
                                 tool_call_names[call_id] = tool_name
                             if self.callback is not None and tool_name and call_id:
-                                if hasattr(self.callback, "on_tool_call"):
-                                    await maybe_await_async(
-                                        self.callback.on_tool_call,
-                                        tool_name,
-                                        content.arguments,
-                                        source=self.agent_name,
-                                        call_id=call_id,
-                                    )
+                                await maybe_await_async(
+                                    self.callback.on_tool_call,
+                                    tool_name,
+                                    content.arguments,
+                                    source=self.agent_key,
+                                    call_id=call_id,
+                                )
                         elif content_type == "function_result":
                             call_id = content.call_id
                             tool_name = tool_call_names.get(call_id or "", "tool")
-                            if self.callback is not None and hasattr(
-                                self.callback, "on_tool_result"
-                            ):
+                            if self.callback is not None:
                                 await maybe_await_async(
                                     self.callback.on_tool_result,
                                     tool_name,
                                     content.result,
                                     is_error=bool(content.exception),
-                                    source=self.agent_name,
+                                    source=self.agent_key,
                                     call_id=call_id,
                                 )
                         elif content_type == "mcp_server_tool_result":
                             call_id = content.call_id
                             tool_name = tool_call_names.get(call_id or "", "tool")
-                            if self.callback is not None and hasattr(
-                                self.callback, "on_tool_result"
-                            ):
+                            if self.callback is not None:
                                 await maybe_await_async(
                                     self.callback.on_tool_result,
                                     tool_name,
                                     content.output,
-                                    source=self.agent_name,
+                                    source=self.agent_key,
                                     call_id=call_id,
                                 )
                 result = await stream.get_final_response()
+                self._last_usage = _usage_details_to_dict(
+                    getattr(result, "usage_details", None)
+                )
 
                 # Extract content from result
                 proposed_content = ""
@@ -536,7 +567,7 @@ class AgentFrameworkAgent(Agent):
             schema = structured_out.model_json_schema()
 
             conversion_agent = self._create_agent(
-                f"{self.agent_name}_structured_output",
+                f"{self.agent_key}_structured_output",
                 reasoning_effort="low",
                 instructions="You are an agent that converts model output to a structured JSON format.",
             )
@@ -560,9 +591,7 @@ class AgentFrameworkAgent(Agent):
             logger.error(f"Failed to convert to structured format: {e}")
             raise ValueError(f"Structured output conversion failed: {e}") from e
 
-    async def run(
-        self, reasoning_callback: ReasoningCallbackType = None, **kwargs
-    ) -> str:
+    async def run(self, **kwargs) -> str:
         """
         Runs the agent.
 
@@ -571,7 +600,7 @@ class AgentFrameworkAgent(Agent):
                  the output will be checked with the task's formatting method and
                  the json string will be returned.
         """
-        logger.info(f"Running Agent Framework agent: {self.agent_name}")
+        logger.info(f"Running Agent Framework agent: {self.agent_key}")
 
         # Set up workbenches from task server paths
         await self.setup_mcp_workbenches()
@@ -579,15 +608,14 @@ class AgentFrameworkAgent(Agent):
         try:
             # Create agent
             agent_signature = self._get_agent_signature()
+            instructions = (
+                self.task.get_system_prompt() if self.task is not None else ""
+            )
             if self._af_agent is None or self._agent_signature != agent_signature:
-                instructions = (
-                    self.task.get_system_prompt() if self.task is not None else ""
-                )
                 self._af_agent = self._create_agent(
-                    self.agent_name, self.reasoning_effort, instructions=instructions
+                    self.agent_key, self.reasoning_effort, instructions=instructions
                 )
                 self._agent_signature = agent_signature
-                self._agent_session = None
 
             # Create or reuse session for stateful conversation
             if self._agent_session is None:
@@ -595,15 +623,18 @@ class AgentFrameworkAgent(Agent):
 
             # Prepare prompt
             user_prompt = self._prepare_task_prompt()
+            self.begin_task_run()
+            await self.notify_task_start()
 
             # Execute with retries
             result = await self._execute_with_retries(
-                self._af_agent, user_prompt, self._agent_session, reasoning_callback
+                self._af_agent, user_prompt, self._agent_session
             )
-
             return result
 
         finally:
+            self.finish_task_run()
+            await self.notify_task_finish()
             await self.close_workbenches()
 
     def get_model_info(self) -> dict[str, Any]:
@@ -614,6 +645,7 @@ class AgentFrameworkAgent(Agent):
             "model": self.model,
             "backend": self.backend,
             "model_kwargs": self.model_kwargs,
+            "lastUsage": self._last_usage,
         }
 
     def load_memory(self, json_str: str) -> None:
@@ -707,8 +739,9 @@ class AgentFrameworkBackend(AgentBackend):
         self,
         task: Optional[Task],
         max_retries: int = 3,
-        agent_name: Optional[str] = None,
+        agent_key: Optional[str] = None,
         memory: Optional[Memory] = None,
+        callback: AgentCallbackType = None,
         **kwargs,
     ) -> AgentFrameworkAgent:
         self.max_retries = max_retries
@@ -717,19 +750,20 @@ class AgentFrameworkBackend(AgentBackend):
         ), "Chat client must be initialized to create an agent."
 
         AgentFrameworkBackend.AGENT_COUNT += 1
-        default_name = f"af_agent_{AgentFrameworkBackend.AGENT_COUNT}"
-        agent_name = default_name if agent_name is None else agent_name
+        default_key = f"af_agent_{AgentFrameworkBackend.AGENT_COUNT}"
+        agent_key = default_key if agent_key is None else agent_key
 
         agent = AgentFrameworkAgent(
             task=task,
             client=self.client,
-            agent_name=agent_name,
+            agent_key=agent_key,
             max_retries=max_retries,
             model=self.model,
             backend=self.backend,
             model_kwargs=self.model_kwargs,
             memory=memory,
             reasoning_effort=self.reasoning_effort,
+            callback=callback,
             **kwargs,
         )
         return agent

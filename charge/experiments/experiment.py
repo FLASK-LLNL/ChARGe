@@ -1,9 +1,25 @@
-from typing import Any, Callable, List, Union, Optional
+from dataclasses import dataclass
+from typing import Any, List, Union, Optional
 from charge.tasks.task import Task
-from charge.clients.agent_factory import Agent, AgentFactory, ReasoningCallbackType
+from charge.clients.agent_factory import (
+    Agent,
+    AgentCallbackType,
+    AgentFactory,
+    AgentRuntimeConfig,
+    create_agent_for_runtime_config,
+    restore_agent_session,
+    serialize_agent_session,
+)
 from charge.experiments.memory import Memory, ListMemory
 from charge._utils import maybe_await_async
 import asyncio
+import json
+
+
+@dataclass
+class AgentRegistryEntry:
+    agent: Agent
+    runtime_config: AgentRuntimeConfig
 
 
 class Experiment:
@@ -19,14 +35,52 @@ class Experiment:
         self.tasks = task if isinstance(task, list) else [task]
         self.finished_tasks = []
         self.memory = memory or ListMemory()
-
+        self.agent_registry: dict[str, AgentRegistryEntry] = {}
         self.args = args
         self.kwargs = kwargs
 
-    def create_agent_with_experiment_state(self, task, **kwargs):
+    def create_agent_with_experiment_state(
+        self,
+        task,
+        *,
+        agent_key: Optional[str] = None,
+        callback: AgentCallbackType = None,
+        **kwargs,
+    ):
         # Create an agent that incorporates the experiment state
         # NOTE: Should self.context be passed into the agent?
-        return AgentFactory.create_agent(task=task, memory=self.memory, **kwargs)
+        if agent_key and agent_key in self.agent_registry:
+            registry_item = self.agent_registry[agent_key]
+            agent = registry_item.agent
+            if task is not None:
+                agent.task = task
+            if callback is not None:
+                agent.callback = callback
+            return agent
+
+        if agent_key:
+            runtime_config = AgentRuntimeConfig()
+            agent, runtime_config = create_agent_for_runtime_config(
+                task=task,
+                agent_key=agent_key,
+                memory=self.memory,
+                runtime_config=runtime_config,
+                create_kwargs=kwargs,
+                callback=callback,
+            )
+            self.agent_registry[agent_key] = AgentRegistryEntry(
+                agent=agent,
+                runtime_config=runtime_config,
+            )
+            return agent
+
+        agent = AgentFactory.create_agent(
+            task=task,
+            memory=self.memory,
+            callback=callback,
+            **kwargs,
+        )
+        return agent
 
     def add_to_context(self, agent: Agent, task: Task, result: Any):
         # Add the result to the context of the experiment
@@ -34,11 +88,36 @@ class Experiment:
 
     def save_state(self):
         # Save the state of the experiment
-        return self.memory.to_json()
+        state = self.memory.to_json()
+        agent_sessions = {}
+        for agent_key, registry_item in self.agent_registry.items():
+            agent_sessions[agent_key] = serialize_agent_session(
+                registry_item.agent, registry_item.runtime_config
+            )
+        if agent_sessions:
+            state["agentSessions"] = agent_sessions
+        return state
 
     def load_state(self, state):
         # Load the state of the experiment
+        if isinstance(state, str):
+            state = json.loads(state)
         self.memory = ListMemory.from_json(state)
+        self.agent_registry = {}
+        agent_sessions = state.get("agentSessions", {}) or {}
+        if not isinstance(agent_sessions, dict):
+            return
+        for raw_agent_key, record in agent_sessions.items():
+            if not isinstance(record, dict):
+                continue
+            agent_key = str(raw_agent_key)
+            agent, runtime_config = restore_agent_session(
+                agent_key, record, memory=self.memory
+            )
+            self.agent_registry[agent_key] = AgentRegistryEntry(
+                agent=agent,
+                runtime_config=runtime_config,
+            )
 
     def num_finished_tasks(self) -> int:
         """Returns the number of finished tasks.
@@ -72,17 +151,38 @@ class Experiment:
         return self.finished_tasks
 
     async def run_async(
-        self, reasoning_callback: ReasoningCallbackType, **kwargs
+        self,
+        *,
+        agent_key: Optional[str] = None,
+        callback: AgentCallbackType = None,
+        **kwargs,
     ) -> None:
         while self.tasks:
             current_task = self.tasks.pop(0)
-            agent = self.create_agent_with_experiment_state(task=current_task, **kwargs)
-            result = await maybe_await_async(agent.run, reasoning_callback)
+            agent = self.create_agent_with_experiment_state(
+                task=current_task,
+                agent_key=agent_key,
+                callback=callback,
+                **kwargs,
+            )
+            result = await maybe_await_async(agent.run)
             await maybe_await_async(self.add_to_context, agent, current_task, result)
             self.finished_tasks.append((current_task, result))
 
-    def run(self, reasoning_callback: ReasoningCallbackType) -> None:
-        asyncio.run(self.run_async(reasoning_callback))
+    def run(
+        self,
+        *,
+        agent_key: Optional[str] = None,
+        callback: AgentCallbackType = None,
+        **kwargs,
+    ) -> None:
+        asyncio.run(
+            self.run_async(
+                agent_key=agent_key,
+                callback=callback,
+                **kwargs,
+            )
+        )
 
     def reset(self):
         """
@@ -91,3 +191,4 @@ class Experiment:
         self.finished_tasks = []
         self.memory = ListMemory()
         self.tasks = []
+        self.agent_registry = {}

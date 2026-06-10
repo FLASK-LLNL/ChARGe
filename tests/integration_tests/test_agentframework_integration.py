@@ -126,7 +126,7 @@ class TestAgentFrameworkIntegration:
         import re
 
         # Run the experiment with two tasks
-        await self.experiment.run_async(backend="agentframework")
+        await self.experiment.run_async()
         finished_tasks = self.experiment.get_finished_tasks()
         assert len(finished_tasks) == 2
 
@@ -157,7 +157,7 @@ class TestAgentFrameworkIntegration:
         self.experiment.add_task(self.third_task)
         assert self.experiment.remaining_tasks() == 1
 
-        await self.experiment.run_async(backend="agentframework")
+        await self.experiment.run_async()
         finished_tasks = self.experiment.get_finished_tasks()
         assert len(finished_tasks) == 3
 
@@ -185,7 +185,7 @@ class TestAgentFrameworkIntegration:
         self.experiment.add_task(self.alternate_third_task)
         assert self.experiment.remaining_tasks() == 1
 
-        await self.experiment.run_async(backend="agentframework")
+        await self.experiment.run_async()
         finished_tasks = self.experiment.get_finished_tasks()
 
         third_task, third_task_result = finished_tasks[-1]
@@ -215,7 +215,7 @@ class TestAgentFrameworkIntegration:
         experiment.add_task(task1)
         experiment.add_task(task2)
 
-        await experiment.run_async(backend="agentframework")
+        await experiment.run_async()
         finished_tasks = experiment.get_finished_tasks()
 
         assert len(finished_tasks) == 2
