@@ -37,7 +37,6 @@ import os
 import warnings
 from charge.clients.agent_factory import (
     AgentBackend,
-    AgentFactory,
     Agent,
     AgentCallbackType,
 )

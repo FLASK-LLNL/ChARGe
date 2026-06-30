@@ -231,54 +231,6 @@ class AgentBackend:
         raise NotImplementedError
 
 
-class AgentFactory:
-    """
-    An Agent Factory that manages multiple Agents.
-
-    Each instance owns its own ``backends`` registry. This is deliberately not a
-    singleton: backends hold per-user credentials (API keys, base URLs, models),
-    so a shared registry would leak one user's configuration into another's
-    session. Construct one ``AgentFactory`` per user session.
-    """
-
-    def __init__(self) -> None:
-        self.backends: dict[str, AgentBackend] = {}
-
-    def create_agent(
-        self,
-        task: Optional[Task],
-        backend: str = DEFAULT_BACKEND,
-        agent_key: Optional[str] = None,
-        memory: Optional[Memory] = None,
-        callback: AgentCallbackType = None,
-        **kwargs,
-    ):
-        """
-        Create and return an Agent instance from a registered backend.
-        """
-        backend_key = backend.lower()
-        if backend_key not in self.backends:
-            raise TypeError(f"AgentFactory does not accept backend {backend!r}")
-        return self.backends[backend_key].create_agent(
-            task, agent_key=agent_key, memory=memory, callback=callback, **kwargs
-        )
-
-    def list_all_backends(self) -> list[str]:
-        """
-        Get a list of all Agent backends in the factory.
-        """
-        return list(self.backends.keys())
-
-    def default_backend(self) -> AgentBackend:
-        return self.backends[DEFAULT_BACKEND]
-
-    def register_backend(self, name: str, backend: AgentBackend):
-        """
-        Registers an agent creation backend with the given name.
-        """
-        self.backends[name.lower()] = backend
-
-
 @dataclass
 class AgentRuntimeConfig:
     backend: str = DEFAULT_BACKEND
@@ -286,15 +238,16 @@ class AgentRuntimeConfig:
 
     @classmethod
     def from_agent(
-        cls, *, agent: Agent, factory: "AgentFactory"
+        cls, *, agent: Agent, backend: AgentBackend
     ) -> "AgentRuntimeConfig":
         model_info = agent.get_model_info()
-        backend = model_info.get("backend") if isinstance(model_info, dict) else None
+        backend_name = (
+            model_info.get("backend") if isinstance(model_info, dict) else None
+        )
         model = model_info.get("model") if isinstance(model_info, dict) else None
-        backend_obj = factory.default_backend()
         return cls(
-            backend=str(backend or backend_obj.backend),
-            model=model or backend_obj.model,
+            backend=str(backend_name or backend.backend),
+            model=model or backend.model,
         )
 
     @classmethod
@@ -328,18 +281,18 @@ def create_agent_for_runtime_config(
     agent_key: str,
     memory: Optional[Memory],
     runtime_config: AgentRuntimeConfig,
-    factory: AgentFactory,
+    backend: AgentBackend,
     create_kwargs: Optional[dict[str, Any]] = None,
     callback: AgentCallbackType = None,
 ) -> tuple[Agent, AgentRuntimeConfig]:
-    agent = factory.create_agent(
+    agent = backend.create_agent(
         task=task,
         memory=memory,
         agent_key=agent_key,
         callback=callback,
         **(create_kwargs or {}),
     )
-    return agent, AgentRuntimeConfig.from_agent(agent=agent, factory=factory)
+    return agent, AgentRuntimeConfig.from_agent(agent=agent, backend=backend)
 
 
 def verify_restored_agent_config(
@@ -395,7 +348,7 @@ def restore_agent_session(
     record: dict[str, Any],
     *,
     memory: Optional[Memory],
-    factory: AgentFactory,
+    backend: AgentBackend,
 ) -> tuple[Agent, AgentRuntimeConfig]:
     task = None
     task_json = record.get("task")
@@ -416,7 +369,7 @@ def restore_agent_session(
         agent_key=agent_key,
         memory=memory,
         runtime_config=saved_config,
-        factory=factory,
+        backend=backend,
     )
     verify_restored_agent_config(agent_key, saved_config, current_config)
 

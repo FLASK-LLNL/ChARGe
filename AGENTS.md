@@ -4,11 +4,11 @@
 
 ChARGe provides the `charge` Python package used by FLASK Copilot for LLM-backed tasks, tool augmentation, backend clients, and sequential experiments. Core task behavior lives in `charge/tasks/task.py`; decorators and MCP conversion helpers are in `charge/_tags.py` and `charge/_to_mcp.py`.
 
-Backend integrations live in `charge/clients/`, including AutoGen, Agent Framework, OpenAI-compatible configuration, and the `AgentFactory`. Experiment orchestration and memory are in `charge/experiments/`. Examples are under `examples/`, and tests are split between `tests/unit_tests/` and `tests/integration_tests/`.
+Backend integrations live in `charge/clients/`, including AutoGen, Agent Framework, OpenAI-compatible configuration, and the common `Agent`/`AgentBackend` interfaces. Experiment orchestration and memory are in `charge/experiments/`. Examples are under `examples/`, and tests are split between `tests/unit_tests/` and `tests/integration_tests/`.
 
 ## Reuse-First Development
 
-Before adding code, inspect `ARCHITECTURE.md` and search for existing tasks, backend adapters, model configuration helpers, MCP workbench utilities, memory classes, and tests. Extend `Task`, `AgentBackend`, `AgentFactory`, or existing backend utilities when they fit; avoid parallel task or provider frameworks.
+Before adding code, inspect `ARCHITECTURE.md` and search for existing tasks, backend adapters, model configuration helpers, MCP workbench utilities, memory classes, and tests. Extend `Task`, `AgentBackend`, or existing backend utilities when they fit; avoid parallel task or provider frameworks.
 
 ## Local Skills
 

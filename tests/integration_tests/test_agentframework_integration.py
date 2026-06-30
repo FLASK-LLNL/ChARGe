@@ -16,20 +16,16 @@ class TestAgentFrameworkIntegration:
 
     @pytest.fixture(autouse=True)
     def setup_fixture(self):
-        """Set up test fixtures with tasks and agent factory."""
+        """Set up test fixtures with tasks and agent backend."""
         from charge.tasks.task import Task
         from charge.clients.agentframework import AgentFrameworkBackend
-        from charge.clients.agent_factory import AgentFactory
         from charge.experiments.experiment import Experiment
         from pydantic import BaseModel
 
-        # Create and register agent backend with OpenAI backend on a
-        # per-test factory instance (no shared global state).
+        # Create agent backend with OpenAI backend.
         self.agent_backend = AgentFrameworkBackend(
             model="gpt-4o-mini", backend="openai"
         )
-        self.agent_factory = AgentFactory()
-        self.agent_factory.register_backend("agentframework", self.agent_backend)
 
         # First task: Simple arithmetic
         first_task = Task(
@@ -58,7 +54,7 @@ class TestAgentFrameworkIntegration:
 
         # Create experiment with two tasks
         self.experiment = Experiment(
-            task=[first_task, second_task], agent_factory=self.agent_factory
+            task=[first_task, second_task], backend=self.agent_backend
         )
 
         # Third task: Use structured output from previous task
@@ -89,7 +85,7 @@ class TestAgentFrameworkIntegration:
             user_prompt="What is the capital of France? Answer in one word.",
         )
 
-        agent = self.agent_factory.create_agent(task=task, backend="agentframework")
+        agent = self.agent_backend.create_agent(task=task)
         result = await agent.run()
 
         print(f"Simple task result: {result}")
@@ -111,7 +107,7 @@ class TestAgentFrameworkIntegration:
             structured_output_schema=CityInfo,
         )
 
-        agent = self.agent_factory.create_agent(task=task, backend="agentframework")
+        agent = self.agent_backend.create_agent(task=task)
         result = await agent.run()
 
         print(f"Structured output result: {result}")
@@ -246,9 +242,7 @@ class TestAgentFrameworkIntegration:
             structured_output_schema=NumberSchema,
         )
 
-        agent = self.agent_factory.create_agent(
-            task=task, backend="agentframework", max_retries=3
-        )
+        agent = self.agent_backend.create_agent(task=task, max_retries=3)
         result = await agent.run()
 
         print(f"Retry test result: {result}")

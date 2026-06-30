@@ -3,8 +3,8 @@ from typing import Any, List, Union, Optional
 from charge.tasks.task import Task
 from charge.clients.agent_factory import (
     Agent,
+    AgentBackend,
     AgentCallbackType,
-    AgentFactory,
     AgentRuntimeConfig,
     create_agent_for_runtime_config,
     restore_agent_session,
@@ -28,7 +28,7 @@ class Experiment:
         task: Optional[Union[Task, List[Task]]],
         *args,
         memory: Optional[Memory] = None,
-        agent_factory: Optional[AgentFactory] = None,
+        backend: Optional[AgentBackend] = None,
         **kwargs,
     ):
         if task is None:
@@ -36,12 +36,21 @@ class Experiment:
         self.tasks = task if isinstance(task, list) else [task]
         self.finished_tasks = []
         self.memory = memory or ListMemory()
-        # Each experiment owns an AgentFactory instance so backends (and the
-        # per-user credentials they carry) are never shared across sessions.
-        self.agent_factory = agent_factory or AgentFactory()
+        # The agent backend (which carries per-user credentials) is supplied by
+        # the caller and is scoped to that caller's session, so configuration is
+        # never shared across sessions.
+        self.backend = backend
         self.agent_registry: dict[str, AgentRegistryEntry] = {}
         self.args = args
         self.kwargs = kwargs
+
+    def _require_backend(self) -> AgentBackend:
+        if self.backend is None:
+            raise RuntimeError(
+                "Experiment has no agent backend configured; pass backend= when "
+                "constructing the Experiment before creating agents."
+            )
+        return self.backend
 
     def create_agent_with_experiment_state(
         self,
@@ -62,6 +71,8 @@ class Experiment:
                 agent.callback = callback
             return agent
 
+        backend = self._require_backend()
+
         if agent_key:
             runtime_config = AgentRuntimeConfig()
             agent, runtime_config = create_agent_for_runtime_config(
@@ -69,7 +80,7 @@ class Experiment:
                 agent_key=agent_key,
                 memory=self.memory,
                 runtime_config=runtime_config,
-                factory=self.agent_factory,
+                backend=backend,
                 create_kwargs=kwargs,
                 callback=callback,
             )
@@ -79,7 +90,7 @@ class Experiment:
             )
             return agent
 
-        agent = self.agent_factory.create_agent(
+        agent = backend.create_agent(
             task=task,
             memory=self.memory,
             callback=callback,
@@ -117,7 +128,7 @@ class Experiment:
                 continue
             agent_key = str(raw_agent_key)
             agent, runtime_config = restore_agent_session(
-                agent_key, record, memory=self.memory, factory=self.agent_factory
+                agent_key, record, memory=self.memory, backend=self._require_backend()
             )
             self.agent_registry[agent_key] = AgentRegistryEntry(
                 agent=agent,

@@ -6,9 +6,7 @@ from charge.clients.agent_factory import (
     Agent,
     AgentBackend,
     AgentCallbackType,
-    AgentFactory,
     AgentInstructionSnapshot,
-    DEFAULT_BACKEND,
 )
 from charge.experiments.experiment import Experiment
 from charge.experiments.memory import Memory
@@ -66,23 +64,10 @@ class DummyBackend(AgentBackend):
         return DummyAgent(task=task, agent_key=agent_key, callback=callback, **kwargs)
 
 
-def _factory_with_dummy_backend() -> AgentFactory:
-    factory = AgentFactory()
-    factory.register_backend(DEFAULT_BACKEND, DummyBackend())
-    return factory
-
-
 def test_experiment_saves_and_rehydrates_raw_agent_sessions():
-    factory = _factory_with_dummy_backend()
-    experiment = Experiment(task=None, agent_factory=factory)
+    backend = DummyBackend()
+    experiment = Experiment(task=None, backend=backend)
     task = Task(system_prompt="System", user_prompt="Hello")
-
-    with pytest.raises(TypeError, match="does not accept backend"):
-        experiment.create_agent_with_experiment_state(
-            task,
-            agent_key="molecule:node_1",
-            backend="dummy_sessions",
-        )
 
     agent = experiment.create_agent_with_experiment_state(
         task,
@@ -115,7 +100,7 @@ def test_experiment_saves_and_rehydrates_raw_agent_sessions():
         state["agentSessions"]["molecule:node_1"]["modelInfo"]["model"] == "dummy-model"
     )
 
-    restored = Experiment(task=None, agent_factory=factory)
+    restored = Experiment(task=None, backend=backend)
     restored.load_state(state)
     restored_agent = restored.agent_registry["molecule:node_1"].agent
     assert isinstance(restored_agent, DummyAgent)
@@ -136,7 +121,7 @@ def test_experiment_saves_and_rehydrates_raw_agent_sessions():
 
 
 def test_experiment_load_state_rejects_backend_mismatch():
-    factory = _factory_with_dummy_backend()
+    backend = DummyBackend()
     state = {
         "items": [],
         "agentSessions": {
@@ -153,4 +138,4 @@ def test_experiment_load_state_rejects_backend_mismatch():
     }
 
     with pytest.raises(RuntimeError, match="mismatched backend"):
-        Experiment(task=None, agent_factory=factory).load_state(state)
+        Experiment(task=None, backend=backend).load_state(state)

@@ -11,7 +11,7 @@ Keep generic task, backend, MCP, and experiment behavior here. Domain-specific c
 - `charge/tasks/task.py`: base `Task` abstraction.
 - `charge/_tags.py`: `@hypothesis` and `@verifier` decorators.
 - `charge/_to_mcp.py`: conversion of decorated task methods into MCP server definitions.
-- `charge/clients/agent_factory.py`: common `Agent`, `AgentBackend`, and `AgentFactory` interfaces.
+- `charge/clients/agent_factory.py`: common `Agent` and `AgentBackend` interfaces, plus agent-session (de)serialization helpers.
 - `charge/clients/autogen.py`: AutoGen backend implementation.
 - `charge/clients/agentframework.py`: Microsoft Agent Framework backend implementation.
 - `charge/clients/openai_base.py`: shared backend/model/API-key configuration.
@@ -30,7 +30,7 @@ Structured output is represented by a Pydantic `BaseModel` subclass. `Task.check
 
 ## Agent Backend Model
 
-`AgentFactory` provides a registry of named backend instances. Backends implement `AgentBackend.create_agent(task=...)` and produce `Agent` instances with an async `run()` method.
+Backends implement `AgentBackend.create_agent(task=...)` and produce `Agent` instances with an async `run()` method. An `Experiment` is constructed with the `AgentBackend` it should use; callers that serve multiple users should give each session its own backend instance, since a backend carries that user's credentials (API key, base URL, model).
 
 [DEPRECATED] The AutoGen path builds model clients, MCP workbenches, and tool wrappers around AutoGen agent primitives. It supports a broader set of providers, including OpenAI-compatible endpoints and local-style backends such as Ollama, Hugging Face, and vLLM where implemented.
 
