@@ -2,7 +2,7 @@ from typing import Any, Optional
 
 import pytest
 
-from charge.clients.agent_factory import (
+from charge.clients.agent import (
     Agent,
     AgentBackend,
     AgentCallbackType,

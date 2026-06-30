@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, List, Union, Optional
 from charge.tasks.task import Task
-from charge.clients.agent_factory import (
+from charge.clients.agent import (
     Agent,
     AgentBackend,
     AgentCallbackType,

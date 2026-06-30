@@ -11,7 +11,7 @@ Keep generic task, backend, MCP, and experiment behavior here. Domain-specific c
 - `charge/tasks/task.py`: base `Task` abstraction.
 - `charge/_tags.py`: `@hypothesis` and `@verifier` decorators.
 - `charge/_to_mcp.py`: conversion of decorated task methods into MCP server definitions.
-- `charge/clients/agent_factory.py`: common `Agent` and `AgentBackend` interfaces, plus agent-session (de)serialization helpers.
+- `charge/clients/agent.py`: common `Agent` and `AgentBackend` interfaces, plus agent-session (de)serialization helpers.
 - `charge/clients/autogen.py`: AutoGen backend implementation.
 - `charge/clients/agentframework.py`: Microsoft Agent Framework backend implementation.
 - `charge/clients/openai_base.py`: shared backend/model/API-key configuration.
