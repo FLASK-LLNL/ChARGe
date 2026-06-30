@@ -35,9 +35,8 @@ import asyncio
 import re
 import os
 import warnings
-from charge.clients.agent_factory import (
+from charge.clients.agent import (
     AgentBackend,
-    AgentFactory,
     Agent,
     AgentCallbackType,
 )

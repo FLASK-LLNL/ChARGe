@@ -30,7 +30,7 @@ except ImportError:
         "Install with: pip install 'charge[agentframework]'"
     )
 
-from charge.clients.agent_factory import (
+from charge.clients.agent import (
     AgentBackend,
     Agent,
     AgentCallbackType,

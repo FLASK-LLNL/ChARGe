@@ -231,66 +231,23 @@ class AgentBackend:
         raise NotImplementedError
 
 
-class AgentFactory:
-    """
-    Base class for an Agent Factory that manages multiple Agents.
-    """
-
-    backends: dict[str, AgentBackend] = {}
-
-    @classmethod
-    def create_agent(
-        cls,
-        task: Optional[Task],
-        backend: str = DEFAULT_BACKEND,
-        agent_key: Optional[str] = None,
-        memory: Optional[Memory] = None,
-        callback: AgentCallbackType = None,
-        **kwargs,
-    ):
-        """
-        Abstract method to create and return an Agent instance.
-        """
-        backend_key = backend.lower()
-        if backend_key not in cls.backends:
-            raise TypeError(f"AgentFactory does not accept backend {backend!r}")
-        return cls.backends[backend_key].create_agent(
-            task, agent_key=agent_key, memory=memory, callback=callback, **kwargs
-        )
-
-    @classmethod
-    def list_all_backends(cls) -> list[str]:
-        """
-        Abstract method to get a list of all Agent backends in the factory.
-        """
-        return list(cls.backends.keys())
-
-    @classmethod
-    def default_backend(cls) -> AgentBackend:
-        return cls.backends[DEFAULT_BACKEND]
-
-    @classmethod
-    def register_backend(cls, name: str, backend: AgentBackend):
-        """
-        Registers an agent creation backend with the given name.
-        """
-        cls.backends[name.lower()] = backend
-
-
 @dataclass
 class AgentRuntimeConfig:
     backend: str = DEFAULT_BACKEND
     model: Optional[str] = None
 
     @classmethod
-    def from_agent(cls, *, agent: Agent) -> "AgentRuntimeConfig":
+    def from_agent(
+        cls, *, agent: Agent, backend: AgentBackend
+    ) -> "AgentRuntimeConfig":
         model_info = agent.get_model_info()
-        backend = model_info.get("backend") if isinstance(model_info, dict) else None
+        backend_name = (
+            model_info.get("backend") if isinstance(model_info, dict) else None
+        )
         model = model_info.get("model") if isinstance(model_info, dict) else None
-        backend_obj = AgentFactory.default_backend()
         return cls(
-            backend=str(backend or backend_obj.backend),
-            model=model or backend_obj.model,
+            backend=str(backend_name or backend.backend),
+            model=model or backend.model,
         )
 
     @classmethod
@@ -324,17 +281,18 @@ def create_agent_for_runtime_config(
     agent_key: str,
     memory: Optional[Memory],
     runtime_config: AgentRuntimeConfig,
+    backend: AgentBackend,
     create_kwargs: Optional[dict[str, Any]] = None,
     callback: AgentCallbackType = None,
 ) -> tuple[Agent, AgentRuntimeConfig]:
-    agent = AgentFactory.create_agent(
+    agent = backend.create_agent(
         task=task,
         memory=memory,
         agent_key=agent_key,
         callback=callback,
         **(create_kwargs or {}),
     )
-    return agent, AgentRuntimeConfig.from_agent(agent=agent)
+    return agent, AgentRuntimeConfig.from_agent(agent=agent, backend=backend)
 
 
 def verify_restored_agent_config(
@@ -390,6 +348,7 @@ def restore_agent_session(
     record: dict[str, Any],
     *,
     memory: Optional[Memory],
+    backend: AgentBackend,
 ) -> tuple[Agent, AgentRuntimeConfig]:
     task = None
     task_json = record.get("task")
@@ -410,6 +369,7 @@ def restore_agent_session(
         agent_key=agent_key,
         memory=memory,
         runtime_config=saved_config,
+        backend=backend,
     )
     verify_restored_agent_config(agent_key, saved_config, current_config)
 
