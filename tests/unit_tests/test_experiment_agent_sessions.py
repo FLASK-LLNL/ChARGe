@@ -66,81 +66,77 @@ class DummyBackend(AgentBackend):
         return DummyAgent(task=task, agent_key=agent_key, callback=callback, **kwargs)
 
 
+def _factory_with_dummy_backend() -> AgentFactory:
+    factory = AgentFactory()
+    factory.register_backend(DEFAULT_BACKEND, DummyBackend())
+    return factory
+
+
 def test_experiment_saves_and_rehydrates_raw_agent_sessions():
-    original_default_backend = AgentFactory.backends.get(DEFAULT_BACKEND)
-    AgentFactory.register_backend(DEFAULT_BACKEND, DummyBackend())
-    experiment = Experiment(task=None)
+    factory = _factory_with_dummy_backend()
+    experiment = Experiment(task=None, agent_factory=factory)
     task = Task(system_prompt="System", user_prompt="Hello")
 
-    try:
-        with pytest.raises(TypeError, match="does not accept backend"):
-            experiment.create_agent_with_experiment_state(
-                task,
-                agent_key="molecule:node_1",
-                backend="dummy_sessions",
-            )
-
-        agent = experiment.create_agent_with_experiment_state(
+    with pytest.raises(TypeError, match="does not accept backend"):
+        experiment.create_agent_with_experiment_state(
             task,
             agent_key="molecule:node_1",
-        )
-        assert isinstance(agent, DummyAgent)
-        assert agent.agent_key == "molecule:node_1"
-        agent.saved_memory = '{"state":{"in_memory":{"messages":[{"role":"user"}]}}}'
-        agent.instruction_history = [
-            AgentInstructionSnapshot(message_count=1, instructions="System")
-        ]
-
-        state = experiment.save_state()
-
-        assert state["agentSessions"]["molecule:node_1"]["memory"] == agent.saved_memory
-        assert (
-            state["agentSessions"]["molecule:node_1"]["task"]["system_prompt"]
-            == "System"
-        )
-        assert state["agentSessions"]["molecule:node_1"]["instructionHistory"] == [
-            {"messageCount": 1, "instructions": "System"}
-        ]
-        assert "metadata" not in state["agentSessions"]["molecule:node_1"]
-        assert "messageMetadata" not in state["agentSessions"]["molecule:node_1"]
-        assert "agentKey" not in state["agentSessions"]["molecule:node_1"]
-        runtime_config = state["agentSessions"]["molecule:node_1"]["runtimeConfig"]
-        assert "agentName" not in runtime_config
-        assert runtime_config["backend"] == "dummy"
-        assert set(runtime_config) == {"backend", "model"}
-        assert (
-            state["agentSessions"]["molecule:node_1"]["modelInfo"]["model"]
-            == "dummy-model"
+            backend="dummy_sessions",
         )
 
-        restored = Experiment(task=None)
-        restored.load_state(state)
-        restored_agent = restored.agent_registry["molecule:node_1"].agent
-        assert isinstance(restored_agent, DummyAgent)
-        assert restored_agent.loaded_memory == agent.saved_memory
-        assert restored_agent.instruction_history == [
-            AgentInstructionSnapshot(message_count=1, instructions="System")
-        ]
+    agent = experiment.create_agent_with_experiment_state(
+        task,
+        agent_key="molecule:node_1",
+    )
+    assert isinstance(agent, DummyAgent)
+    assert agent.agent_key == "molecule:node_1"
+    agent.saved_memory = '{"state":{"in_memory":{"messages":[{"role":"user"}]}}}'
+    agent.instruction_history = [
+        AgentInstructionSnapshot(message_count=1, instructions="System")
+    ]
 
-        restored_agent = restored.create_agent_with_experiment_state(
-            Task(system_prompt="System", user_prompt="Continue"),
-            agent_key="molecule:node_1",
-        )
+    state = experiment.save_state()
 
-        assert isinstance(restored_agent, DummyAgent)
-        assert restored_agent.loaded_memory == agent.saved_memory
-        restored_state = restored.save_state()
-        assert "metadata" not in restored_state["agentSessions"]["molecule:node_1"]
-    finally:
-        if original_default_backend is None:
-            AgentFactory.backends.pop(DEFAULT_BACKEND, None)
-        else:
-            AgentFactory.register_backend(DEFAULT_BACKEND, original_default_backend)
+    assert state["agentSessions"]["molecule:node_1"]["memory"] == agent.saved_memory
+    assert (
+        state["agentSessions"]["molecule:node_1"]["task"]["system_prompt"] == "System"
+    )
+    assert state["agentSessions"]["molecule:node_1"]["instructionHistory"] == [
+        {"messageCount": 1, "instructions": "System"}
+    ]
+    assert "metadata" not in state["agentSessions"]["molecule:node_1"]
+    assert "messageMetadata" not in state["agentSessions"]["molecule:node_1"]
+    assert "agentKey" not in state["agentSessions"]["molecule:node_1"]
+    runtime_config = state["agentSessions"]["molecule:node_1"]["runtimeConfig"]
+    assert "agentName" not in runtime_config
+    assert runtime_config["backend"] == "dummy"
+    assert set(runtime_config) == {"backend", "model"}
+    assert (
+        state["agentSessions"]["molecule:node_1"]["modelInfo"]["model"] == "dummy-model"
+    )
+
+    restored = Experiment(task=None, agent_factory=factory)
+    restored.load_state(state)
+    restored_agent = restored.agent_registry["molecule:node_1"].agent
+    assert isinstance(restored_agent, DummyAgent)
+    assert restored_agent.loaded_memory == agent.saved_memory
+    assert restored_agent.instruction_history == [
+        AgentInstructionSnapshot(message_count=1, instructions="System")
+    ]
+
+    restored_agent = restored.create_agent_with_experiment_state(
+        Task(system_prompt="System", user_prompt="Continue"),
+        agent_key="molecule:node_1",
+    )
+
+    assert isinstance(restored_agent, DummyAgent)
+    assert restored_agent.loaded_memory == agent.saved_memory
+    restored_state = restored.save_state()
+    assert "metadata" not in restored_state["agentSessions"]["molecule:node_1"]
 
 
 def test_experiment_load_state_rejects_backend_mismatch():
-    original_default_backend = AgentFactory.backends.get(DEFAULT_BACKEND)
-    AgentFactory.register_backend(DEFAULT_BACKEND, DummyBackend())
+    factory = _factory_with_dummy_backend()
     state = {
         "items": [],
         "agentSessions": {
@@ -156,11 +152,5 @@ def test_experiment_load_state_rejects_backend_mismatch():
         },
     }
 
-    try:
-        with pytest.raises(RuntimeError, match="mismatched backend"):
-            Experiment(task=None).load_state(state)
-    finally:
-        if original_default_backend is None:
-            AgentFactory.backends.pop(DEFAULT_BACKEND, None)
-        else:
-            AgentFactory.register_backend(DEFAULT_BACKEND, original_default_backend)
+    with pytest.raises(RuntimeError, match="mismatched backend"):
+        Experiment(task=None, agent_factory=factory).load_state(state)

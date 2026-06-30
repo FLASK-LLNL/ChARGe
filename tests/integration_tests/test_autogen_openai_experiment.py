@@ -10,12 +10,16 @@ class TestOpenAISimpleTask:
     def setup_fixture(self):
         from charge.tasks.task import Task
         from charge.clients.autogen import AutoGenBackend
-        from charge.clients.agent_factory import AgentFactory
+        from charge.clients.agent_factory import AgentFactory, DEFAULT_BACKEND
         from charge.experiments.experiment import Experiment
         from pydantic import BaseModel
 
+        # Register the AutoGen backend on a per-test factory under the default
+        # backend key so the experiment's default agent-creation path uses it
+        # (no reliance on globally-leaked registrations from other tests).
         self.agent_backend = AutoGenBackend(model="gpt-5-nano")
-        AgentFactory.register_backend("autogen", self.agent_backend)
+        self.agent_factory = AgentFactory()
+        self.agent_factory.register_backend(DEFAULT_BACKEND, self.agent_backend)
 
         first_task = Task(
             system_prompt="You are a helpful assistant, that is capable of"
@@ -39,7 +43,9 @@ class TestOpenAISimpleTask:
             structured_output_schema=MathExplanationSchema,
         )
 
-        self.experiment = Experiment(task=[first_task, second_task])
+        self.experiment = Experiment(
+            task=[first_task, second_task], agent_factory=self.agent_factory
+        )
 
         third_task = Task(
             system_prompt="You are a helpful assistant that can parse JSON from text"

@@ -233,14 +233,19 @@ class AgentBackend:
 
 class AgentFactory:
     """
-    Base class for an Agent Factory that manages multiple Agents.
+    An Agent Factory that manages multiple Agents.
+
+    Each instance owns its own ``backends`` registry. This is deliberately not a
+    singleton: backends hold per-user credentials (API keys, base URLs, models),
+    so a shared registry would leak one user's configuration into another's
+    session. Construct one ``AgentFactory`` per user session.
     """
 
-    backends: dict[str, AgentBackend] = {}
+    def __init__(self) -> None:
+        self.backends: dict[str, AgentBackend] = {}
 
-    @classmethod
     def create_agent(
-        cls,
+        self,
         task: Optional[Task],
         backend: str = DEFAULT_BACKEND,
         agent_key: Optional[str] = None,
@@ -249,32 +254,29 @@ class AgentFactory:
         **kwargs,
     ):
         """
-        Abstract method to create and return an Agent instance.
+        Create and return an Agent instance from a registered backend.
         """
         backend_key = backend.lower()
-        if backend_key not in cls.backends:
+        if backend_key not in self.backends:
             raise TypeError(f"AgentFactory does not accept backend {backend!r}")
-        return cls.backends[backend_key].create_agent(
+        return self.backends[backend_key].create_agent(
             task, agent_key=agent_key, memory=memory, callback=callback, **kwargs
         )
 
-    @classmethod
-    def list_all_backends(cls) -> list[str]:
+    def list_all_backends(self) -> list[str]:
         """
-        Abstract method to get a list of all Agent backends in the factory.
+        Get a list of all Agent backends in the factory.
         """
-        return list(cls.backends.keys())
+        return list(self.backends.keys())
 
-    @classmethod
-    def default_backend(cls) -> AgentBackend:
-        return cls.backends[DEFAULT_BACKEND]
+    def default_backend(self) -> AgentBackend:
+        return self.backends[DEFAULT_BACKEND]
 
-    @classmethod
-    def register_backend(cls, name: str, backend: AgentBackend):
+    def register_backend(self, name: str, backend: AgentBackend):
         """
         Registers an agent creation backend with the given name.
         """
-        cls.backends[name.lower()] = backend
+        self.backends[name.lower()] = backend
 
 
 @dataclass
@@ -283,11 +285,13 @@ class AgentRuntimeConfig:
     model: Optional[str] = None
 
     @classmethod
-    def from_agent(cls, *, agent: Agent) -> "AgentRuntimeConfig":
+    def from_agent(
+        cls, *, agent: Agent, factory: "AgentFactory"
+    ) -> "AgentRuntimeConfig":
         model_info = agent.get_model_info()
         backend = model_info.get("backend") if isinstance(model_info, dict) else None
         model = model_info.get("model") if isinstance(model_info, dict) else None
-        backend_obj = AgentFactory.default_backend()
+        backend_obj = factory.default_backend()
         return cls(
             backend=str(backend or backend_obj.backend),
             model=model or backend_obj.model,
@@ -324,17 +328,18 @@ def create_agent_for_runtime_config(
     agent_key: str,
     memory: Optional[Memory],
     runtime_config: AgentRuntimeConfig,
+    factory: AgentFactory,
     create_kwargs: Optional[dict[str, Any]] = None,
     callback: AgentCallbackType = None,
 ) -> tuple[Agent, AgentRuntimeConfig]:
-    agent = AgentFactory.create_agent(
+    agent = factory.create_agent(
         task=task,
         memory=memory,
         agent_key=agent_key,
         callback=callback,
         **(create_kwargs or {}),
     )
-    return agent, AgentRuntimeConfig.from_agent(agent=agent)
+    return agent, AgentRuntimeConfig.from_agent(agent=agent, factory=factory)
 
 
 def verify_restored_agent_config(
@@ -390,6 +395,7 @@ def restore_agent_session(
     record: dict[str, Any],
     *,
     memory: Optional[Memory],
+    factory: AgentFactory,
 ) -> tuple[Agent, AgentRuntimeConfig]:
     task = None
     task_json = record.get("task")
@@ -410,6 +416,7 @@ def restore_agent_session(
         agent_key=agent_key,
         memory=memory,
         runtime_config=saved_config,
+        factory=factory,
     )
     verify_restored_agent_config(agent_key, saved_config, current_config)
 

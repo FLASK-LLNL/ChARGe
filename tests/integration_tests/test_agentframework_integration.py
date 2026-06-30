@@ -23,11 +23,13 @@ class TestAgentFrameworkIntegration:
         from charge.experiments.experiment import Experiment
         from pydantic import BaseModel
 
-        # Create and register agent backend with OpenAI backend
+        # Create and register agent backend with OpenAI backend on a
+        # per-test factory instance (no shared global state).
         self.agent_backend = AgentFrameworkBackend(
             model="gpt-4o-mini", backend="openai"
         )
-        AgentFactory.register_backend("agentframework", self.agent_backend)
+        self.agent_factory = AgentFactory()
+        self.agent_factory.register_backend("agentframework", self.agent_backend)
 
         # First task: Simple arithmetic
         first_task = Task(
@@ -55,7 +57,9 @@ class TestAgentFrameworkIntegration:
         )
 
         # Create experiment with two tasks
-        self.experiment = Experiment(task=[first_task, second_task])
+        self.experiment = Experiment(
+            task=[first_task, second_task], agent_factory=self.agent_factory
+        )
 
         # Third task: Use structured output from previous task
         third_task = Task(
@@ -79,14 +83,13 @@ class TestAgentFrameworkIntegration:
     async def test_simple_task_execution(self):
         """Test basic task execution with Agent Framework."""
         from charge.tasks.task import Task
-        from charge.clients.agent_factory import AgentFactory
 
         task = Task(
             system_prompt="You are a helpful assistant.",
             user_prompt="What is the capital of France? Answer in one word.",
         )
 
-        agent = AgentFactory.create_agent(task=task, backend="agentframework")
+        agent = self.agent_factory.create_agent(task=task, backend="agentframework")
         result = await agent.run()
 
         print(f"Simple task result: {result}")
@@ -96,7 +99,6 @@ class TestAgentFrameworkIntegration:
     async def test_structured_output(self):
         """Test structured output validation with Pydantic schemas."""
         from charge.tasks.task import Task
-        from charge.clients.agent_factory import AgentFactory
         from pydantic import BaseModel
 
         class CityInfo(BaseModel):
@@ -109,7 +111,7 @@ class TestAgentFrameworkIntegration:
             structured_output_schema=CityInfo,
         )
 
-        agent = AgentFactory.create_agent(task=task, backend="agentframework")
+        agent = self.agent_factory.create_agent(task=task, backend="agentframework")
         result = await agent.run()
 
         print(f"Structured output result: {result}")
@@ -232,7 +234,6 @@ class TestAgentFrameworkIntegration:
     async def test_agent_retry_logic(self):
         """Test that agent retry logic works correctly."""
         from charge.tasks.task import Task
-        from charge.clients.agent_factory import AgentFactory
         from pydantic import BaseModel
 
         class NumberSchema(BaseModel):
@@ -245,7 +246,7 @@ class TestAgentFrameworkIntegration:
             structured_output_schema=NumberSchema,
         )
 
-        agent = AgentFactory.create_agent(
+        agent = self.agent_factory.create_agent(
             task=task, backend="agentframework", max_retries=3
         )
         result = await agent.run()
