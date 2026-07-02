@@ -102,6 +102,20 @@ class Task(ABC):
 
         self.constructor_args = {}
 
+    async def run(self, agent, *args, **kwargs):
+        """Run this Task on the given Agent.
+
+        Default behavior: assign ``self`` to ``agent.task`` and dispatch to
+        ``agent.run``. Agents read prompts and schemas off their ``.task``
+        attribute (see the Agent ABC), so this hands the Task to the Agent
+        rather than passing prompts as kwargs.
+
+        Subclasses with non-trivial control flow (e.g. ``RSATask`` running an
+        N-K-T loop) override this method.
+        """
+        agent.task = self
+        return await agent.run(*args, **kwargs)
+
     def get_system_prompt(self) -> str:
         return self.system_prompt or ""
 
