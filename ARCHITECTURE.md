@@ -12,10 +12,9 @@ Keep generic task, backend, MCP, and experiment behavior here. Domain-specific c
 - `charge/_tags.py`: `@hypothesis` and `@verifier` decorators.
 - `charge/_to_mcp.py`: conversion of decorated task methods into MCP server definitions.
 - `charge/clients/agent.py`: common `Agent` and `AgentBackend` interfaces, plus agent-session (de)serialization helpers.
-- `charge/clients/autogen.py`: AutoGen backend implementation.
 - `charge/clients/agentframework.py`: Microsoft Agent Framework backend implementation.
 - `charge/clients/openai_base.py`: shared backend/model/API-key configuration.
-- `charge/clients/autogen_utils.py` and `agentframework_utils.py`: backend-specific tool and MCP setup.
+- `charge/clients/agentframework_utils.py`: backend-specific tool and MCP setup.
 - `charge/experiments/experiment.py`: sequential task runner.
 - `charge/experiments/memory.py`: memory serialization and replay abstractions.
 - `charge/utils/mcp_workbench_utils.py`: direct MCP session setup, tool listing, and tool calls.
@@ -32,9 +31,7 @@ Structured output is represented by a Pydantic `BaseModel` subclass. `Task.check
 
 Backends implement `AgentBackend.create_agent(task=...)` and produce `Agent` instances with an async `run()` method. An `Experiment` is constructed with the `AgentBackend` it should use; callers that serve multiple users should give each session its own backend instance, since a backend carries that user's credentials (API key, base URL, model).
 
-[DEPRECATED] The AutoGen path builds model clients, MCP workbenches, and tool wrappers around AutoGen agent primitives. It supports a broader set of providers, including OpenAI-compatible endpoints and local-style backends such as Ollama, Hugging Face, and vLLM where implemented.
-
-The Agent Framework path builds Microsoft Agent Framework clients and tool adapters. It is primarily for OpenAI-compatible endpoints. When changing shared model configuration, verify both backend implementations because they translate settings differently.
+The Agent Framework path builds Microsoft Agent Framework clients and tool adapters. It targets OpenAI-compatible endpoints, including hosted providers (OpenAI, Gemini) and local OpenAI-compatible servers such as vLLM and Ollama (configured via `base_url`). Local in-process HuggingFace transformers loading is no longer supported; run such models behind an OpenAI-compatible server instead.
 
 `openai_base.py` is the provider configuration authority. Add or change backend names, base URLs, default models, and capability flags there before adapting backend-specific clients.
 
@@ -42,7 +39,7 @@ The Agent Framework path builds Microsoft Agent Framework clients and tool adapt
 
 External tools enter through `Task.server_urls` or `Task.server_files`. `mcp_workbench_utils.py` opens HTTP/SSE or STDIO sessions, lists tools, and calls selected MCP tools directly when needed.
 
-Task-local Python tools enter through decorated methods or registered built-in callables. Backend implementations wrap those callables into the tool format expected by AutoGen or Agent Framework.
+Task-local Python tools enter through decorated methods or registered built-in callables. Backend implementations wrap those callables into the tool format expected by Agent Framework.
 
 Per-server allowlists should be applied before exposing tools to the model. When debugging missing or extra tools, inspect task construction, MCP session setup, backend utility adapters, and the final agent creation call.
 
@@ -50,7 +47,7 @@ Per-server allowlists should be applied before exposing tools to the model. When
 
 `Experiment` runs one or more tasks sequentially. Each task gets a new agent instance while shared state is carried through a `Memory` implementation, usually `ListMemory`. Save/load behavior serializes memory so parent applications can persist context across sessions.
 
-Changing experiment behavior requires testing task ordering, memory serialization, and backend-specific memory replay in both AutoGen and Agent Framework paths.
+Changing experiment behavior requires testing task ordering, memory serialization, and backend-specific memory replay in the Agent Framework path.
 
 ## Debugging Guide
 

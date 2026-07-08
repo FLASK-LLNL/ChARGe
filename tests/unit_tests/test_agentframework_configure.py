@@ -123,17 +123,17 @@ def test_custom_base_url(agentframework_module):
     assert model_kwargs.get("base_url") == custom_url
 
 
-def test_ollama_not_supported(agentframework_module):
-    """Test that Ollama backend shows warning."""
+def test_ollama_configuration(agentframework_module):
+    """Ollama is configured as a local OpenAI-compatible backend."""
     from charge.clients.agentframework import model_configure
 
     backend = "ollama"
 
-    # Should not raise error but will log warning
     model, backend_out, api_key, model_kwargs = model_configure(backend=backend)
 
     assert backend_out == "ollama"
     assert model == "gpt-oss:latest"
+    assert model_kwargs.get("base_url")  # local endpoint resolved
 
 
 def test_create_openai_chat_client(agentframework_module):
@@ -150,15 +150,19 @@ def test_create_openai_chat_client(agentframework_module):
     assert isinstance(client, OpenAIChatClient)
 
 
-def test_create_client_unsupported_backend(agentframework_module):
-    """Test that creating client with unsupported backend raises error."""
+def test_create_client_local_openai_compatible_backend(agentframework_module):
+    """Ollama/vLLM are OpenAI-compatible and build a standard chat client."""
     from charge.clients.agentframework import create_agentframework_client
+    from agent_framework.openai import OpenAIChatClient
 
-    backend = "ollama"
-    model = "llama2"
-
-    with pytest.raises(NotImplementedError, match="Ollama support"):
-        create_agentframework_client(backend=backend, model=model)
+    for backend in ("ollama", "vllm"):
+        client = create_agentframework_client(
+            backend=backend,
+            model="gpt-oss",
+            api_key="EMPTY",
+            model_kwargs={"base_url": "http://localhost:8000/v1"},
+        )
+        assert isinstance(client, OpenAIChatClient)
 
 
 def test_agentframework_pool_initialization(agentframework_module):
