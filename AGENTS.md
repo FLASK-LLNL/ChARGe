@@ -4,7 +4,7 @@
 
 ChARGe provides the `charge` Python package used by FLASK Copilot for LLM-backed tasks, tool augmentation, backend clients, and sequential experiments. Core task behavior lives in `charge/tasks/task.py`; decorators and MCP conversion helpers are in `charge/_tags.py` and `charge/_to_mcp.py`.
 
-Backend integrations live in `charge/clients/`, including AutoGen, Agent Framework, OpenAI-compatible configuration, and the common `Agent`/`AgentBackend` interfaces. Experiment orchestration and memory are in `charge/experiments/`. Examples are under `examples/`, and tests are split between `tests/unit_tests/` and `tests/integration_tests/`.
+Backend integrations live in `charge/clients/`, including the Agent Framework backend, OpenAI-compatible configuration, and the common `Agent`/`AgentBackend` interfaces. Experiment orchestration and memory are in `charge/experiments/`. Examples are under `examples/`, and tests are split between `tests/unit_tests/` and `tests/integration_tests/`.
 
 ## Reuse-First Development
 
@@ -39,4 +39,4 @@ Use concise, scoped commit subjects, for example `fix(agentframework): preserve 
 
 ## Security & Configuration Tips
 
-Do not commit provider credentials, tokens, local endpoint files, virtualenvs, caches, or generated logs. Keep model/provider configuration explicit and avoid changing default backend behavior without tests for both AutoGen and Agent Framework paths.
+Do not commit provider credentials, tokens, local endpoint files, virtualenvs, caches, or generated logs. Keep model/provider configuration explicit and avoid changing default backend behavior without tests for the Agent Framework path.

@@ -8,9 +8,9 @@ import os
 class TestOpenAISimpleTask:
     @pytest.fixture(autouse=True)
     def setup_fixture(self):
-        from charge.clients.autogen import AutoGenBackend
+        from charge.clients.agentframework import AgentFrameworkBackend
 
-        self.agent_backend = AutoGenBackend(model="gpt-5", backend="openai")
+        self.agent_backend = AgentFrameworkBackend(model="gpt-5", backend="openai")
 
     @pytest.mark.asyncio
     async def test_openai_simple_task(self):

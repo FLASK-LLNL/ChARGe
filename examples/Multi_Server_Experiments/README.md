@@ -1,6 +1,6 @@
 ## Multi-server Support in Charge
 
-This directory contains an example of a multi-server application using the ChARGe framework and the AutoGen library. The application allows users to interact with a language model that can utilize multiple molecular tools hosted on different servers with different transports (SSE and STDIO).
+This directory contains an example of a multi-server application using the ChARGe framework and the Agent Framework backend. The application allows users to interact with a language model that can utilize multiple molecular tools hosted on different servers with different transports (SSE and STDIO).
 
 ## SSE and STDIO Servers
 To run the multi-server application, you need to start SSE server on a different process:

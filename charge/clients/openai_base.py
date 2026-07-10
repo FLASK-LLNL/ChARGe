@@ -5,10 +5,10 @@
 ## SPDX-License-Identifier: Apache-2.0
 ################################################################################
 """
-Common OpenAI API functionality shared between AutoGen and Agent Framework clients.
+Common OpenAI API functionality shared by the Agent Framework clients.
 
 This module provides an abstraction layer for OpenAI API configuration, client creation,
-and common utilities that can be used by both AutoGen and Agent Framework implementations.
+and common utilities used by the Agent Framework implementation.
 """
 
 import os
@@ -99,7 +99,6 @@ def get_default_model_for_backend(backend: str) -> str:
         "llamame": "openai/gpt-oss-120b",
         "alcf": "openai/gpt-oss-120b",
         "ollama": "gpt-oss:latest",
-        "huggingface": "gpt-oss",
         "vllm": "gpt-oss",
     }
 
@@ -166,37 +165,49 @@ def configure_openai_backend(
 def configure_special_backends(
     backend: str,
     model: Optional[str] = None,
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
 ) -> Tuple[str, str, Optional[str], Dict[str, Any]]:
     """
-    Configure special backends (ollama, huggingface, vllm).
+    Configure special OpenAI-compatible local backends (ollama, vllm).
 
-    These backends have different configuration requirements and may not
-    need API keys.
+    These backends expose an OpenAI-compatible endpoint and do not require a
+    real API key. A custom endpoint may be supplied via the base_url parameter
+    or a backend-specific environment variable; otherwise a local default is used.
 
     Args:
-        backend: The backend to use (ollama, huggingface, vllm)
+        backend: The backend to use (ollama, vllm)
         model: Optional model name (uses default if not provided)
+        api_key: Optional API key (local backends accept a placeholder)
+        base_url: Optional base URL for the OpenAI-compatible endpoint
 
     Returns:
         Tuple of (model, backend, api_key, kwargs)
     """
     kwargs: Dict[str, Any] = {}
-    api_key = None
+    # Local OpenAI-compatible servers don't require a real key; use a placeholder.
+    api_key = api_key or "EMPTY"
 
-    if backend == "ollama":
-        model = model or "gpt-oss:latest"
-        logger.info("Ollama backend configured")
+    default_base_urls = {
+        "ollama": "http://localhost:11434/v1",
+        "vllm": "http://localhost:8000/v1",
+    }
+    env_var_map = {
+        "ollama": "OLLAMA_BASE_URL",
+        "vllm": "VLLM_URL",
+    }
 
-    elif backend == "huggingface":
-        model = model or "gpt-oss"
-        logger.info("HuggingFace backend configured")
-
-    elif backend == "vllm":
-        model = model or "gpt-oss"
-        # vLLM-specific configuration
-        reasoning_effort = os.getenv("OSS_REASONING", "medium")
-        kwargs["reasoning_effort"] = reasoning_effort
-        logger.info(f"vLLM backend configured with reasoning_effort={reasoning_effort}")
+    if backend in default_base_urls:
+        resolved_base_url = (
+            base_url
+            or os.getenv(env_var_map[backend])
+            or default_base_urls[backend]
+        )
+        kwargs["base_url"] = resolved_base_url
+        model = model or get_default_model_for_backend(backend)
+        logger.info(
+            f"{backend} backend configured with base_url={resolved_base_url}"
+        )
 
     return model, backend, api_key, kwargs
 
@@ -252,7 +263,7 @@ def model_configure(
     if openai_compatible:
         return configure_openai_backend(backend, model, api_key, base_url)
     else:
-        return configure_special_backends(backend, model)
+        return configure_special_backends(backend, model, api_key, base_url)
 
 
 # Backend capability matrix

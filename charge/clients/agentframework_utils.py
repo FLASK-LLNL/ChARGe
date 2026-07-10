@@ -46,10 +46,10 @@ def _normalize_server_url(url: str) -> str:
 
 class MCPWorkbenchAdapter:
     """
-    Adapter to convert AutoGen MCP workbenches to Agent Framework MCP tools.
+    Adapter to expose MCP workbench tools as Agent Framework MCP tools.
 
     Agent Framework uses MCPStdioTool, MCPStreamableHTTPTool, and MCPWebsocketTool
-    for MCP integration, which differs from AutoGen's McpWorkbench approach.
+    for MCP integration.
     """
 
     def __init__(

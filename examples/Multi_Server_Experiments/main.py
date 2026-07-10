@@ -4,7 +4,7 @@ from typing import Optional, Union
 import charge
 from charge.tasks.task import Task
 from charge.clients.client import Client
-from charge.clients.autogen import AutoGenBackend
+from charge.clients.agentframework import AgentFrameworkBackend
 
 parser = argparse.ArgumentParser()
 
@@ -84,7 +84,7 @@ if __name__ == "__main__":
         server_paths=[server_path_1, server_path_2],
     )
 
-    agent_backend = AutoGenBackend(model=args.model, backend=args.backend)
+    agent_backend = AgentFrameworkBackend(model=args.model, backend=args.backend)
 
     runner = agent_backend.create_agent(task=mytask)
 

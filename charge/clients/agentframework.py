@@ -138,20 +138,14 @@ def create_agentframework_client(
     if model_kwargs is None:
         model_kwargs = {}
 
-    if backend == "ollama":
-        raise NotImplementedError(
-            "Ollama support is planned but not yet available in Agent Framework. "
-            "Use AutoGen implementation for Ollama support."
-        )
-    elif backend == "huggingface":
-        raise NotImplementedError(
-            "HuggingFace support requires custom implementation with Agent Framework. "
-            "Use AutoGen implementation for HuggingFace support."
-        )
-    elif backend == "vllm":
-        raise NotImplementedError(
-            "vLLM support requires custom implementation with Agent Framework. "
-            "Use AutoGen implementation for vLLM support."
+    if backend in ("ollama", "vllm"):
+        # Local OpenAI-compatible servers (Ollama /v1, vLLM). model_kwargs carries
+        # the resolved base_url from openai_base.configure_special_backends; the
+        # api_key is a placeholder since these endpoints don't authenticate.
+        client = OpenAIChatClient(
+            model=model,
+            api_key=api_key or "EMPTY",
+            **model_kwargs if model_kwargs is not None else {},
         )
     else:
         # OpenAI or OpenAI-compatible endpoints only

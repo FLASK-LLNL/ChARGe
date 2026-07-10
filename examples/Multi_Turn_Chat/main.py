@@ -3,7 +3,7 @@ import asyncio
 from charge.tasks.task import Task
 from typing import Optional, Union
 from charge.clients.client import Client
-from charge.clients.autogen import AutoGenBackend
+from charge.clients.agentframework import AgentFrameworkBackend
 
 parser = argparse.ArgumentParser()
 
@@ -40,10 +40,26 @@ if __name__ == "__main__":
         server_urls=server_url,
     )
 
-    agent_backend = AutoGenBackend(model=args.model, backend=args.backend)
+    agent_backend = AgentFrameworkBackend(model=args.model, backend=args.backend)
 
     agent = agent_backend.create_agent(task=mytask)
 
-    agent_state = asyncio.run(agent.chat())
+    async def chat_loop() -> None:
+        # Agent Framework agents keep conversation state in a session that is
+        # created on first run() and reused on subsequent calls, so repeatedly
+        # calling run() with fresh user input yields a multi-turn conversation.
+        print("Multi-turn chat. Type 'exit' or 'quit' (or Ctrl-D) to stop.")
+        while True:
+            try:
+                user_input = input("You: ").strip()
+            except EOFError:
+                break
+            if user_input.lower() in {"exit", "quit"}:
+                break
+            if not user_input:
+                continue
+            agent.task.user_prompt = user_input
+            response = await agent.run()
+            print(f"Assistant: {response}")
 
-    print(f"Task completed. Results: {agent_state}")
+    asyncio.run(chat_loop())

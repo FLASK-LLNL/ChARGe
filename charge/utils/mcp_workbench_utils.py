@@ -4,17 +4,6 @@
 ##
 ## SPDX-License-Identifier: Apache-2.0
 ################################################################################
-try:
-
-    from autogen_ext.tools.mcp import (
-        StdioServerParams,
-        McpWorkbench,
-        StreamableHttpServerParams,
-    )
-except ImportError:
-    raise ImportError(
-        "Please install the autogen-agentchat package to use this module."
-    )
 import asyncio
 import os
 from loguru import logger
@@ -38,7 +27,7 @@ class ToolResult:
     """
     Wrapper for MCP tool results to maintain backward compatibility.
 
-    The AutoGen McpWorkbench returned objects with a .content attribute.
+    MCP workbench tool calls returned objects with a .content attribute.
     This wrapper provides the same interface for the native MCP client.
     """
 
@@ -191,84 +180,6 @@ async def _get_stdio_mcp_session(path: str):
             yield session
 
 
-def create_servers(
-    paths: List[str],
-    urls: List[str],
-    bearer_token: Optional[str] = None,
-    timeout: Optional[int] = 1800,
-) -> List[Any]:
-    """
-    DEPRECATED: Creates AutoGen MCP server parameters from the task's server paths.
-
-    This function creates server params for AutoGen's McpWorkbench which is deprecated.
-    Only kept for backwards compatibility with autogen.py client.
-
-    Returns:
-        List[Any]: List of AutoGen MCP server parameters (StdioServerParams, StreamableHttpServerParams).
-    """
-    mcp_servers = []
-    for path in paths:
-        mcp_servers.append(
-            StdioServerParams(
-                command="python3",
-                args=[path],
-                read_timeout_seconds=timeout,
-            )
-        )
-    headers = _create_streaming_bearer_token_header(bearer_token)
-
-    for url in urls:
-        mcp_servers.append(
-            StreamableHttpServerParams(
-                url=url,
-                headers=headers,
-                timeout=timeout,
-                sse_read_timeout=timeout,
-            )
-        )
-    return mcp_servers
-
-
-# BVE FIXME so that it is not autogen specific
-async def _setup_mcp_workbenches(
-    paths: List[str], urls: List[str], bearer_token: Optional[str] = None
-) -> List[McpWorkbench]:
-    """
-    DEPRECATED: Sets up AutoGen MCP workbenches from the task's server paths.
-
-    This function uses AutoGen's McpWorkbench which is deprecated.
-    Use the direct MCP client functions instead (call_mcp_tool_directly, list_mcp_tools_direct).
-
-    Only kept for backwards compatibility with autogen.py client.
-
-    Returns:
-        List of McpWorkbench instances
-    """
-    mcps = create_servers(paths, urls, bearer_token)
-
-    if len(mcps) == 0:
-        return []
-    workbenches = [McpWorkbench(server) for server in mcps]
-
-    await asyncio.gather(*[workbench.start() for workbench in workbenches])
-    return workbenches
-
-
-async def _close_mcp_workbenches(workbenches: List[McpWorkbench]) -> None:
-    """
-    DEPRECATED: Closes AutoGen MCP workbenches.
-
-    This function is deprecated along with _setup_mcp_workbenches.
-    Only kept for backwards compatibility with autogen.py client.
-
-    Returns:
-        None
-    """
-    if not workbenches:
-        return
-    await asyncio.gather(*[workbench.stop() for workbench in workbenches])
-
-
 async def _list_tools_on_session(session: ClientSession, server_id: str) -> list[dict]:
     """
     Helper to list all tools from an established MCP session.
@@ -393,7 +304,7 @@ async def call_mcp_tool_directly(
         ToolResult object with .content attribute containing the result text (single result),
         list of ToolResult objects (multiple results), or None (no results)
 
-        The ToolResult wrapper maintains backward compatibility with AutoGen's McpWorkbench interface.
+        The ToolResult wrapper preserves the .content attribute expected by callers.
 
     Raises:
         ValueError: If tool is not found in any server
