@@ -37,9 +37,9 @@ ollama = ["ollama>=0.5.0"]
 gemini = ["google-genai >=1.19.0"]
 agentframework = [
     # Can't use basic `agent-framework` install since hyperlight breaks install on HPCs
-    "agent-framework-core>=1.1.1",
-    "agent-framework-openai>=1.1.1",
-    "agent-framework-orchestrations==1.0.0",
+    "agent-framework-core==1.1.1",
+    "agent-framework-openai==1.1.1",
+    "agent-framework-orchestrations",
     # The rest of the agent-framework packages are in pre-release
     "agent-framework-a2a",
     "agent-framework-ag-ui",
