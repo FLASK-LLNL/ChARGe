@@ -39,14 +39,6 @@ agentframework = [
     # Can't use basic `agent-framework` install since hyperlight breaks install on HPCs
     "agent-framework-core==1.1.1",
     "agent-framework-openai==1.1.1",
-    "agent-framework-orchestrations",
-    # The rest of the agent-framework packages are in pre-release
-    "agent-framework-a2a",
-    "agent-framework-ag-ui",
-    "agent-framework-anthropic",
-    "agent-framework-bedrock",
-    "agent-framework-claude",
-    "agent-framework-ollama",
     "openai>=2.0.0",
     "tiktoken>=0.10.0",
     # Pin opentelemetry to a known good version
