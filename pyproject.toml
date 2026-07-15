@@ -35,8 +35,16 @@ include = ["charge*"]
 [project.optional-dependencies]
 ollama = ["ollama>=0.5.0"]
 gemini = ["google-genai >=1.19.0"]
-# Pin opentelemetry to a known good version
-agentframework = ["agent-framework==1.1.1", "agent-framework-openai==1.1.1", "openai>=2.0.0", "tiktoken>=0.10.0", "opentelemetry-semantic-conventions-ai==0.4.13"]
+agentframework = [
+    # Can't use basic `agent-framework` install since hyperlight breaks install on HPCs
+    "agent-framework-core==1.1.1",
+    "agent-framework-openai==1.1.1",
+    "openai>=2.0.0",
+    "tiktoken>=0.10.0",
+    # Pin opentelemetry to a known good version
+    "opentelemetry-semantic-conventions-ai==0.4.13"
+]
+
 test = ["pytest", "pytest-asyncio", "pytest-mock", "responses", "httpx", "requests-mock"]
 
 # Define a set of optional packages for use when deploying persistent data services
