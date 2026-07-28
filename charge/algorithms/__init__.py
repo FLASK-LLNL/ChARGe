@@ -1,8 +1,12 @@
-from charge._tags import verifier, hypothesis
-from charge._utils import enable_cmd_history_and_shell_integration
+"""ChARGe algorithms.
 
-# Make algorithms available at top level
-from charge.algorithms import (
+Currently provides:
+
+- RSA (Recursive Self-Aggregation): an N-K-T proposal-and-aggregation loop,
+  exposed as a :class:`Task` subclass for direct use with any ChARGe runner.
+"""
+
+from charge.algorithms.rsa import (
     RSATask,
     GenericRSAOutput,
     default_format_candidates,
@@ -11,9 +15,6 @@ from charge.algorithms import (
 )
 
 __all__ = [
-    "verifier",
-    "hypothesis",
-    "enable_cmd_history_and_shell_integration",
     "RSATask",
     "GenericRSAOutput",
     "default_format_candidates",
