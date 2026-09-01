@@ -1,4 +1,4 @@
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 from loguru import logger
 
 from charge.servers.server_utils import add_server_arguments

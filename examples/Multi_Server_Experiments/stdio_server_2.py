@@ -1,4 +1,4 @@
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 from loguru import logger
 
 mcp = FastMCP("Chem Server that canonicalizes SMILES strings")
