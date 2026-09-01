@@ -12,7 +12,7 @@ license = {file = "LICENSE"}
 readme = "README.md"
 requires-python = ">=3.11, <3.13"
 dependencies = [
-    "mcp>=1.10.0",
+    "fastmcp>=3.0.0",
     "jsonschema>=4.17.3",
     "loguru>=0.7.0",
     "pydantic>=2.10.7",

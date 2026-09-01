@@ -9,7 +9,7 @@ def task_to_mcp(class_info, methods_list) -> str:
     Convert an Task class to an MCP server definition string.
     """
     return_str = ""
-    return_str += "from mcp.server.fastmcp import FastMCP\n"
+    return_str += "from fastmcp import FastMCP\n"
     return_str += f"from {class_info['file']} import {class_info['name']}\n\n"
 
     return_str += 'mcp = FastMCP("Hypothesis MCP Server")\n\n'
